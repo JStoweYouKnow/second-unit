@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Heart, Star, Calendar, TrendingUp, Users, DollarSign, FileText, ArrowUpRight, BarChart3, PieChart, Activity } from '../components/icons'
 import { artists, bookings, contracts, payments } from '../data/mockData'
 import { useApp } from '../context/AppContext'
+import { bookingSubtotal, formatArtistRate } from '../lib/pricing'
+import PricingModeToggle from '../components/PricingModeToggle'
 
 // Simple bar chart component (pure CSS)
 function BarChart({ data, height = 160 }) {
@@ -76,7 +78,7 @@ function Sparkline({ data, color = 'var(--accent)', height = 40 }) {
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { favorites } = useApp()
+  const { favorites, pricingMode } = useApp()
   const favArtists = artists.filter(a => favorites.includes(a.id))
   const [timeRange, setTimeRange] = useState('6m')
 
@@ -212,11 +214,14 @@ export default function Dashboard() {
       </div>
 
       {/* Favorites */}
-      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 16 }}>Your Favorites</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, margin: 0 }}>Your Favorites</h2>
+        <PricingModeToggle compact />
+      </div>
       {favArtists.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
           <Heart size={32} style={{ marginBottom: 8, opacity: 0.5 }} />
-          <p>No favorites yet. Browse the leaderboard to add artists.</p>
+          <p>No favorites yet. Browse Artist Spotlight to add artists.</p>
           <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => navigate('/')}>Browse Artists</button>
         </div>
       ) : (
@@ -237,7 +242,7 @@ export default function Dashboard() {
                 {a.skills.slice(0, 3).map(s => <span key={s} className="skill-tag">{s}</span>)}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, alignItems: 'center' }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>${a.hourlyRate}/hr</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>{formatArtistRate(pricingMode, a)}</span>
                 <span style={{
                   padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
                   background: a.available ? 'rgba(0,212,170,0.1)' : 'rgba(255,77,106,0.1)',
@@ -264,7 +269,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <span style={{ fontSize: 14, fontWeight: 600 }}>${b.rate * b.duration}</span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>${bookingSubtotal(b).toLocaleString()}</span>
               <span style={{
                 padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
                 background: b.status === 'confirmed' ? 'rgba(0,212,170,0.1)' : 'rgba(245,197,66,0.1)',

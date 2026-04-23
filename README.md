@@ -4,7 +4,7 @@ The world's leading marketplace for professional AI artists and creators. Hire t
 
 ## 🚀 Key Features
 
-- **Artist Leaderboard** — Filter by skills, ratings, and roles.
+- **Artist Spotlight** — Filter by skills, ratings, and roles.
 - **Stripe Payments** — Secure payment processing with platform fee tracking.
 - **E-Signatures** — Legally binding digital contracts with custom/standard terms.
 - **Real-time Messaging** — Instant chat with typing indicators and notifications.

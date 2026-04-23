@@ -4,11 +4,13 @@ import { artists } from '../data/mockData'
 import { useApp } from '../context/AppContext'
 import { useState } from 'react'
 import CalendarModal from '../components/CalendarModal'
+import PricingModeToggle from '../components/PricingModeToggle'
+import { formatArtistRate } from '../lib/pricing'
 
 export default function ArtistProfile() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { favorites, toggleFavorite, startConversation } = useApp()
+  const { favorites, toggleFavorite, startConversation, pricingMode } = useApp()
   const [showCalendar, setShowCalendar] = useState(false)
   const [activeTab, setActiveTab] = useState('portfolio')
   const artist = artists.find(a => a.id === parseInt(id))
@@ -44,7 +46,10 @@ export default function ArtistProfile() {
               <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-secondary)', fontSize: 14 }}>
                 <MapPin size={14} /> {artist.location}
               </span>
-              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--accent)' }}>${artist.hourlyRate}/hr</span>
+              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--accent)' }}>{formatArtistRate(pricingMode, artist)}</span>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <PricingModeToggle compact />
             </div>
             <div className="profile-socials">
               <a href={artist.socials.twitter} className="social-btn" title="Twitter"><AtSign size={16} /></a>
@@ -167,8 +172,12 @@ export default function ArtistProfile() {
                 <span style={{ fontWeight: 600, color: 'var(--gold)' }}>{artist.rating} ★</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Hourly Rate</span>
-                <span style={{ fontWeight: 600, color: 'var(--accent)' }}>${artist.hourlyRate}</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Rates</span>
+                <span style={{ fontWeight: 600, color: 'var(--accent)', textAlign: 'right', fontSize: 13, maxWidth: '58%' }}>
+                  <span style={{ display: 'block' }}>{formatArtistRate('hourly', artist)}</span>
+                  <span style={{ display: 'block', color: 'var(--text-muted)', fontWeight: 500 }}>{formatArtistRate('daily', artist)}</span>
+                  <span style={{ display: 'block', color: 'var(--text-muted)', fontWeight: 500 }}>{formatArtistRate('flat', artist)}</span>
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Member Since</span>

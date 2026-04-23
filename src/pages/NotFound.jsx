@@ -16,10 +16,10 @@ export default function NotFound() {
       </div>
       <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 40, marginBottom: 16 }}>404 — Lost in Space?</h1>
       <p style={{ color: 'var(--text-secondary)', marginBottom: 32, maxWidth: 400 }}>
-        The page you're looking for doesn't exist or has been moved. Let's get you back to the leaderboard.
+        The page you're looking for doesn't exist or has been moved. Let's get you back to Artist Spotlight.
       </p>
       <button className="btn btn-primary btn-lg" onClick={() => navigate('/')}>
-        <ArrowLeft size={18} /> Back to Leaderboard
+        <ArrowLeft size={18} /> Back to Artist Spotlight
       </button>
     </div>
   )

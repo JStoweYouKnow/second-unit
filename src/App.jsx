@@ -41,6 +41,7 @@ function AppShell() {
   const { user, profile, signOut, isMockMode } = useAuth()
   const { favorites, toggleFavorite } = useFavorites(user?.id)
   const [allMessages, setAllMessages] = useState(mockMessages)
+  const [pricingMode, setPricingMode] = useState('hourly')
 
   const sendMessage = useCallback((conversationId, text, senderOverride) => {
     setAllMessages(prev => prev.map(m => {
@@ -69,7 +70,7 @@ function AppShell() {
   const unreadCount = allMessages.filter(m => m.unread).length
 
   const navItems = [
-    { path: '/', icon: Trophy, label: 'Leaderboard' },
+    { path: '/', icon: Trophy, label: 'Artist Spotlight' },
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
     { path: '/bookings', icon: Calendar, label: 'Bookings' },
@@ -77,7 +78,15 @@ function AppShell() {
     { path: '/payments', icon: CreditCard, label: 'Payments' },
   ]
 
-  const ctx = { favorites, toggleFavorite, allMessages, sendMessage, startConversation }
+  const ctx = {
+    favorites,
+    toggleFavorite,
+    allMessages,
+    sendMessage,
+    startConversation,
+    pricingMode,
+    setPricingMode,
+  }
 
   const handleSignOut = async () => {
     await signOut()

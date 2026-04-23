@@ -36,12 +36,18 @@ export function AuthProvider({ children }) {
       return
     }
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      if (session?.user) fetchProfile(session.user.id)
-      setLoading(false)
-    })
+    // Get initial session (always clear loading — otherwise ProtectedRoute hangs forever on reject)
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setUser(session?.user ?? null)
+        if (session?.user) fetchProfile(session.user.id)
+      })
+      .catch((err) => {
+        console.error('Supabase getSession failed', err)
+        setUser(null)
+      })
+      .finally(() => setLoading(false))
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -59,12 +65,17 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function fetchProfile(userId) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-    setProfile(data)
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+      setProfile(data)
+    } catch (err) {
+      console.error('fetchProfile failed', err)
+      setProfile(null)
+    }
   }
 
   async function signUp({ email, password, fullName, role = 'employer' }) {
@@ -81,6 +92,11 @@ export function AuthProvider({ children }) {
         data: { full_name: fullName, role },
       },
     })
+    if (error?.message?.toLowerCase().includes('database error')) {
+      console.warn(
+        '[auth] Profile insert likely failed in Postgres. Run supabase/fix-database-error-new-user.sql in the Supabase SQL Editor, then check Logs → Postgres for the exact error.'
+      )
+    }
     return { data, error }
   }
 
@@ -107,13 +123,27 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
   }
 
+  function getAuthRedirectUrl() {
+    const base = (import.meta.env.VITE_SITE_URL || window.location.origin).replace(/\/$/, '')
+    return `${base}/`
+  }
+
+  /**
+   * @param {'google' | 'github' | 'linkedin_oidc'} provider Supabase Auth provider id
+   */
   async function signInWithOAuth(provider) {
     if (!isSupabaseConfigured) {
       setUser(MOCK_USER)
       setProfile(MOCK_PROFILE)
-      return
+      return { error: null }
     }
-    await supabase.auth.signInWithOAuth({ provider })
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: getAuthRedirectUrl(),
+      },
+    })
+    return { data, error }
   }
 
   const value = {
@@ -121,6 +151,7 @@ export function AuthProvider({ children }) {
     profile,
     loading,
     isAuthenticated: !!user,
+    isAdmin: profile?.role === 'admin',
     isMockMode: !isSupabaseConfigured,
     signUp,
     signIn,

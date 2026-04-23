@@ -1,6 +1,17 @@
 import { createContext, useContext } from 'react'
 
-export const AppContext = createContext()
+/** Safe fallback if a consumer renders outside `AppContext.Provider` (e.g. HMR edge cases). */
+const defaultAppContext = {
+  favorites: [],
+  toggleFavorite: () => {},
+  allMessages: [],
+  sendMessage: () => {},
+  startConversation: () => undefined,
+  pricingMode: 'hourly',
+  setPricingMode: () => {},
+}
+
+export const AppContext = createContext(defaultAppContext)
 
 export function useApp() {
   return useContext(AppContext)

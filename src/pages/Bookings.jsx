@@ -2,13 +2,37 @@ import { useState } from 'react'
 import { Calendar, Clock, Plus, CheckCircle, AlertCircle, X, Send, CreditCard, Loader2, Shield } from '../components/icons'
 import { bookings as mockBookings, artists } from '../data/mockData'
 import { bookings as bookingsApi } from '../lib/api'
+import { useApp } from '../context/AppContext'
+import PricingModeToggle from '../components/PricingModeToggle'
+import {
+  bookingSubtotal,
+  estimateBookingTotal,
+  formatArtistRate,
+  normalizeArtistPricing,
+} from '../lib/pricing'
+
+function bookingRateCaption(b) {
+  const model = b.pricingModel || 'hourly'
+  if (model === 'flat') return 'Flat project fee'
+  if (model === 'daily') return `$${b.rate}/day × ${b.duration}d`
+  return `$${b.rate}/hr × ${b.duration}h`
+}
 
 export default function Bookings() {
+  const { pricingMode } = useApp()
   const [tab, setTab] = useState('upcoming')
   const [localBookings, setLocalBookings] = useState(mockBookings)
   const [showNew, setShowNew] = useState(false)
   const [showPay, setShowPay] = useState(null)
-  const [newBooking, setNewBooking] = useState({ artistId: '', date: '', time: '', duration: 1, type: 'Consultation', notes: '' })
+  const [newBooking, setNewBooking] = useState({
+    artistId: '',
+    date: '',
+    time: '',
+    duration: 1,
+    durationDays: 1,
+    type: 'Consultation',
+    notes: '',
+  })
   const [loading, setLoading] = useState(null) // ID of booking being processed
   const [error, setError] = useState(null)
 
@@ -22,15 +46,30 @@ export default function Bookings() {
     const artist = artists.find(a => a.id === parseInt(newBooking.artistId))
     if (!artist) return
 
+    const p = normalizeArtistPricing(artist)
+    let rate
+    let duration
+    if (pricingMode === 'hourly') {
+      rate = p.hourlyRate
+      duration = parseFloat(newBooking.duration)
+    } else if (pricingMode === 'daily') {
+      rate = p.dailyRate
+      duration = parseFloat(newBooking.durationDays)
+    } else {
+      rate = p.projectFlatRate
+      duration = 1
+    }
+
     const booking = {
       id: `bk_${Date.now()}`,
       artistId: artist.id,
       artistName: artist.name,
       date: newBooking.date,
       time: newBooking.time,
-      duration: parseFloat(newBooking.duration),
+      duration,
       type: newBooking.type,
-      rate: artist.hourlyRate,
+      rate,
+      pricingModel: pricingMode,
       status: 'pending',
       notes: newBooking.notes,
     }
@@ -40,7 +79,7 @@ export default function Bookings() {
       await bookingsApi.create({ ...booking, employerId: 'current-user' })
       setLocalBookings(prev => [booking, ...prev])
       setShowNew(false)
-      setNewBooking({ artistId: '', date: '', time: '', duration: 1, type: 'Consultation', notes: '' })
+      setNewBooking({ artistId: '', date: '', time: '', duration: 1, durationDays: 1, type: 'Consultation', notes: '' })
     } catch (err) {
       setError('Failed to create booking. Please try again.')
       console.error(err)
@@ -113,6 +152,9 @@ export default function Bookings() {
           <div>
             <h1>Bookings</h1>
             <p>Manage your sessions and appointments</p>
+            <div style={{ marginTop: 12 }}>
+              <PricingModeToggle />
+            </div>
           </div>
           <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New Booking</button>
         </div>
@@ -140,7 +182,8 @@ export default function Bookings() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {filtered.map(b => {
             const s = statusConfig[b.status] || statusConfig.pending
-            const total = b.rate * b.duration
+            const total = bookingSubtotal(b)
+            const model = b.pricingModel || 'hourly'
             const isProcessing = loading === b.id
             return (
               <div key={b.id} className="card slide-up" style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 16, opacity: isProcessing ? 0.7 : 1 }}>
@@ -157,7 +200,9 @@ export default function Bookings() {
                       <Calendar size={14} /> {b.date}
                     </span>
                     <span style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Clock size={14} /> {b.time} · {b.duration}h
+                      <Clock size={14} /> {b.time}
+                      {model !== 'flat' && <> · {b.duration}{model === 'daily' ? 'd' : 'h'}</>}
+                      {model === 'flat' && <> · flat project</>}
                     </span>
                     <span className="skill-tag">{b.type}</span>
                   </div>
@@ -166,7 +211,7 @@ export default function Bookings() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ textAlign: 'right', marginRight: 8 }}>
                     <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700 }}>${total}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>${b.rate}/hr × {b.duration}h</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{bookingRateCaption(b)}</div>
                   </div>
 
                   <div style={{ minWidth: 140, display: 'flex', justifyContent: 'flex-end' }}>
@@ -214,7 +259,7 @@ export default function Bookings() {
                 <select className="form-input" value={newBooking.artistId} onChange={e => setNewBooking(p => ({ ...p, artistId: e.target.value }))} required>
                   <option value="">Select an artist...</option>
                   {artists.filter(a => a.available).map(a => (
-                    <option key={a.id} value={a.id}>{a.name} — {a.role} (${a.hourlyRate}/hr)</option>
+                    <option key={a.id} value={a.id}>{a.name} — {a.role} ({formatArtistRate(pricingMode, a)})</option>
                   ))}
                 </select>
               </div>
@@ -229,13 +274,39 @@ export default function Bookings() {
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div className="form-group">
-                  <label className="form-label">Duration (hours)</label>
-                  <select className="form-input" value={newBooking.duration} onChange={e => setNewBooking(p => ({ ...p, duration: e.target.value }))}>
-                    {[0.5, 1, 2, 3, 4, 6, 8].map(d => <option key={d} value={d}>{d}h</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
+                {pricingMode === 'hourly' && (
+                  <div className="form-group">
+                    <label className="form-label">Duration (hours)</label>
+                    <select className="form-input" value={newBooking.duration} onChange={e => setNewBooking(p => ({ ...p, duration: e.target.value }))}>
+                      {[0.5, 1, 2, 3, 4, 6, 8].map((d) => (
+                        <option key={d} value={d}>
+                          {d}h
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {pricingMode === 'daily' && (
+                  <div className="form-group">
+                    <label className="form-label">Duration (days)</label>
+                    <select className="form-input" value={newBooking.durationDays} onChange={e => setNewBooking(p => ({ ...p, durationDays: e.target.value }))}>
+                      {[1, 2, 3, 4, 5, 6, 7, 10, 14].map((d) => (
+                        <option key={d} value={d}>
+                          {d} {d === 1 ? 'day' : 'days'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {pricingMode === 'flat' && (
+                  <div className="form-group">
+                    <label className="form-label">Project scope</label>
+                    <div className="form-input" style={{ color: 'var(--text-secondary)', cursor: 'default' }}>
+                      Flat fee covers the agreed deliverables (no hourly multiplier).
+                    </div>
+                  </div>
+                )}
+                <div className="form-group" style={{ gridColumn: pricingMode === 'flat' ? '1 / -1' : 'auto' }}>
                   <label className="form-label">Type</label>
                   <select className="form-input" value={newBooking.type} onChange={e => setNewBooking(p => ({ ...p, type: e.target.value }))}>
                     {['Consultation', 'Project Work', 'Full Day Session', 'Workshop', 'Review Session'].map(t => (
@@ -252,9 +323,16 @@ export default function Bookings() {
 
               {newBooking.artistId && (
                 <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Estimated Total</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Estimated total ({pricingMode})</span>
                   <span style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700 }}>
-                    ${(artists.find(a => a.id === parseInt(newBooking.artistId))?.hourlyRate || 0) * parseFloat(newBooking.duration)}
+                    $
+                    {estimateBookingTotal(
+                      pricingMode,
+                      artists.find((a) => a.id === parseInt(newBooking.artistId, 10)),
+                      pricingMode === 'daily'
+                        ? Number(newBooking.durationDays)
+                        : Number(newBooking.duration)
+                    ).toLocaleString()}
                   </span>
                 </div>
               )}
@@ -282,24 +360,30 @@ export default function Bookings() {
 
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 700, marginBottom: 4 }}>
-                ${showPay.rate * showPay.duration}
+                ${bookingSubtotal(showPay).toLocaleString()}
               </div>
               <div style={{ color: 'var(--text-muted)' }}>{showPay.type} with {showPay.artistName}</div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{showPay.date} at {showPay.time} · {showPay.duration}h</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
+                {showPay.date} at {showPay.time}
+                {(showPay.pricingModel || 'hourly') !== 'flat' && (
+                  <> · {showPay.duration}{(showPay.pricingModel || 'hourly') === 'daily' ? 'd' : 'h'}</>
+                )}
+                {(showPay.pricingModel || 'hourly') === 'flat' && <> · flat project</>}
+              </div>
             </div>
 
             <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Session ({showPay.duration}h × ${showPay.rate})</span>
-                <span>${showPay.rate * showPay.duration}</span>
+                <span style={{ color: 'var(--text-muted)' }}>{bookingRateCaption(showPay)}</span>
+                <span>${bookingSubtotal(showPay).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={{ color: 'var(--text-muted)' }}>Platform fee (10%)</span>
-                <span>${Math.round(showPay.rate * showPay.duration * 0.1)}</span>
+                <span>${Math.round(bookingSubtotal(showPay) * 0.1).toLocaleString()}</span>
               </div>
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
                 <span>Total</span>
-                <span>${showPay.rate * showPay.duration + Math.round(showPay.rate * showPay.duration * 0.1)}</span>
+                <span>${(bookingSubtotal(showPay) + Math.round(bookingSubtotal(showPay) * 0.1)).toLocaleString()}</span>
               </div>
             </div>
 
@@ -320,7 +404,7 @@ export default function Bookings() {
 
             <button className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }} onClick={handlePaymentSubmit} disabled={loading === showPay.id}>
               {loading === showPay.id ? <Loader2 size={18} className="animate-spin" /> : <CreditCard size={18} />}
-              Pay ${showPay.rate * showPay.duration + Math.round(showPay.rate * showPay.duration * 0.1)} via Stripe
+              Pay ${(bookingSubtotal(showPay) + Math.round(bookingSubtotal(showPay) * 0.1)).toLocaleString()} via Stripe
             </button>
             <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
               <Shield size={12} style={{ marginRight: 4 }} /> Secured by Stripe. Your payment information is encrypted.

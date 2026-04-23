@@ -52,7 +52,8 @@ const BookingSchema = z.object({
   duration: z.number().positive(),
   type: z.string(),
   rate: z.number().positive(),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  pricingModel: z.enum(['hourly', 'daily', 'flat']).optional(),
 })
 
 const MessageSchema = z.object({
@@ -149,13 +150,16 @@ function addNotification(userId, { type, title, body, link, avatar }) {
 app.post('/api/bookings', async (req, res) => {
   try {
     const validatedData = BookingSchema.parse(req.body)
-    const { artistId, artistName, employerId, date, time, duration, type, rate, notes } = validatedData
-    
+    const { artistId, artistName, employerId, date, time, duration, type, rate, notes, pricingModel } =
+      validatedData
+    const model = pricingModel || 'hourly'
+    const totalAmount = model === 'flat' ? rate : rate * duration
+
     const booking = {
       id: `bk_${Date.now()}`,
       ...validatedData,
       status: 'pending',
-      totalAmount: rate * duration,
+      totalAmount,
       createdAt: new Date().toISOString(),
     }
 
@@ -227,6 +231,15 @@ app.get('/api/health', (req, res) => {
     mode: stripe ? 'live' : 'mock',
     connections: onlineUsers.size,
   })
+})
+
+httpServer.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\nPort ${PORT} is already in use (another API server?). Stop it or set API_PORT, e.g.:\n  API_PORT=3002 npm run dev:server\n`)
+  } else {
+    console.error(err)
+  }
+  process.exit(1)
 })
 
 httpServer.listen(PORT, () => {

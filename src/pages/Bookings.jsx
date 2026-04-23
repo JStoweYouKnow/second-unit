@@ -1,0 +1,333 @@
+import { useState } from 'react'
+import { Calendar, Clock, DollarSign, Plus, CheckCircle, AlertCircle, X, Send, CreditCard, ArrowRight, Loader2 } from 'lucide-react'
+import { bookings as mockBookings, artists } from '../data/mockData'
+import { bookings as bookingsApi } from '../lib/api'
+
+export default function Bookings() {
+  const [tab, setTab] = useState('upcoming')
+  const [localBookings, setLocalBookings] = useState(mockBookings)
+  const [showNew, setShowNew] = useState(false)
+  const [showPay, setShowPay] = useState(null)
+  const [newBooking, setNewBooking] = useState({ artistId: '', date: '', time: '', duration: 1, type: 'Consultation', notes: '' })
+  const [loading, setLoading] = useState(null) // ID of booking being processed
+  const [error, setError] = useState(null)
+
+  const filtered = tab === 'upcoming'
+    ? localBookings.filter(b => b.status === 'confirmed' || b.status === 'pending')
+    : localBookings
+
+  const handleCreateBooking = async (e) => {
+    e.preventDefault()
+    setError(null)
+    const artist = artists.find(a => a.id === parseInt(newBooking.artistId))
+    if (!artist) return
+
+    const booking = {
+      id: `bk_${Date.now()}`,
+      artistId: artist.id,
+      artistName: artist.name,
+      date: newBooking.date,
+      time: newBooking.time,
+      duration: parseFloat(newBooking.duration),
+      type: newBooking.type,
+      rate: artist.hourlyRate,
+      status: 'pending',
+      notes: newBooking.notes,
+    }
+
+    setLoading('new')
+    try {
+      await bookingsApi.create({ ...booking, employerId: 'current-user' })
+      setLocalBookings(prev => [booking, ...prev])
+      setShowNew(false)
+      setNewBooking({ artistId: '', date: '', time: '', duration: 1, type: 'Consultation', notes: '' })
+    } catch (err) {
+      setError('Failed to create booking. Please try again.')
+      console.error(err)
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const handleConfirm = async (id) => {
+    setError(null)
+    setLoading(id)
+    try {
+      await bookingsApi.respond(id, 'confirm')
+      setLocalBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'confirmed' } : b))
+    } catch (err) {
+      setError('Failed to confirm booking.')
+      console.error(err)
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const handleDecline = async (id) => {
+    setError(null)
+    setLoading(id)
+    try {
+      await bookingsApi.respond(id, 'decline')
+      setLocalBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' } : b))
+    } catch (err) {
+      setError('Failed to decline booking.')
+      console.error(err)
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const handlePay = (booking) => {
+    setShowPay(booking)
+  }
+
+  const handlePaymentSubmit = async () => {
+    if (!showPay) return
+    setError(null)
+    setLoading(showPay.id)
+    try {
+      // Simulate payment processing
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      setLocalBookings(prev => prev.map(b => b.id === showPay.id ? { ...b, status: 'paid' } : b))
+      setShowPay(null)
+    } catch (err) {
+      setError('Payment failed. Please check your card details.')
+      console.error(err)
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const statusConfig = {
+    pending: { bg: 'rgba(245,197,66,0.1)', color: 'var(--warning)', icon: <AlertCircle size={14} />, label: 'Pending' },
+    confirmed: { bg: 'rgba(0,212,170,0.1)', color: 'var(--success)', icon: <CheckCircle size={14} />, label: 'Confirmed' },
+    paid: { bg: 'rgba(124,92,252,0.1)', color: 'var(--accent)', icon: <CreditCard size={14} />, label: 'Paid' },
+    cancelled: { bg: 'rgba(255,77,106,0.1)', color: 'var(--danger)', icon: <X size={14} />, label: 'Cancelled' },
+    completed: { bg: 'rgba(0,212,170,0.1)', color: 'var(--success)', icon: <CheckCircle size={14} />, label: 'Completed' },
+  }
+
+  return (
+    <div className="page-container">
+      <div className="page-header">
+        <div className="page-header-row">
+          <div>
+            <h1>📅 Bookings</h1>
+            <p>Manage your sessions and appointments</p>
+          </div>
+          <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New Booking</button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="alert alert-danger" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <AlertCircle size={18} />
+          <div style={{ flex: 1 }}>{error}</div>
+          <button className="btn-icon" onClick={() => setError(null)}><X size={14} /></button>
+        </div>
+      )}
+
+      <div className="tabs">
+        <button className={`tab ${tab === 'upcoming' ? 'active' : ''}`} onClick={() => setTab('upcoming')}>Upcoming</button>
+        <button className={`tab ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>All Bookings</button>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
+          <Calendar size={32} style={{ marginBottom: 8, opacity: 0.5 }} />
+          <p>No bookings yet.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {filtered.map(b => {
+            const s = statusConfig[b.status] || statusConfig.pending
+            const total = b.rate * b.duration
+            const isProcessing = loading === b.id
+            return (
+              <div key={b.id} className="card slide-up" style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 16, opacity: isProcessing ? 0.7 : 1 }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <div className="avatar avatar-sm">{b.artistName.split(' ').map(n => n[0]).join('')}</div>
+                    <h3 style={{ fontSize: 16 }}>{b.artistName}</h3>
+                    <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: s.bg, color: s.color, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {s.icon} {s.label}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: b.notes ? 8 : 0 }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Calendar size={14} /> {b.date}
+                    </span>
+                    <span style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Clock size={14} /> {b.time} · {b.duration}h
+                    </span>
+                    <span className="skill-tag">{b.type}</span>
+                  </div>
+                  {b.notes && <p style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>"{b.notes}"</p>}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ textAlign: 'right', marginRight: 8 }}>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700 }}>${total}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>${b.rate}/hr × {b.duration}h</div>
+                  </div>
+
+                  <div style={{ minWidth: 140, display: 'flex', justifyContent: 'flex-end' }}>
+                    {isProcessing ? (
+                      <Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent)' }} />
+                    ) : (
+                      <>
+                        {b.status === 'pending' && (
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="btn btn-success btn-sm" onClick={() => handleConfirm(b.id)}>
+                              <CheckCircle size={14} /> Confirm
+                            </button>
+                            <button className="btn btn-secondary btn-sm" onClick={() => handleDecline(b.id)}>
+                              Decline
+                            </button>
+                          </div>
+                        )}
+
+                        {b.status === 'confirmed' && (
+                          <button className="btn btn-primary btn-sm" onClick={() => handlePay(b)}>
+                            <CreditCard size={14} /> Pay Now
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* New Booking Modal */}
+      {showNew && (
+        <div className="modal-overlay" onClick={() => setShowNew(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>📅 Create New Booking</h2>
+              <button className="btn-icon" onClick={() => setShowNew(false)}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleCreateBooking}>
+              <div className="form-group">
+                <label className="form-label">Artist</label>
+                <select className="form-input" value={newBooking.artistId} onChange={e => setNewBooking(p => ({ ...p, artistId: e.target.value }))} required>
+                  <option value="">Select an artist...</option>
+                  {artists.filter(a => a.available).map(a => (
+                    <option key={a.id} value={a.id}>{a.name} — {a.role} (${a.hourlyRate}/hr)</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="form-group">
+                  <label className="form-label">Date</label>
+                  <input className="form-input" type="date" value={newBooking.date} onChange={e => setNewBooking(p => ({ ...p, date: e.target.value }))} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Time</label>
+                  <input className="form-input" type="time" value={newBooking.time} onChange={e => setNewBooking(p => ({ ...p, time: e.target.value }))} required />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="form-group">
+                  <label className="form-label">Duration (hours)</label>
+                  <select className="form-input" value={newBooking.duration} onChange={e => setNewBooking(p => ({ ...p, duration: e.target.value }))}>
+                    {[0.5, 1, 2, 3, 4, 6, 8].map(d => <option key={d} value={d}>{d}h</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Type</label>
+                  <select className="form-input" value={newBooking.type} onChange={e => setNewBooking(p => ({ ...p, type: e.target.value }))}>
+                    {['Consultation', 'Project Work', 'Full Day Session', 'Workshop', 'Review Session'].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Notes (optional)</label>
+                <textarea className="form-input" placeholder="Any details about the session..." value={newBooking.notes}
+                  onChange={e => setNewBooking(p => ({ ...p, notes: e.target.value }))} />
+              </div>
+
+              {newBooking.artistId && (
+                <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Estimated Total</span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700 }}>
+                    ${(artists.find(a => a.id === parseInt(newBooking.artistId))?.hourlyRate || 0) * parseFloat(newBooking.duration)}
+                  </span>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowNew(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={loading === 'new'}>
+                  {loading === 'new' ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                  Send Request
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPay && (
+        <div className="modal-overlay" onClick={() => setShowPay(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>💳 Pay for Booking</h2>
+              <button className="btn-icon" onClick={() => setShowPay(null)}><X size={18} /></button>
+            </div>
+
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 700, marginBottom: 4 }}>
+                ${showPay.rate * showPay.duration}
+              </div>
+              <div style={{ color: 'var(--text-muted)' }}>{showPay.type} with {showPay.artistName}</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{showPay.date} at {showPay.time} · {showPay.duration}h</div>
+            </div>
+
+            <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Session ({showPay.duration}h × ${showPay.rate})</span>
+                <span>${showPay.rate * showPay.duration}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Platform fee (10%)</span>
+                <span>${Math.round(showPay.rate * showPay.duration * 0.1)}</span>
+              </div>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                <span>Total</span>
+                <span>${showPay.rate * showPay.duration + Math.round(showPay.rate * showPay.duration * 0.1)}</span>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Card Number</label>
+              <input className="form-input" placeholder="4242 4242 4242 4242" />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="form-group">
+                <label className="form-label">Expiry</label>
+                <input className="form-input" placeholder="MM/YY" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">CVC</label>
+                <input className="form-input" placeholder="123" />
+              </div>
+            </div>
+
+            <button className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }} onClick={handlePaymentSubmit} disabled={loading === showPay.id}>
+              {loading === showPay.id ? <Loader2 size={18} className="animate-spin" /> : <CreditCard size={18} />}
+              Pay ${showPay.rate * showPay.duration + Math.round(showPay.rate * showPay.duration * 0.1)} via Stripe
+            </button>
+            <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+              🔒 Secured by Stripe. Your payment information is encrypted.
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

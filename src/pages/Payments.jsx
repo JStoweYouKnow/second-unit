@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CreditCard, CheckCircle, Clock, ArrowUpRight, DollarSign, TrendingUp, Download, Eye, X, Filter, Search, ArrowDownRight, Receipt } from 'lucide-react'
+import { CreditCard, CheckCircle, Clock, ArrowUpRight, DollarSign, TrendingUp, Download, X, Search, ArrowDownRight, Receipt, Shield } from '../components/icons'
 import { payments as mockPayments } from '../data/mockData'
 
 export default function Payments() {
@@ -71,7 +71,7 @@ https://secondunit.com
       <div className="page-header">
         <div className="page-header-row">
           <div>
-            <h1>💳 Payments</h1>
+            <h1>Payments</h1>
             <p>Track payments powered by Stripe</p>
           </div>
         </div>
@@ -191,7 +191,7 @@ https://secondunit.com
         <div className="modal-overlay" onClick={() => setShowReceipt(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>🧾 Receipt</h2>
+              <h2>Receipt</h2>
               <button className="btn-icon" onClick={() => setShowReceipt(null)}><X size={18} /></button>
             </div>
 
@@ -257,7 +257,7 @@ https://secondunit.com
         <div className="modal-overlay" onClick={() => setShowStripe(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>💳 Process Payment</h2>
+              <h2>Process Payment</h2>
               <button className="btn-icon" onClick={() => setShowStripe(false)}><X size={18} /></button>
             </div>
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
@@ -285,7 +285,7 @@ https://secondunit.com
               <CreditCard size={18} /> Pay ${selectedPayment.amount.toLocaleString()} with Stripe
             </button>
             <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
-              🔒 Secured by Stripe. Your payment information is encrypted.
+              <Shield size={12} style={{ marginRight: 4 }} /> Secured by Stripe. Your payment information is encrypted.
             </div>
           </div>
         </div>

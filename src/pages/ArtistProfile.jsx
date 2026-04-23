@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Heart, Star, MapPin, Calendar, ExternalLink, Play, Globe, AtSign, Camera, Briefcase, Mail, Send } from 'lucide-react'
+import { ArrowLeft, Heart, Star, MapPin, Calendar, ExternalLink, Play, Globe, AtSign, Camera, Briefcase, Send } from '../components/icons'
 import { artists } from '../data/mockData'
 import { useApp } from '../context/AppContext'
 import { useState } from 'react'

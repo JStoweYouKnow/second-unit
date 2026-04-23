@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Calendar, Clock, DollarSign, Plus, CheckCircle, AlertCircle, X, Send, CreditCard, ArrowRight, Loader2 } from 'lucide-react'
+import { Calendar, Clock, Plus, CheckCircle, AlertCircle, X, Send, CreditCard, Loader2, Shield } from '../components/icons'
 import { bookings as mockBookings, artists } from '../data/mockData'
 import { bookings as bookingsApi } from '../lib/api'
 
@@ -111,7 +111,7 @@ export default function Bookings() {
       <div className="page-header">
         <div className="page-header-row">
           <div>
-            <h1>📅 Bookings</h1>
+            <h1>Bookings</h1>
             <p>Manage your sessions and appointments</p>
           </div>
           <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New Booking</button>
@@ -205,7 +205,7 @@ export default function Bookings() {
         <div className="modal-overlay" onClick={() => setShowNew(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>📅 Create New Booking</h2>
+              <h2>Create New Booking</h2>
               <button className="btn-icon" onClick={() => setShowNew(false)}><X size={18} /></button>
             </div>
             <form onSubmit={handleCreateBooking}>
@@ -276,7 +276,7 @@ export default function Bookings() {
         <div className="modal-overlay" onClick={() => setShowPay(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>💳 Pay for Booking</h2>
+              <h2>Pay for Booking</h2>
               <button className="btn-icon" onClick={() => setShowPay(null)}><X size={18} /></button>
             </div>
 
@@ -323,7 +323,7 @@ export default function Bookings() {
               Pay ${showPay.rate * showPay.duration + Math.round(showPay.rate * showPay.duration * 0.1)} via Stripe
             </button>
             <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
-              🔒 Secured by Stripe. Your payment information is encrypted.
+              <Shield size={12} style={{ marginRight: 4 }} /> Secured by Stripe. Your payment information is encrypted.
             </div>
           </div>
         </div>

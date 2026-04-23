@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, Plus, Download, Eye, CheckCircle, Clock, Archive, X, PenTool, Shield, AlertCircle, ExternalLink, Copy, Check } from 'lucide-react'
+import { FileText, Plus, Download, Eye, CheckCircle, Clock, Archive, X, PenTool, Shield, Copy, Check } from '../components/icons'
 import { contracts as mockContracts, artists } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 
@@ -194,7 +194,7 @@ ${divider}
       <div className="page-header">
         <div className="page-header-row">
           <div>
-            <h1>📄 Contracts</h1>
+            <h1>Contracts</h1>
             <p>Manage agreements with your artists</p>
           </div>
           <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New Contract</button>
@@ -270,16 +270,16 @@ ${divider}
         <div className="modal-overlay" onClick={() => setShowNew(false)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>📄 Create New Contract</h2>
+              <h2>Create New Contract</h2>
               <button className="btn-icon" onClick={() => setShowNew(false)}><X size={18} /></button>
             </div>
 
             <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
               <button className={`btn ${contractType === 'standard' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setContractType('standard')}>
-                📋 Standard Agreement
+                <FileText size={14} /> Standard Agreement
               </button>
               <button className={`btn ${contractType === 'custom' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setContractType('custom')}>
-                ✏️ Custom Agreement
+                <PenTool size={14} /> Custom Agreement
               </button>
             </div>
 
@@ -351,7 +351,7 @@ ${divider}
         <div className="modal-overlay" onClick={() => setShowView(null)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh' }}>
             <div className="modal-header">
-              <h2>📄 {showView.title}</h2>
+              <h2>{showView.title}</h2>
               <button className="btn-icon" onClick={() => setShowView(null)}><X size={18} /></button>
             </div>
 
@@ -371,7 +371,7 @@ ${divider}
               </div>
               <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)' }}>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Type</div>
-                <div style={{ fontSize: 14 }}>{showView.type === 'standard' ? '📋 Standard' : '✏️ Custom'} Agreement</div>
+                <div style={{ fontSize: 14, display: 'flex', alignItems: 'center', gap: 4 }}>{showView.type === 'standard' ? <FileText size={13} /> : <PenTool size={13} />}{showView.type === 'standard' ? 'Standard' : 'Custom'} Agreement</div>
               </div>
             </div>
 
@@ -460,7 +460,7 @@ ${divider}
         <div className="modal-overlay" onClick={() => setShowSign(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>✍️ Sign Contract</h2>
+              <h2>Sign Contract</h2>
               <button className="btn-icon" onClick={() => setShowSign(null)}><X size={18} /></button>
             </div>
 
@@ -535,7 +535,7 @@ ${divider}
             </div>
 
             <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
-              🔒 Your signature is encrypted and timestamped for legal compliance.
+              <Shield size={12} style={{ marginRight: 4 }} /> Your signature is encrypted and timestamped for legal compliance.
             </div>
           </div>
         </div>

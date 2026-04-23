@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Heart, Star, Calendar, TrendingUp, Users, DollarSign, FileText, ArrowUpRight, ArrowDownRight, BarChart3, PieChart, Activity, Eye } from 'lucide-react'
+import { Heart, Star, Calendar, TrendingUp, Users, DollarSign, FileText, ArrowUpRight, BarChart3, PieChart, Activity } from '../components/icons'
 import { artists, bookings, contracts, payments } from '../data/mockData'
 import { useApp } from '../context/AppContext'
 
@@ -112,7 +112,7 @@ export default function Dashboard() {
       <div className="page-header">
         <div className="page-header-row">
           <div>
-            <h1>📊 Dashboard</h1>
+            <h1>Dashboard</h1>
             <p>Your hiring overview and analytics</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -212,7 +212,7 @@ export default function Dashboard() {
       </div>
 
       {/* Favorites */}
-      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 16 }}>❤️ Your Favorites</h2>
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 16 }}>Your Favorites</h2>
       {favArtists.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
           <Heart size={32} style={{ marginBottom: 8, opacity: 0.5 }} />
@@ -252,7 +252,7 @@ export default function Dashboard() {
       )}
 
       {/* Upcoming Bookings */}
-      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 16 }}>📅 Upcoming Bookings</h2>
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 16 }}>Upcoming Bookings</h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {bookings.map(b => (
           <div key={b.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px' }}>

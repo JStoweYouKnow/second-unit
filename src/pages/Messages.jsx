@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Send, Check, HelpCircle, Wifi, WifiOff } from 'lucide-react'
+import { Send, Check, HelpCircle, Wifi, WifiOff } from '../components/icons'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { getSocket } from '../lib/socket'
@@ -122,7 +122,7 @@ export default function Messages() {
       {/* Sidebar */}
       <div style={{ width: 340, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '24px 20px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20 }}>💬 Messages</h2>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20 }}>Messages</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: socketOk ? 'var(--success)' : 'var(--text-muted)' }}>
             {socketOk ? <Wifi size={12} /> : <WifiOff size={12} />}
             {socketOk ? 'Live' : 'Offline'}

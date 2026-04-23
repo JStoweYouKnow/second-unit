@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Calendar, Heart, Play, ExternalLink, Star, Filter } from 'lucide-react'
+import { Search, Calendar, Heart, Play, Star, MedalGold, MedalSilver, MedalBronze } from '../components/icons'
 import { artists } from '../data/mockData'
 import { useApp } from '../context/AppContext'
 import CalendarModal from '../components/CalendarModal'
@@ -25,7 +25,7 @@ export default function Leaderboard() {
       <div className="page-header">
         <div className="page-header-row">
           <div>
-            <h1>🏆 Artist Leaderboard</h1>
+            <h1>Artist Leaderboard</h1>
             <p>Discover and hire the world's top AI artists and creators</p>
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
@@ -51,7 +51,7 @@ export default function Leaderboard() {
             <div key={artist.id} className="artist-card slide-up" style={{ animationDelay: `${i * 0.05}s` }}
               onClick={() => navigate(`/artist/${artist.id}`)}>
               <div className={`artist-rank ${rankClass}`}>
-                {rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : `#${rank}`}
+                {rank === 1 ? <MedalGold size={22} /> : rank === 2 ? <MedalSilver size={22} /> : rank === 3 ? <MedalBronze size={22} /> : `#${rank}`}
               </div>
               <div className="artist-info">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

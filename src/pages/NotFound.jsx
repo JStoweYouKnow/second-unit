@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { FileQuestion, ArrowLeft } from 'lucide-react'
+import { FileQuestion, ArrowLeft } from '../components/icons'
 
 export default function NotFound() {
   const navigate = useNavigate()

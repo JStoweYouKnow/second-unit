@@ -1,7 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Mail, Lock, LogIn, ArrowRight } from 'lucide-react'
+import { Mail, Lock, LogIn, ArrowRight } from '../components/icons'
 import { useAuth } from '../context/AuthContext'
+
+function readOAuthErrorFromUrl() {
+  const q = new URLSearchParams(window.location.search)
+  const fromQuery = q.get('error_description') || q.get('error')
+  if (fromQuery) return decodeURIComponent(fromQuery.replace(/\+/g, ' '))
+  const hash = window.location.hash?.replace(/^#/, '') ?? ''
+  if (!hash) return ''
+  const h = new URLSearchParams(hash)
+  const fromHash = h.get('error_description') || h.get('error')
+  if (fromHash) return decodeURIComponent(fromHash.replace(/\+/g, ' '))
+  return ''
+}
 
 export default function SignIn() {
   const navigate = useNavigate()
@@ -10,6 +22,18 @@ export default function SignIn() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState(null)
+
+  useEffect(() => {
+    const msg = readOAuthErrorFromUrl()
+    if (msg) {
+      setError(msg)
+      const url = new URL(window.location.href)
+      url.search = ''
+      url.hash = ''
+      window.history.replaceState({}, '', url.pathname + url.search)
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -22,6 +46,14 @@ export default function SignIn() {
     } else {
       navigate('/')
     }
+  }
+
+  const handleOAuth = async (provider) => {
+    setError('')
+    setOauthLoading(provider)
+    const { error: oauthError } = await signInWithOAuth(provider)
+    setOauthLoading(null)
+    if (oauthError) setError(oauthError.message)
   }
 
   return (
@@ -38,7 +70,7 @@ export default function SignIn() {
 
         {isMockMode && (
           <div className="auth-mock-banner">
-            🧪 Demo Mode — Supabase not configured. Click sign in to enter as a demo user.
+            Demo Mode — Supabase not configured. Click sign in to enter as a demo user.
           </div>
         )}
 
@@ -69,14 +101,17 @@ export default function SignIn() {
         <div className="auth-divider"><span>or continue with</span></div>
 
         <div className="auth-oauth-row">
-          <button className="btn btn-secondary auth-oauth-btn" onClick={() => signInWithOAuth('google')}>
-            Google
+          <button type="button" className="btn btn-secondary auth-oauth-btn" disabled={!!oauthLoading}
+            onClick={() => handleOAuth('google')}>
+            {oauthLoading === 'google' ? 'Redirecting…' : 'Google'}
           </button>
-          <button className="btn btn-secondary auth-oauth-btn" onClick={() => signInWithOAuth('github')}>
-            GitHub
+          <button type="button" className="btn btn-secondary auth-oauth-btn" disabled={!!oauthLoading}
+            onClick={() => handleOAuth('github')}>
+            {oauthLoading === 'github' ? 'Redirecting…' : 'GitHub'}
           </button>
-          <button className="btn btn-secondary auth-oauth-btn" onClick={() => signInWithOAuth('linkedin_oidc')}>
-            LinkedIn
+          <button type="button" className="btn btn-secondary auth-oauth-btn" disabled={!!oauthLoading}
+            onClick={() => handleOAuth('linkedin_oidc')}>
+            {oauthLoading === 'linkedin_oidc' ? 'Redirecting…' : 'LinkedIn'}
           </button>
         </div>
 

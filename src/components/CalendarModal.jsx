@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isToday, isSameDay, addMonths, subMonths } from 'date-fns'
-import { X, ChevronLeft, ChevronRight, ExternalLink, Download, Clock, MapPin } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, ExternalLink, Download, Clock, MapPin } from './icons'
 
 // Generate demo availability for current and next month
 function generateAvailability() {
@@ -116,7 +116,7 @@ END:VCALENDAR`
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>📅 {artist.name}'s Availability</h2>
+          <h2>{artist.name}'s Availability</h2>
           <button className="btn-icon" onClick={onClose}><X size={18} /></button>
         </div>
 

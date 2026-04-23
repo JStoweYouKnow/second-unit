@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Bell, MessageSquare, Calendar, CreditCard, Check, CheckCheck, X } from 'lucide-react'
+import { Bell, MessageSquare, Calendar, CreditCard, Check, CheckCheck, X } from './icons'
 import { useNavigate } from 'react-router-dom'
 import { useNotifications } from '../context/NotificationContext'
 

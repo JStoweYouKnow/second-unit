@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { FileText, Plus, Download, Eye, CheckCircle, Clock, Archive, X, PenTool, Shield, Copy, Check } from '../components/icons'
 import { contracts as mockContracts, artists } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
+import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
 
 const STANDARD_TERMS = `INDEPENDENT CONTRACTOR AGREEMENT
 
@@ -50,6 +51,8 @@ This document constitutes the entire agreement between the parties and supersede
 
 export default function Contracts() {
   const { profile } = useAuth()
+  const isArtist = isArtistProfile(profile)
+  const me = demoArtistPersona(profile)
   const [localContracts, setLocalContracts] = useState(mockContracts)
   const [showNew, setShowNew] = useState(false)
   const [showView, setShowView] = useState(null) // contract to view
@@ -101,17 +104,23 @@ export default function Contracts() {
     if (!signatureName.trim() || !signatureAgreed || !showSign) return
 
     setLocalContracts(prev => prev.map(c => {
-      if (c.id === showSign.id) {
+      if (c.id !== showSign.id) return c
+      if (isArtist) {
         const updated = {
           ...c,
-          signedByEmployer: true,
-          employerSignature: { name: signatureName, date: new Date().toISOString(), ip: '127.0.0.1' },
+          signedByArtist: true,
+          artistSignature: { name: signatureName, date: new Date().toISOString(), ip: '127.0.0.1' },
         }
-        // If both signed, activate
-        if (updated.signedByArtist) updated.status = 'active'
+        if (updated.signedByEmployer) updated.status = 'active'
         return updated
       }
-      return c
+      const updated = {
+        ...c,
+        signedByEmployer: true,
+        employerSignature: { name: signatureName, date: new Date().toISOString(), ip: '127.0.0.1' },
+      }
+      if (updated.signedByArtist) updated.status = 'active'
+      return updated
     }))
 
     setShowSign(null)
@@ -136,6 +145,11 @@ export default function Contracts() {
     setCopied(contract.id)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  const displayContracts = useMemo(() => {
+    if (!isArtist || !me) return localContracts
+    return localContracts.filter((c) => c.artistId === me.id)
+  }, [isArtist, me, localContracts])
 
   function generateContractText(contract) {
     const divider = '═'.repeat(60)
@@ -195,19 +209,21 @@ ${divider}
         <div className="page-header-row">
           <div>
             <h1>Contracts</h1>
-            <p>Manage agreements with your artists</p>
+            <p>{isArtist ? 'Agreements clients have sent you' : 'Manage agreements with your artists'}</p>
           </div>
-          <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New Contract</button>
+          {!isArtist && (
+            <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New Contract</button>
+          )}
         </div>
       </div>
 
       {/* Contract Stats */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         {[
-          { label: 'Active', value: localContracts.filter(c => c.status === 'active').length, color: 'var(--success)' },
-          { label: 'Pending Signature', value: localContracts.filter(c => c.status === 'pending').length, color: 'var(--warning)' },
-          { label: 'Completed', value: localContracts.filter(c => c.status === 'completed').length, color: 'var(--text-muted)' },
-          { label: 'Total Value', value: '$' + localContracts.reduce((s, c) => s + (c.value || 0), 0).toLocaleString(), color: 'var(--accent)' },
+          { label: 'Active', value: displayContracts.filter(c => c.status === 'active').length, color: 'var(--success)' },
+          { label: 'Pending Signature', value: displayContracts.filter(c => c.status === 'pending').length, color: 'var(--warning)' },
+          { label: 'Completed', value: displayContracts.filter(c => c.status === 'completed').length, color: 'var(--text-muted)' },
+          { label: 'Total Value', value: '$' + displayContracts.reduce((s, c) => s + (c.value || 0), 0).toLocaleString(), color: 'var(--accent)' },
         ].map(s => (
           <div key={s.label} className="stat-card">
             <span className="stat-label">{s.label}</span>
@@ -218,7 +234,7 @@ ${divider}
 
       {/* Contract List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {localContracts.map(c => {
+        {displayContracts.map(c => {
           const s = statusConfig[c.status] || statusConfig.draft
           return (
             <div key={c.id} className="contract-card slide-up">
@@ -229,7 +245,7 @@ ${divider}
                   <span className="skill-tag">{c.type}</span>
                 </div>
                 <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-secondary)', alignItems: 'center' }}>
-                  <span>Artist: {c.artistName}</span>
+                  <span>{isArtist ? 'Your engagement with the client' : `Artist: ${c.artistName}`}</span>
                   <span>{c.startDate} → {c.endDate}</span>
                   {/* Signature Status */}
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -249,7 +265,7 @@ ${divider}
                 <div className={`contract-status ${c.status}`} style={{ color: s.color }}>
                   {s.icon} {s.label}
                 </div>
-                {c.status === 'pending' && !c.signedByEmployer && (
+                {c.status === 'pending' && ((!isArtist && !c.signedByEmployer) || (isArtist && !c.signedByArtist)) && (
                   <button className="btn btn-success btn-sm" onClick={() => setShowSign(c)}>
                     <PenTool size={14} /> Sign
                   </button>
@@ -443,7 +459,7 @@ ${divider}
             </div>
 
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              {showView.status === 'pending' && !showView.signedByEmployer && (
+              {showView.status === 'pending' && ((!isArtist && !showView.signedByEmployer) || (isArtist && !showView.signedByArtist)) && (
                 <button className="btn btn-success" onClick={() => { setShowView(null); setShowSign(showView) }}>
                   <PenTool size={16} /> Sign Contract
                 </button>
@@ -467,7 +483,8 @@ ${divider}
             <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 24 }}>
               <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{showSign.title}</div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                Artist: {showSign.artistName} · Value: ${(showSign.value || 0).toLocaleString()} · {showSign.startDate} → {showSign.endDate}
+                {isArtist ? `Signing as artist · ${showSign.artistName}` : `Artist: ${showSign.artistName}`}
+                {' · '}Value: ${(showSign.value || 0).toLocaleString()} · {showSign.startDate} → {showSign.endDate}
               </div>
             </div>
 

@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Calendar, Clock, Plus, CheckCircle, AlertCircle, X, Send, CreditCard, Loader2, Shield } from '../components/icons'
 import { bookings as mockBookings, artists } from '../data/mockData'
 import { bookings as bookingsApi } from '../lib/api'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
+import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
 import PricingModeToggle from '../components/PricingModeToggle'
 import {
   bookingSubtotal,
@@ -20,6 +22,9 @@ function bookingRateCaption(b) {
 
 export default function Bookings() {
   const { pricingMode } = useApp()
+  const { profile } = useAuth()
+  const isArtist = isArtistProfile(profile)
+  const myArtist = demoArtistPersona(profile)
   const [tab, setTab] = useState('upcoming')
   const [localBookings, setLocalBookings] = useState(mockBookings)
   const [showNew, setShowNew] = useState(false)
@@ -36,9 +41,14 @@ export default function Bookings() {
   const [loading, setLoading] = useState(null) // ID of booking being processed
   const [error, setError] = useState(null)
 
+  const roleBookings = useMemo(() => {
+    if (!isArtist || !myArtist) return localBookings
+    return localBookings.filter((b) => b.artistId === myArtist.id)
+  }, [isArtist, myArtist, localBookings])
+
   const filtered = tab === 'upcoming'
-    ? localBookings.filter(b => b.status === 'confirmed' || b.status === 'pending')
-    : localBookings
+    ? roleBookings.filter(b => b.status === 'confirmed' || b.status === 'pending')
+    : roleBookings
 
   const handleCreateBooking = async (e) => {
     e.preventDefault()
@@ -150,13 +160,17 @@ export default function Bookings() {
       <div className="page-header">
         <div className="page-header-row">
           <div>
-            <h1>Bookings</h1>
-            <p>Manage your sessions and appointments</p>
-            <div style={{ marginTop: 12 }}>
-              <PricingModeToggle />
-            </div>
+            <h1>{isArtist ? 'Your bookings' : 'Bookings'}</h1>
+            <p>{isArtist ? 'Sessions clients have booked with you' : 'Manage your sessions and appointments'}</p>
+            {!isArtist && (
+              <div style={{ marginTop: 12 }}>
+                <PricingModeToggle />
+              </div>
+            )}
           </div>
-          <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New Booking</button>
+          {!isArtist && (
+            <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New Booking</button>
+          )}
         </div>
       </div>
 
@@ -176,7 +190,7 @@ export default function Bookings() {
       {filtered.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
           <Calendar size={32} style={{ marginBottom: 8, opacity: 0.5 }} />
-          <p>No bookings yet.</p>
+          <p>{isArtist ? 'No bookings on your calendar yet.' : 'No bookings yet.'}</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -189,8 +203,12 @@ export default function Bookings() {
               <div key={b.id} className="card slide-up" style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 16, opacity: isProcessing ? 0.7 : 1 }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                    <div className="avatar avatar-sm">{b.artistName.split(' ').map(n => n[0]).join('')}</div>
-                    <h3 style={{ fontSize: 16 }}>{b.artistName}</h3>
+                    <div className="avatar avatar-sm">
+                      {isArtist
+                        ? (b.type || 'BK').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() || 'BK'
+                        : b.artistName.split(' ').map(n => n[0]).join('')}
+                    </div>
+                    <h3 style={{ fontSize: 16 }}>{isArtist ? 'Client booking' : b.artistName}</h3>
                     <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: s.bg, color: s.color, display: 'flex', alignItems: 'center', gap: 4 }}>
                       {s.icon} {s.label}
                     </span>
@@ -230,10 +248,15 @@ export default function Bookings() {
                           </div>
                         )}
 
-                        {b.status === 'confirmed' && (
+                        {b.status === 'confirmed' && !isArtist && (
                           <button className="btn btn-primary btn-sm" onClick={() => handlePay(b)}>
                             <CreditCard size={14} /> Pay Now
                           </button>
+                        )}
+                        {b.status === 'confirmed' && isArtist && (
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 120, textAlign: 'right' }}>
+                            Awaiting client payment
+                          </span>
                         )}
                       </>
                     )}

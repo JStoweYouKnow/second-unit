@@ -1,6 +1,7 @@
-import { useState, useCallback, lazy, Suspense } from 'react'
+import { useState, useCallback, lazy, Suspense, useMemo } from 'react'
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom'
-import { LayoutDashboard, Trophy, MessageSquare, Calendar, FileText, CreditCard, LogOut, Loader2 } from './components/icons'
+import { LayoutDashboard, Trophy, MessageSquare, Calendar, FileText, CreditCard, LogOut, Loader2, User } from './components/icons'
+import { isArtistProfile, demoArtistPersona } from './lib/roleView'
 import { AppContext } from './context/AppContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
@@ -33,6 +34,12 @@ function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth()
   if (loading) return <div className="page-container" style={{ textAlign: 'center', paddingTop: 100, color: 'var(--text-muted)' }}>Loading...</div>
   return isAuthenticated ? children : <Navigate to="/signin" />
+}
+
+function HomeGate() {
+  const { profile } = useAuth()
+  if (isArtistProfile(profile)) return <Navigate to="/dashboard" replace />
+  return <Leaderboard />
 }
 
 function AppShell() {
@@ -68,15 +75,30 @@ function AppShell() {
   }
 
   const unreadCount = allMessages.filter(m => m.unread).length
+  const demoPersona = demoArtistPersona(profile)
 
-  const navItems = [
-    { path: '/', icon: Trophy, label: 'Artist Spotlight' },
-    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
-    { path: '/bookings', icon: Calendar, label: 'Bookings' },
-    { path: '/contracts', icon: FileText, label: 'Contracts' },
-    { path: '/payments', icon: CreditCard, label: 'Payments' },
-  ]
+  const navItems = useMemo(() => {
+    if (isArtistProfile(profile)) {
+      const pid = demoPersona?.id ?? 1
+      const profilePath = `/artist/${pid}`
+      return [
+        { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+        { path: profilePath, icon: User, label: 'My profile', matchPrefix: profilePath },
+        { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
+        { path: '/bookings', icon: Calendar, label: 'Bookings' },
+        { path: '/contracts', icon: FileText, label: 'Contracts' },
+        { path: '/payments', icon: CreditCard, label: 'Earnings' },
+      ]
+    }
+    return [
+      { path: '/', icon: Trophy, label: 'Artist Spotlight' },
+      { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
+      { path: '/bookings', icon: Calendar, label: 'Bookings' },
+      { path: '/contracts', icon: FileText, label: 'Contracts' },
+      { path: '/payments', icon: CreditCard, label: 'Payments' },
+    ]
+  }, [profile?.role, profile?.full_name, unreadCount, demoPersona?.id])
 
   const ctx = {
     favorites,
@@ -104,14 +126,19 @@ function AppShell() {
           <nav>
             <div className="nav-section">
               <div className="nav-label">Main</div>
-              {navItems.map(item => (
-                <button key={item.path} className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
-                  onClick={() => navigate(item.path)}>
-                  <item.icon size={18} />
-                  {item.label}
-                  {item.badge && <span className="badge">{item.badge}</span>}
-                </button>
-              ))}
+              {navItems.map((item) => {
+                const active = item.matchPrefix
+                  ? location.pathname === item.matchPrefix || location.pathname.startsWith(`${item.matchPrefix}/`)
+                  : location.pathname === item.path
+                return (
+                  <button key={item.path} className={`nav-link ${active ? 'active' : ''}`}
+                    onClick={() => navigate(item.path)}>
+                    <item.icon size={18} />
+                    {item.label}
+                    {item.badge && <span className="badge">{item.badge}</span>}
+                  </button>
+                )
+              })}
             </div>
             <div className="nav-section" style={{ marginTop: 'auto' }}>
               <div className="nav-label">Account</div>
@@ -137,7 +164,7 @@ function AppShell() {
           <ErrorBoundary>
             <Suspense fallback={<LoadingScreen />}>
               <Routes>
-                <Route path="/" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+                <Route path="/" element={<ProtectedRoute><HomeGate /></ProtectedRoute>} />
                 <Route path="/artist/:id" element={<ProtectedRoute><ArtistProfile /></ProtectedRoute>} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />

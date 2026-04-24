@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isToday, isSameDay, addMonths, subMonths } from 'date-fns'
 import { X, ChevronLeft, ChevronRight, ExternalLink, Download, Clock, MapPin } from './icons'
 import { useApp } from '../context/AppContext'
@@ -76,6 +76,14 @@ export default function CalendarModal({ artist, onClose, onBook }) {
   const selectedDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null
   const availableSlots = availability.find(a => a.date === selectedDateStr)?.slots || []
 
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   // Google Calendar link generator
   const generateGoogleCalendarLink = (date, time) => {
     const dateObj = new Date(`${date}T${convertTo24h(time)}:00`)
@@ -116,11 +124,19 @@ END:VCALENDAR`
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay" role="presentation" onClick={onClose}>
+      <div
+        className="modal modal-lg"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="calendar-modal-title"
+        onClick={e => e.stopPropagation()}
+      >
         <div className="modal-header">
-          <h2>{artist.name}'s Availability</h2>
-          <button className="btn-icon" onClick={onClose}><X size={18} /></button>
+          <h2 id="calendar-modal-title">{`${artist.name}'s availability`}</h2>
+          <button type="button" className="btn-icon" onClick={onClose} aria-label="Close calendar">
+            <X size={18} aria-hidden />
+          </button>
         </div>
 
         {/* Artist Quick Info */}

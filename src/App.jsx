@@ -1,6 +1,6 @@
-import { useState, useCallback, lazy, Suspense, useMemo } from 'react'
+import { useState, useCallback, lazy, Suspense, useMemo, useEffect } from 'react'
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom'
-import { LayoutDashboard, Trophy, MessageSquare, Calendar, FileText, CreditCard, LogOut, Loader2, User } from './components/icons'
+import { LayoutDashboard, Trophy, MessageSquare, Calendar, FileText, CreditCard, LogOut, Loader2, User, Menu, X } from './components/icons'
 import { isArtistProfile, demoArtistPersona } from './lib/roleView'
 import { AppContext } from './context/AppContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -24,15 +24,25 @@ const NotFound = lazy(() => import('./pages/NotFound'))
 
 function LoadingScreen() {
   return (
-    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-      <Loader2 size={32} className="animate-spin" />
+    <div className="loading-screen" role="status" aria-live="polite">
+      <Loader2 size={32} className="animate-spin" aria-hidden />
+      <span className="loading-screen__label">Loading…</span>
+      <span className="sr-only">Please wait while the page loads.</span>
     </div>
   )
 }
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth()
-  if (loading) return <div className="page-container" style={{ textAlign: 'center', paddingTop: 100, color: 'var(--text-muted)' }}>Loading...</div>
+  if (loading) {
+    return (
+      <div className="page-container loading-screen" style={{ paddingTop: 80 }} role="status" aria-live="polite">
+        <Loader2 size={32} className="animate-spin" aria-hidden />
+        <span className="loading-screen__label">Checking your session…</span>
+        <span className="sr-only">Authentication in progress.</span>
+      </div>
+    )
+  }
   return isAuthenticated ? children : <Navigate to="/signin" />
 }
 
@@ -42,10 +52,17 @@ function HomeGate() {
   return <Leaderboard />
 }
 
+function formatAccountRole(role) {
+  if (!role) return 'Hirer'
+  const map = { employer: 'Hirer', artist: 'Artist', admin: 'Admin' }
+  return map[role] || role.charAt(0).toUpperCase() + role.slice(1)
+}
+
 function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, profile, signOut, isMockMode } = useAuth()
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const { favorites, toggleFavorite } = useFavorites(user?.id)
   const [allMessages, setAllMessages] = useState(mockMessages)
   const [pricingMode, setPricingMode] = useState('hourly')
@@ -112,13 +129,57 @@ function AppShell() {
 
   const handleSignOut = async () => {
     await signOut()
+    setMobileNavOpen(false)
     navigate('/signin')
+  }
+
+  useEffect(() => {
+    setMobileNavOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    if (mobileNavOpen) document.body.classList.add('nav-drawer-open')
+    else document.body.classList.remove('nav-drawer-open')
+    return () => document.body.classList.remove('nav-drawer-open')
+  }, [mobileNavOpen])
+
+  const goNav = (path) => {
+    navigate(path)
+    setMobileNavOpen(false)
   }
 
   return (
     <AppContext.Provider value={ctx}>
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <div className="app-layout">
-        <aside className="sidebar">
+        <header className="mobile-topbar">
+          <div className="mobile-topbar-brand">
+            <div className="logo-icon" style={{ width: 32, height: 32, fontSize: 15 }}>S</div>
+            <span>Second Unit</span>
+          </div>
+          <button
+            type="button"
+            className="mobile-menu-btn"
+            aria-expanded={mobileNavOpen}
+            aria-controls="app-sidebar"
+            onClick={() => setMobileNavOpen((o) => !o)}
+          >
+            {mobileNavOpen ? <X size={22} aria-hidden /> : <Menu size={22} aria-hidden />}
+            <span className="sr-only">{mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}</span>
+          </button>
+        </header>
+
+        <button
+          type="button"
+          className={`mobile-nav-overlay${mobileNavOpen ? ' is-open' : ''}`}
+          aria-label="Close menu"
+          tabIndex={mobileNavOpen ? 0 : -1}
+          onClick={() => setMobileNavOpen(false)}
+        />
+
+        <aside id="app-sidebar" className={`sidebar${mobileNavOpen ? ' sidebar--open' : ''}`}>
           <div className="logo">
             <div className="logo-icon">S</div>
             <span className="logo-text">Second Unit</span>
@@ -131,9 +192,14 @@ function AppShell() {
                   ? location.pathname === item.matchPrefix || location.pathname.startsWith(`${item.matchPrefix}/`)
                   : location.pathname === item.path
                 return (
-                  <button key={item.path} className={`nav-link ${active ? 'active' : ''}`}
-                    onClick={() => navigate(item.path)}>
-                    <item.icon size={18} />
+                  <button
+                    key={item.path}
+                    type="button"
+                    className={`nav-link ${active ? 'active' : ''}`}
+                    aria-current={active ? 'page' : undefined}
+                    onClick={() => goNav(item.path)}
+                  >
+                    <item.icon size={18} aria-hidden />
                     {item.label}
                     {item.badge && <span className="badge">{item.badge}</span>}
                   </button>
@@ -151,16 +217,18 @@ function AppShell() {
                     {profile?.full_name || 'User'}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    {profile?.role || 'employer'}{isMockMode ? ' · demo' : ''}
+                    {formatAccountRole(profile?.role)}{isMockMode ? ' · demo' : ''}
                   </div>
                 </div>
                 <NotificationPanel />
               </div>
-              <button className="nav-link" onClick={handleSignOut}><LogOut size={18} /> Sign Out</button>
+              <button type="button" className="nav-link" onClick={handleSignOut}>
+                <LogOut size={18} aria-hidden /> Sign Out
+              </button>
             </div>
           </nav>
         </aside>
-        <main className="main-content">
+        <main id="main-content" className="main-content" tabIndex={-1}>
           <ErrorBoundary>
             <Suspense fallback={<LoadingScreen />}>
               <Routes>

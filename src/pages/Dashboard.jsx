@@ -92,15 +92,15 @@ export default function Dashboard() {
   const myPayments = useMemo(() => (me ? payments.filter((p) => p.artistName === me.name) : []), [me])
 
   // Mock analytics data
-  const revenueData = [
+  const monthlySpendData = [
     { label: 'Oct', value: 4200 }, { label: 'Nov', value: 6800 }, { label: 'Dec', value: 3500 },
     { label: 'Jan', value: 8200 }, { label: 'Feb', value: 5600 }, { label: 'Mar', value: 9800 },
     { label: 'Apr', value: 7400 },
   ]
 
   const bookingTrend = [3, 5, 4, 7, 6, 8, 5, 9, 7, 11, 8, 10]
-  const totalRevenue = payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
-  const pendingPayments = payments.filter(p => p.status === 'pending' || p.status === 'upcoming').reduce((s, p) => s + p.amount, 0)
+  const totalPaidOut = payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+  const scheduledSpend = payments.filter(p => p.status === 'pending' || p.status === 'upcoming').reduce((s, p) => s + p.amount, 0)
 
   const roleDistribution = [
     { label: 'Visual Artist', value: 3, color: 'var(--accent)' },
@@ -112,7 +112,7 @@ export default function Dashboard() {
 
   const recentActivity = [
     { type: 'booking', text: 'Booking confirmed with Maya Chen', time: '2h ago', color: 'var(--success)' },
-    { type: 'payment', text: 'Payment of $5,000 processed', time: '5h ago', color: 'var(--accent)' },
+    { type: 'payment', text: 'You sent $5,000 to an artist (milestone)', time: '5h ago', color: 'var(--accent)' },
     { type: 'contract', text: 'Contract signed by Theo Park', time: '1d ago', color: 'var(--warning)' },
     { type: 'message', text: 'New message from Dex Okafor', time: '1d ago', color: '#6366f1' },
     { type: 'booking', text: 'Booking request sent to Aria Nakamura', time: '2d ago', color: 'var(--success)' },
@@ -320,9 +320,9 @@ export default function Dashboard() {
       {/* KPI Cards */}
       <div className="stats-grid slide-up" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div className="stat-card">
-          <span className="stat-label"><DollarSign size={14} /> Revenue</span>
-          <span className="stat-value" style={{ color: 'var(--success)' }}>${totalRevenue.toLocaleString()}</span>
-          <span className="stat-change"><ArrowUpRight size={12} /> 18% vs last period</span>
+          <span className="stat-label"><DollarSign size={14} /> Paid out</span>
+          <span className="stat-value" style={{ color: 'var(--accent)' }}>${totalPaidOut.toLocaleString()}</span>
+          <span className="stat-change stat-change--muted">${scheduledSpend.toLocaleString()} scheduled or pending</span>
         </div>
         <div className="stat-card">
           <span className="stat-label"><Calendar size={14} /> Bookings</span>
@@ -343,17 +343,16 @@ export default function Dashboard() {
 
       {/* Charts Row */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 32 }}>
-        {/* Revenue Chart */}
         <div className="card slide-up" style={{ padding: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <div>
               <h3 style={{ fontSize: 16, fontFamily: 'var(--font-display)', marginBottom: 4 }}>
-                <BarChart3 size={16} style={{ marginRight: 6, color: 'var(--accent)' }} /> Spending Over Time
+                <BarChart3 size={16} style={{ marginRight: 6, color: 'var(--accent)' }} /> Spending over time
               </h3>
-              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Monthly spend on artists and services</span>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Monthly spend on artists and services (your outlay)</span>
             </div>
           </div>
-          <BarChart data={revenueData} height={180} />
+          <BarChart data={monthlySpendData} height={180} />
         </div>
 
         {/* Distribution */}

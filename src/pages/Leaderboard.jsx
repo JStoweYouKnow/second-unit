@@ -101,6 +101,19 @@ export default function Leaderboard() {
 
   return (
     <div className="page-container">
+      <div className="spotlight-hero">
+        <p className="spotlight-hero__eyebrow">Launch-ready marketplace</p>
+        <h2 className="spotlight-hero__title">Hire exceptional AI-native creative talent</h2>
+        <p className="spotlight-hero__lede">
+          Browse verified artists, compare rates, and move from discovery to booking without leaving the platform.
+        </p>
+        <div className="spotlight-hero__trust">
+          <span><strong>Stripe</strong> — secure checkout</span>
+          <span><strong>Contracts</strong> — e-sign ready</span>
+          <span><strong>Messages</strong> — keep context in one thread</span>
+        </div>
+      </div>
+
       <div className="page-header">
         <div className="page-header-row">
           <div>
@@ -248,7 +261,15 @@ export default function Leaderboard() {
               key={artist.id}
               className="artist-card slide-up"
               style={{ animationDelay: `${i * 0.05}s` }}
+              tabIndex={0}
+              aria-label={`View profile: ${artist.name}`}
               onClick={() => navigate(`/artist/${artist.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  navigate(`/artist/${artist.id}`)
+                }
+              }}
             >
               <div className={`artist-rank ${rankClass}`}>
                 {rank === 1 ? (

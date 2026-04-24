@@ -81,20 +81,41 @@ export default function SignIn() {
             <label className="form-label">Email</label>
             <div className="auth-input-wrapper">
               <Mail size={16} />
-              <input className="form-input" type="email" placeholder="you@example.com"
-                value={email} onChange={e => setEmail(e.target.value)} required />
+              <input
+                className="form-input"
+                type="email"
+                name="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+              />
             </div>
           </div>
           <div className="form-group">
             <label className="form-label">Password</label>
             <div className="auth-input-wrapper">
               <Lock size={16} />
-              <input className="form-input" type="password" placeholder="••••••••"
-                value={password} onChange={e => setPassword(e.target.value)} required={!isMockMode} />
+              <input
+                className="form-input"
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required={!isMockMode}
+              />
             </div>
           </div>
-          <button className="btn btn-primary btn-lg auth-submit" type="submit" disabled={loading}>
-            {loading ? 'Signing in...' : <><LogIn size={18} /> Sign In</>}
+          <button
+            className="btn btn-primary btn-lg auth-submit"
+            type="submit"
+            disabled={loading}
+            aria-busy={loading}
+          >
+            {loading ? 'Signing in...' : <><LogIn size={18} aria-hidden /> Sign In</>}
           </button>
         </form>
 

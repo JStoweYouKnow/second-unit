@@ -77,12 +77,12 @@ export default function SignUp() {
         {error && <div className="auth-error">{error}</div>}
 
         <div className="auth-role-picker">
-          <button className={`auth-role-option ${role === 'employer' ? 'active' : ''}`} onClick={() => setRole('employer')}>
+          <button type="button" className={`auth-role-option ${role === 'employer' ? 'active' : ''}`} onClick={() => setRole('employer')}>
             <Briefcase size={20} />
             <span>I'm hiring</span>
             <small>Find and book AI artists</small>
           </button>
-          <button className={`auth-role-option ${role === 'artist' ? 'active' : ''}`} onClick={() => setRole('artist')}>
+          <button type="button" className={`auth-role-option ${role === 'artist' ? 'active' : ''}`} onClick={() => setRole('artist')}>
             <Palette size={20} />
             <span>I'm an artist</span>
             <small>Showcase work & get hired</small>
@@ -94,28 +94,57 @@ export default function SignUp() {
             <label className="form-label">Full Name</label>
             <div className="auth-input-wrapper">
               <User size={16} />
-              <input className="form-input" placeholder="Your full name"
-                value={fullName} onChange={e => setFullName(e.target.value)} required />
+              <input
+                className="form-input"
+                name="name"
+                autoComplete="name"
+                placeholder="Your full name"
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                required
+              />
             </div>
           </div>
           <div className="form-group">
             <label className="form-label">Email</label>
             <div className="auth-input-wrapper">
               <Mail size={16} />
-              <input className="form-input" type="email" placeholder="you@example.com"
-                value={email} onChange={e => setEmail(e.target.value)} required />
+              <input
+                className="form-input"
+                type="email"
+                name="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+              />
             </div>
           </div>
           <div className="form-group">
             <label className="form-label">Password</label>
             <div className="auth-input-wrapper">
               <Lock size={16} />
-              <input className="form-input" type="password" placeholder="Min 8 characters"
-                value={password} onChange={e => setPassword(e.target.value)} minLength={isMockMode ? 0 : 8} required={!isMockMode} />
+              <input
+                className="form-input"
+                type="password"
+                name="password"
+                autoComplete="new-password"
+                placeholder="Min 8 characters"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                minLength={isMockMode ? 0 : 8}
+                required={!isMockMode}
+              />
             </div>
           </div>
-          <button className="btn btn-primary btn-lg auth-submit" type="submit" disabled={loading || !!oauthLoading}>
-            {loading ? 'Creating account...' : <><UserPlus size={18} /> Create Account</>}
+          <button
+            className="btn btn-primary btn-lg auth-submit"
+            type="submit"
+            disabled={loading || !!oauthLoading}
+            aria-busy={loading}
+          >
+            {loading ? 'Creating account...' : <><UserPlus size={18} aria-hidden /> Create Account</>}
           </button>
         </form>
 

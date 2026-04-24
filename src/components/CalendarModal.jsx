@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isToday, isSameDay, addMonths, subMonths } from 'date-fns'
 import { X, ChevronLeft, ChevronRight, ExternalLink, Download, Clock, MapPin } from './icons'
-import { useApp } from '../context/AppContext'
-import { formatArtistRate } from '../lib/pricing'
 
 // Generate demo availability for current and next month
 function generateAvailability() {
@@ -29,8 +27,9 @@ function generateAvailability() {
   return slots
 }
 
+const CAL_COMP_NOTE = 'Compensation is agreed with the client for each engagement (not shown here).'
+
 export default function CalendarModal({ artist, onClose, onBook }) {
-  const { pricingMode } = useApp()
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(null)
   const [selectedSlot, setSelectedSlot] = useState(null)
@@ -89,7 +88,7 @@ export default function CalendarModal({ artist, onClose, onBook }) {
     const dateObj = new Date(`${date}T${convertTo24h(time)}:00`)
     const endObj = new Date(dateObj.getTime() + 60 * 60 * 1000) // 1 hour
     const fmt = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
-    return `https://calendar.google.com/calendar/event?action=TEMPLATE&text=${encodeURIComponent(`Session with ${artist.name}`)}&dates=${fmt(dateObj)}/${fmt(endObj)}&details=${encodeURIComponent(`Booked through Second Unit\nArtist: ${artist.name}\nRate: ${formatArtistRate(pricingMode, artist)}`)}`
+    return `https://calendar.google.com/calendar/event?action=TEMPLATE&text=${encodeURIComponent(`Session with ${artist.name}`)}&dates=${fmt(dateObj)}/${fmt(endObj)}&details=${encodeURIComponent(`Booked through Second Unit\nArtist: ${artist.name}\n${CAL_COMP_NOTE}`)}`
   }
 
   // .ics file download
@@ -103,7 +102,7 @@ BEGIN:VEVENT
 DTSTART:${fmt(dateObj)}
 DTEND:${fmt(endObj)}
 SUMMARY:Session with ${artist.name}
-DESCRIPTION:Booked through Second Unit\\nRate: ${formatArtistRate(pricingMode, artist).replace(/,/g, '')}
+DESCRIPTION:Booked through Second Unit\\n${CAL_COMP_NOTE.replace(/\\/g, '\\\\').replace(/\n/g, '\\n')}
 END:VEVENT
 END:VCALENDAR`
     const blob = new Blob([ics], { type: 'text/calendar' })
@@ -146,9 +145,9 @@ END:VCALENDAR`
             <div style={{ fontWeight: 600 }}>{artist.name}</div>
             <div style={{ fontSize: 13, color: 'var(--accent)' }}>{artist.role}</div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18 }}>{formatArtistRate(pricingMode, artist)}</div>
-            <div style={{ fontSize: 12, color: artist.available ? 'var(--success)' : 'var(--text-muted)' }}>
+          <div style={{ textAlign: 'right', maxWidth: 220 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.45 }}>{CAL_COMP_NOTE}</div>
+            <div style={{ fontSize: 12, color: artist.available ? 'var(--success)' : 'var(--text-muted)', marginTop: 6 }}>
               {artist.available ? '● Available' : '○ Unavailable'}
             </div>
           </div>
@@ -203,9 +202,7 @@ END:VCALENDAR`
                   {format(selectedDate, 'MMM d')} at {selectedSlot}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                  {pricingMode === 'flat'
-                    ? `Kickoff slot · ${formatArtistRate(pricingMode, artist)}`
-                    : `1 hour session · ${formatArtistRate(pricingMode, artist)}`}
+                  1 hour hold · confirm scope and fees with the client before work begins.
                 </div>
               </div>
             </div>

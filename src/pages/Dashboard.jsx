@@ -5,8 +5,7 @@ import { artists, bookings, contracts, payments } from '../data/mockData'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
-import { bookingSubtotal, formatArtistRate } from '../lib/pricing'
-import PricingModeToggle from '../components/PricingModeToggle'
+import { bookingSubtotal } from '../lib/pricing'
 
 // Simple bar chart component (pure CSS)
 function BarChart({ data, height = 160 }) {
@@ -81,7 +80,7 @@ function Sparkline({ data, color = 'var(--accent)', height = 40 }) {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { favorites, pricingMode } = useApp()
+  const { favorites } = useApp()
   const isArtist = isArtistProfile(profile)
   const me = demoArtistPersona(profile)
   const favArtists = artists.filter(a => favorites.includes(a.id))
@@ -406,7 +405,7 @@ export default function Dashboard() {
       {/* Favorites */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, margin: 0 }}>Your Favorites</h2>
-        <PricingModeToggle compact />
+        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Fees agreed per project with each artist</span>
       </div>
       {favArtists.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
@@ -432,7 +431,7 @@ export default function Dashboard() {
                 {a.skills.slice(0, 3).map(s => <span key={s} className="skill-tag">{s}</span>)}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, alignItems: 'center' }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>{formatArtistRate(pricingMode, a)}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Negotiated with client</span>
                 <span style={{
                   padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
                   background: a.available ? 'rgba(0,212,170,0.1)' : 'rgba(255,77,106,0.1)',

@@ -44,13 +44,32 @@ export function estimateBookingTotal(mode, artist, duration) {
 }
 
 /**
- * Line item for booking list / payment copy.
- * @param {{ pricingModel?: PricingModel, rate: number, duration: number }} booking
+ * Line item for booking list / payment (agreed total, no rate card).
+ * @param {{ agreedTotal?: number, pricingModel?: PricingModel, rate?: number, duration?: number }} booking
  */
 export function bookingSubtotal(booking) {
+  if (booking == null) return 0
+  const agreed = Number(booking.agreedTotal)
+  if (!Number.isNaN(agreed) && agreed > 0) return Math.round(agreed)
+  const rate = Number(booking.rate) || 0
+  const dur = Number(booking.duration) || 0
   const model = booking.pricingModel || 'hourly'
-  if (model === 'flat') return Math.round(booking.rate)
-  return Math.round(booking.rate * booking.duration)
+  if (model === 'flat') return Math.round(rate)
+  return Math.round(rate * dur)
+}
+
+/**
+ * Schedule length copy (no dollar amounts).
+ * @param {{ duration?: number, durationUnit?: 'hours'|'days'|'project', pricingModel?: PricingModel }} booking
+ */
+export function bookingScheduleCaption(booking) {
+  const legacyUnit =
+    booking.durationUnit ||
+    (booking.pricingModel === 'daily' ? 'days' : booking.pricingModel === 'flat' ? 'project' : 'hours')
+  const d = Number(booking.duration) || 0
+  if (legacyUnit === 'project') return 'Project block (agreed scope)'
+  if (legacyUnit === 'days') return `${d} day${d === 1 ? '' : 's'} booked`
+  return `${d} hour${d === 1 ? '' : 's'} scheduled`
 }
 
 export function pricingModelLabel(model) {

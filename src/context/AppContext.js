@@ -7,8 +7,6 @@ const defaultAppContext = {
   allMessages: [],
   sendMessage: () => {},
   startConversation: () => undefined,
-  pricingMode: 'hourly',
-  setPricingMode: () => {},
 }
 
 export const AppContext = createContext(defaultAppContext)

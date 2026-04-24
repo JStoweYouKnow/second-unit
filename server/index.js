@@ -50,10 +50,10 @@ const BookingSchema = z.object({
   date: z.string(),
   time: z.string(),
   duration: z.number().positive(),
+  durationUnit: z.enum(['hours', 'days', 'project']).optional().default('hours'),
   type: z.string(),
-  rate: z.number().positive(),
+  agreedTotal: z.number().positive(),
   notes: z.string().optional(),
-  pricingModel: z.enum(['hourly', 'daily', 'flat']).optional(),
 })
 
 const MessageSchema = z.object({
@@ -150,16 +150,14 @@ function addNotification(userId, { type, title, body, link, avatar }) {
 app.post('/api/bookings', async (req, res) => {
   try {
     const validatedData = BookingSchema.parse(req.body)
-    const { artistId, artistName, employerId, date, time, duration, type, rate, notes, pricingModel } =
+    const { artistId, artistName, employerId, date, time, duration, type, agreedTotal, notes } =
       validatedData
-    const model = pricingModel || 'hourly'
-    const totalAmount = model === 'flat' ? rate : rate * duration
 
     const booking = {
       id: `bk_${Date.now()}`,
       ...validatedData,
       status: 'pending',
-      totalAmount,
+      totalAmount: agreedTotal,
       createdAt: new Date().toISOString(),
     }
 

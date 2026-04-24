@@ -400,6 +400,16 @@ export function Menu({ size = 24, color = 'currentColor', className = '', style 
   )
 }
 
+export function Upload({ size = 24, color = 'currentColor', className = '', style } = {}) {
+  return (
+    <Svg {...p(size, color, className, style)}>
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </Svg>
+  )
+}
+
 export function X({ size = 24, color = 'currentColor', className = '', style } = {}) {
   return (
     <Svg {...p(size, color, className, style)}>

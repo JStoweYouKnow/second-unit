@@ -1,11 +1,15 @@
 import { useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Calendar, Heart, Play, Star, MedalGold, MedalSilver, MedalBronze, Filter } from '../components/icons'
-import { artists } from '../data/mockData'
+import { Search, Calendar, Heart, Play, Star, MedalGold, MedalSilver, MedalBronze, Filter, DollarSign, MapPin } from '../components/icons'
+import { artists, availableProjects } from '../data/mockData'
 import { useApp } from '../context/AppContext'
 import CalendarModal from '../components/CalendarModal'
-import PricingModeToggle from '../components/PricingModeToggle'
-import { formatArtistRate } from '../lib/pricing'
+
+function formatBudgetRange(min, max) {
+  const a = Number(min) || 0
+  const b = Number(max) || 0
+  return `$${a.toLocaleString()} – $${b.toLocaleString()}`
+}
 
 function toggleInSet(set, key) {
   const next = new Set(set)
@@ -16,7 +20,7 @@ function toggleInSet(set, key) {
 
 export default function Leaderboard() {
   const navigate = useNavigate()
-  const { favorites, toggleFavorite, pricingMode } = useApp()
+  const { favorites, toggleFavorite } = useApp()
   const [search, setSearch] = useState('')
   const [calendarArtist, setCalendarArtist] = useState(null)
 
@@ -104,7 +108,7 @@ export default function Leaderboard() {
       <div className="spotlight-hero">
         <h2 className="spotlight-hero__title">Hire exceptional AI-native creative talent</h2>
         <p className="spotlight-hero__lede">
-          Browse verified artists, compare rates, and move from discovery to booking without leaving the platform.
+          Browse verified talent, review open projects with transparent client budgets, and agree fees directly with the client before you book.
         </p>
         <div className="spotlight-hero__trust">
           <span><strong>Stripe</strong> — secure checkout</span>
@@ -120,7 +124,6 @@ export default function Leaderboard() {
             <p>Discover and hire the world's top AI artists and creators</p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
-            <PricingModeToggle compact />
             <div className="search-bar" style={{ width: 300, maxWidth: '100%' }}>
               <Search size={16} />
               <input
@@ -251,6 +254,45 @@ export default function Leaderboard() {
         </section>
       </div>
 
+      <section className="spotlight-projects" aria-label="Available projects with budgets">
+        <div className="spotlight-projects__head">
+          <h2>Available projects</h2>
+          <p className="spotlight-projects__sub">
+            Client-listed budgets for scope reference — final compensation is always negotiated in your thread.
+          </p>
+        </div>
+        <div className="spotlight-projects__grid">
+          {availableProjects.map((proj) => (
+            <article key={proj.id} className="spotlight-project-card card slide-up">
+              <div className="spotlight-project-card__top">
+                <div>
+                  <h3 className="spotlight-project-card__title">{proj.title}</h3>
+                  <div className="spotlight-project-card__meta">
+                    <span className="spotlight-project-card__client">{proj.client}</span>
+                    <span className="spotlight-project-card__posted">Posted {proj.posted}</span>
+                  </div>
+                </div>
+                <div className="spotlight-project-card__budget" title="Client budget range for this brief">
+                  <DollarSign size={18} aria-hidden />
+                  <span>{formatBudgetRange(proj.budgetMin, proj.budgetMax)}</span>
+                </div>
+              </div>
+              <div className="spotlight-project-card__row">
+                <span className="spotlight-project-card__label"><MapPin size={14} aria-hidden /> {proj.location}</span>
+                <span className="spotlight-project-card__label">Timeline: {proj.timeline}</span>
+              </div>
+              <div className="artist-skills" style={{ marginTop: 10 }}>
+                {proj.skills.map((s) => (
+                  <span key={s} className="skill-tag">
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {filtered.map((artist, i) => {
           const rank = i + 1
@@ -318,6 +360,7 @@ export default function Leaderboard() {
                   </div>
                   {artist.videoLinks.length > 0 && (
                     <button
+                      type="button"
                       className="btn btn-ghost btn-sm"
                       onClick={(e) => {
                         e.stopPropagation()
@@ -340,19 +383,22 @@ export default function Leaderboard() {
               <div className="artist-actions" onClick={(e) => e.stopPropagation()}>
                 <span
                   style={{
-                    color: 'var(--text-secondary)',
-                    fontSize: 15,
-                    fontWeight: 700,
-                    fontFamily: 'var(--font-display)',
+                    color: 'var(--text-muted)',
+                    fontSize: 13,
+                    fontWeight: 600,
                     marginRight: 8,
+                    maxWidth: 200,
+                    textAlign: 'right',
+                    lineHeight: 1.35,
                   }}
                 >
-                  {formatArtistRate(pricingMode, artist)}
+                  Fees negotiated with client
                 </span>
-                <button className="btn-icon" title="View Calendar" onClick={() => setCalendarArtist(artist)}>
+                <button type="button" className="btn-icon" title="View Calendar" onClick={() => setCalendarArtist(artist)}>
                   <Calendar size={16} />
                 </button>
                 <button
+                  type="button"
                   className="btn-icon"
                   title="Favorite"
                   onClick={() => toggleFavorite(artist.id)}

@@ -65,7 +65,6 @@ function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const { favorites, toggleFavorite } = useFavorites(user?.id)
   const [allMessages, setAllMessages] = useState(mockMessages)
-  const [pricingMode, setPricingMode] = useState('hourly')
 
   const sendMessage = useCallback((conversationId, text, senderOverride) => {
     setAllMessages(prev => prev.map(m => {
@@ -123,8 +122,6 @@ function AppShell() {
     allMessages,
     sendMessage,
     startConversation,
-    pricingMode,
-    setPricingMode,
   }
 
   const handleSignOut = async () => {

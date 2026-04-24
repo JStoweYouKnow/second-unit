@@ -422,6 +422,90 @@ textarea.form-input { min-height: 100px; resize: vertical; }
   color: var(--text-muted);
 }
 
+/* Artist Spotlight — open projects with client budgets */
+.spotlight-projects {
+  margin-bottom: 28px;
+}
+.spotlight-projects__head {
+  margin-bottom: 16px;
+}
+.spotlight-projects__head h2 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+.spotlight-projects__sub {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 60ch;
+}
+.spotlight-projects__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+.spotlight-project-card {
+  padding: 18px 20px;
+  margin: 0;
+  text-align: left;
+}
+.spotlight-project-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.spotlight-project-card__title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  line-height: 1.35;
+}
+.spotlight-project-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+.spotlight-project-card__client {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.spotlight-project-card__posted {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.spotlight-project-card__budget {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(124, 92, 252, 0.12);
+  border: 1px solid rgba(124, 92, 252, 0.22);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.spotlight-project-card__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.spotlight-project-card__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* ===== Pricing mode (hourly / daily / flat) ===== */
 .pricing-mode-toggle {
   display: flex;

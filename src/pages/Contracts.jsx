@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { FileText, Plus, Download, Eye, CheckCircle, Clock, Archive, X, PenTool, Shield, Copy, Check } from '../components/icons'
+import { useMemo, useState, useRef } from 'react'
+import { FileText, Plus, Download, Eye, CheckCircle, Clock, Archive, X, PenTool, Shield, Copy, Check, Upload, Receipt } from '../components/icons'
 import { contracts as mockContracts, artists } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
@@ -49,6 +49,19 @@ This Agreement shall be governed by the laws of the state specified by the Clien
 10. ENTIRE AGREEMENT
 This document constitutes the entire agreement between the parties and supersedes all prior negotiations and agreements.`
 
+const MAX_CUSTOM_FILE_BYTES = 15 * 1024 * 1024 // 15MB
+
+function isAllowedCustomAgreementFile(file) {
+  if (!file?.name) return false
+  if (/\.(pdf|doc|docx)$/i.test(file.name)) return true
+  const mime = (file.type || '').toLowerCase()
+  return (
+    mime === 'application/pdf' ||
+    mime === 'application/msword' ||
+    mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  )
+}
+
 export default function Contracts() {
   const { profile } = useAuth()
   const isArtist = isArtistProfile(profile)
@@ -61,6 +74,10 @@ export default function Contracts() {
   const [newContract, setNewContract] = useState({
     title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: ''
   })
+  /** Pending upload in the modal only (blob URL revoked on discard). On create, URL is kept on the contract row. */
+  const [customAgreementUpload, setCustomAgreementUpload] = useState(null)
+  const [customUploadError, setCustomUploadError] = useState('')
+  const customAgreementInputRef = useRef(null)
   const [signatureName, setSignatureName] = useState('')
   const [signatureAgreed, setSignatureAgreed] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -72,10 +89,77 @@ export default function Contracts() {
     draft: { icon: <FileText size={14} />, color: 'var(--text-secondary)', label: 'Draft' },
   }
 
+  function discardCustomAgreementUpload() {
+    setCustomAgreementUpload((prev) => {
+      if (prev?.objectUrl) URL.revokeObjectURL(prev.objectUrl)
+      return null
+    })
+  }
+
+  function closeNewContractModal() {
+    discardCustomAgreementUpload()
+    setCustomUploadError('')
+    setContractType('standard')
+    setNewContract({ title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: '' })
+    setShowNew(false)
+  }
+
+  function handleCustomAgreementFileChange(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setCustomUploadError('')
+    if (file.size > MAX_CUSTOM_FILE_BYTES) {
+      setCustomUploadError('File must be 15MB or smaller.')
+      return
+    }
+    if (!isAllowedCustomAgreementFile(file)) {
+      setCustomUploadError('Use a PDF (.pdf) or Word file (.doc, .docx).')
+      return
+    }
+    setCustomAgreementUpload((prev) => {
+      if (prev?.objectUrl) URL.revokeObjectURL(prev.objectUrl)
+      return {
+        name: file.name,
+        size: file.size,
+        mimeType: file.type || 'application/octet-stream',
+        objectUrl: URL.createObjectURL(file),
+      }
+    })
+  }
+
   const handleCreateContract = (e) => {
     e.preventDefault()
+    const hasCustomText = newContract.customTerms.trim().length > 0
+    const hasCustomFile = !!customAgreementUpload
+    if (contractType === 'custom' && !hasCustomText && !hasCustomFile) {
+      setCustomUploadError('Add terms in the text area or upload a PDF / Word document.')
+      return
+    }
+    setCustomUploadError('')
+
     const artist = artists.find(a => a.id === parseInt(newContract.artistId))
     if (!artist) return
+
+    let terms = STANDARD_TERMS
+    let attachmentUrl = null
+    let attachmentName = null
+    let attachmentMime = null
+
+    if (contractType === 'custom') {
+      const parts = []
+      if (hasCustomText) parts.push(newContract.customTerms.trim())
+      if (hasCustomFile) {
+        const kb = (customAgreementUpload.size / 1024).toFixed(1)
+        parts.push(
+          `[Uploaded agreement: ${customAgreementUpload.name} — ${kb} KB]\nUse “Download attachment” on this contract to retrieve the PDF or Word file.`
+        )
+        attachmentUrl = customAgreementUpload.objectUrl
+        attachmentName = customAgreementUpload.name
+        attachmentMime = customAgreementUpload.mimeType
+      }
+      terms = parts.join('\n\n---\n\n')
+    }
 
     const contract = {
       id: `ct_${Date.now()}`,
@@ -87,7 +171,10 @@ export default function Contracts() {
       value: parseInt(newContract.value) || 0,
       startDate: newContract.startDate,
       endDate: newContract.endDate,
-      terms: contractType === 'custom' ? newContract.customTerms : STANDARD_TERMS,
+      terms,
+      attachmentUrl,
+      attachmentName,
+      attachmentMime,
       signedByEmployer: false,
       signedByArtist: false,
       employerSignature: null,
@@ -97,7 +184,18 @@ export default function Contracts() {
 
     setLocalContracts(prev => [contract, ...prev])
     setShowNew(false)
+    setCustomAgreementUpload(null)
     setNewContract({ title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: '' })
+    setContractType('standard')
+  }
+
+  const handleDownloadAttachment = (contract) => {
+    if (!contract?.attachmentUrl || !contract?.attachmentName) return
+    const a = document.createElement('a')
+    a.href = contract.attachmentUrl
+    a.download = contract.attachmentName
+    a.rel = 'noopener'
+    a.click()
   }
 
   const handleSign = () => {
@@ -140,6 +238,65 @@ export default function Contracts() {
     URL.revokeObjectURL(url)
   }
 
+  const handleDownloadContractInvoice = (contract) => {
+    const viewer = profile?.full_name || (isArtist ? 'Artist' : 'Client')
+    const roleNote = isArtist
+      ? 'Artist copy — financial summary for this engagement (not a tax document).'
+      : 'Client copy — financial summary for this booking (not a tax document).'
+    const value = contract.value ?? 0
+    const third = Math.round(value / 3)
+    const remainder = value - third * 2
+    const content = `
+═══════════════════════════════════════
+   SECOND UNIT — CONTRACT STATEMENT
+═══════════════════════════════════════
+
+Statement ref: CNT-${contract.id}
+Contract ID: ${contract.id}
+Title: ${contract.title}
+Agreement type: ${contract.type === 'standard' ? 'Standard' : 'Custom'}
+
+Prepared for: ${viewer}
+${roleNote}
+
+───────────────────────────────────────
+PARTIES
+───────────────────────────────────────
+Client: ${profile?.full_name || 'Employer'}
+Artist: ${contract.artistName}
+
+───────────────────────────────────────
+TERM & VALUE
+───────────────────────────────────────
+Period: ${contract.startDate} → ${contract.endDate}
+Total contract value: $${value.toLocaleString()}
+
+Suggested milestone schedule (per platform terms):
+  • On execution:        $${third.toLocaleString()}
+  • First draft/proof:   $${third.toLocaleString()}
+  • Final delivery:      $${remainder.toLocaleString()}
+
+───────────────────────────────────────
+SIGNATURE STATUS
+───────────────────────────────────────
+Client:  ${contract.signedByEmployer ? 'Signed' : 'Pending'}
+Artist:  ${contract.signedByArtist ? 'Signed' : 'Pending'}
+Contract status: ${contract.status}
+
+${contract.attachmentName ? `Attached agreement file: ${contract.attachmentName} (download from Second Unit contract record)\n` : ''}
+═══════════════════════════════════════
+https://secondunit.com
+═══════════════════════════════════════
+`
+    const blob = new Blob([content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${contract.title.replace(/\s+/g, '_')}_Contract_Statement.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const handleCopyLink = (contract) => {
     navigator.clipboard.writeText(`${window.location.origin}/contracts/${contract.id}`)
     setCopied(contract.id)
@@ -177,6 +334,7 @@ TERMS AND CONDITIONS
 ${divider}
 
 ${contract.terms || STANDARD_TERMS}
+${contract.attachmentName ? `\n\n[Attached file: ${contract.attachmentName} — download from contract record in Second Unit]\n` : ''}
 
 ${divider}
 SIGNATURES
@@ -266,13 +424,24 @@ ${divider}
                   {s.icon} {s.label}
                 </div>
                 {c.status === 'pending' && ((!isArtist && !c.signedByEmployer) || (isArtist && !c.signedByArtist)) && (
-                  <button className="btn btn-success btn-sm" onClick={() => setShowSign(c)}>
+                  <button type="button" className="btn btn-success btn-sm" onClick={() => setShowSign(c)}>
                     <PenTool size={14} /> Sign
                   </button>
                 )}
-                <button className="btn-icon" title="View" onClick={() => setShowView(c)}><Eye size={16} /></button>
-                <button className="btn-icon" title="Download" onClick={() => handleDownloadPDF(c)}><Download size={16} /></button>
-                <button className="btn-icon" title="Copy Link" onClick={() => handleCopyLink(c)}>
+                <button type="button" className="btn-icon" title="View" onClick={() => setShowView(c)}><Eye size={16} /></button>
+                <button type="button" className="btn-icon" title="Download contract (.txt)" onClick={() => handleDownloadPDF(c)}><Download size={16} /></button>
+                <button type="button" className="btn-icon" title="Download contract statement / invoice (.txt)" onClick={() => handleDownloadContractInvoice(c)}><Receipt size={16} /></button>
+                {c.attachmentUrl && c.attachmentName && (
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    title={`Download ${c.attachmentName}`}
+                    onClick={() => handleDownloadAttachment(c)}
+                  >
+                    <Upload size={16} />
+                  </button>
+                )}
+                <button type="button" className="btn-icon" title="Copy Link" onClick={() => handleCopyLink(c)}>
                   {copied === c.id ? <Check size={16} style={{ color: 'var(--success)' }} /> : <Copy size={16} />}
                 </button>
               </div>
@@ -283,18 +452,26 @@ ${divider}
 
       {/* ========== New Contract Modal ========== */}
       {showNew && (
-        <div className="modal-overlay" onClick={() => setShowNew(false)}>
+        <div className="modal-overlay" onClick={closeNewContractModal}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Create New Contract</h2>
-              <button className="btn-icon" onClick={() => setShowNew(false)}><X size={18} /></button>
+              <button type="button" className="btn-icon" onClick={closeNewContractModal}><X size={18} /></button>
             </div>
 
             <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-              <button className={`btn ${contractType === 'standard' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setContractType('standard')}>
+              <button
+                type="button"
+                className={`btn ${contractType === 'standard' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => {
+                  discardCustomAgreementUpload()
+                  setCustomUploadError('')
+                  setContractType('standard')
+                }}
+              >
                 <FileText size={14} /> Standard Agreement
               </button>
-              <button className={`btn ${contractType === 'custom' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setContractType('custom')}>
+              <button type="button" className={`btn ${contractType === 'custom' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setContractType('custom')}>
                 <PenTool size={14} /> Custom Agreement
               </button>
             </div>
@@ -332,13 +509,62 @@ ${divider}
               </div>
 
               {contractType === 'custom' && (
-                <div className="form-group">
-                  <label className="form-label">Custom Terms & Conditions</label>
-                  <textarea className="form-input" placeholder="Enter your custom agreement terms here..."
-                    style={{ minHeight: 200, fontFamily: 'monospace', fontSize: 13 }}
-                    value={newContract.customTerms}
-                    onChange={e => setNewContract(p => ({ ...p, customTerms: e.target.value }))} required />
-                </div>
+                <>
+                  <div className="form-group">
+                    <label className="form-label">Upload agreement (PDF or Word)</label>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.45 }}>
+                      Optional if you paste terms below — max 15MB. Accepted: .pdf, .doc, .docx
+                    </p>
+                    <input
+                      ref={customAgreementInputRef}
+                      type="file"
+                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      className="sr-only"
+                      aria-label="Upload PDF or Word agreement"
+                      onChange={handleCustomAgreementFileChange}
+                    />
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => customAgreementInputRef.current?.click()}
+                      >
+                        <Upload size={16} /> Choose file
+                      </button>
+                      {customAgreementUpload && (
+                        <span style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <strong style={{ color: 'var(--text-primary)' }}>{customAgreementUpload.name}</strong>
+                          ({(customAgreementUpload.size / 1024).toFixed(1)} KB)
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => {
+                              discardCustomAgreementUpload()
+                              setCustomUploadError('')
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Custom terms (optional if you upload a document)</label>
+                    <textarea
+                      className="form-input"
+                      placeholder="Paste key terms, scope, or amendments here, or rely on your uploaded PDF / Word file only."
+                      style={{ minHeight: 160, fontFamily: 'monospace', fontSize: 13 }}
+                      value={newContract.customTerms}
+                      onChange={e => setNewContract(p => ({ ...p, customTerms: e.target.value }))}
+                    />
+                  </div>
+                  {customUploadError && (
+                    <div className="auth-error" style={{ marginBottom: 16 }} role="alert">
+                      {customUploadError}
+                    </div>
+                  )}
+                </>
               )}
 
               {contractType === 'standard' && (
@@ -354,7 +580,7 @@ ${divider}
               )}
 
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowNew(false)}>Cancel</button>
+                <button type="button" className="btn btn-secondary" onClick={closeNewContractModal}>Cancel</button>
                 <button type="submit" className="btn btn-primary"><FileText size={16} /> Create Contract</button>
               </div>
             </form>
@@ -394,6 +620,11 @@ ${divider}
             {/* Terms */}
             <div style={{ marginBottom: 24 }}>
               <h3 style={{ fontSize: 14, marginBottom: 12, color: 'var(--text-secondary)' }}>Terms & Conditions</h3>
+              {showView.attachmentName && (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+                  Includes uploaded file: <strong style={{ color: 'var(--text-secondary)' }}>{showView.attachmentName}</strong> — use &quot;Original file&quot; below to download.
+                </p>
+              )}
               <div style={{
                 padding: 20, background: 'var(--surface)', borderRadius: 'var(--radius-sm)',
                 fontSize: 13, lineHeight: 1.8, color: 'var(--text-secondary)',
@@ -458,14 +689,20 @@ ${divider}
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               {showView.status === 'pending' && ((!isArtist && !showView.signedByEmployer) || (isArtist && !showView.signedByArtist)) && (
-                <button className="btn btn-success" onClick={() => { setShowView(null); setShowSign(showView) }}>
+                <button type="button" className="btn btn-success" onClick={() => { setShowView(null); setShowSign(showView) }}>
                   <PenTool size={16} /> Sign Contract
                 </button>
               )}
-              <button className="btn btn-secondary" onClick={() => handleDownloadPDF(showView)}><Download size={16} /> Download</button>
-              <button className="btn btn-secondary" onClick={() => setShowView(null)}>Close</button>
+              <button type="button" className="btn btn-secondary" onClick={() => handleDownloadPDF(showView)}><Download size={16} /> Contract (.txt)</button>
+              <button type="button" className="btn btn-secondary" onClick={() => handleDownloadContractInvoice(showView)}><Receipt size={16} /> Statement / invoice (.txt)</button>
+              {showView.attachmentUrl && showView.attachmentName && (
+                <button type="button" className="btn btn-secondary" onClick={() => handleDownloadAttachment(showView)}>
+                  <Download size={16} /> Original file
+                </button>
+              )}
+              <button type="button" className="btn btn-secondary" onClick={() => setShowView(null)}>Close</button>
             </div>
           </div>
         </div>

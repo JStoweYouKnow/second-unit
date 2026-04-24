@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CreditCard, CheckCircle, Clock, ArrowUpRight, DollarSign, TrendingUp, Download, X, Search, ArrowDownRight, Receipt, Shield } from '../components/icons'
+import { CreditCard, CheckCircle, Clock, ArrowUpRight, DollarSign, TrendingUp, Download, X, Search, ArrowDownRight, Receipt, Shield, FileText } from '../components/icons'
 import { payments as mockPayments } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
@@ -72,6 +72,53 @@ https://secondunit.com
     const a = document.createElement('a')
     a.href = url
     a.download = `Receipt_${payment.id}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleDownloadInvoice = (payment) => {
+    const viewer = profile?.full_name || (isArtist ? 'Artist' : 'Client')
+    const platformFee = Math.round(payment.amount * 0.1)
+    const total = payment.amount + platformFee
+    const roleNote = isArtist
+      ? 'Artist copy — amounts shown reflect your payout / milestone record on Second Unit.'
+      : 'Client copy — amounts shown reflect your payment record on Second Unit.'
+    const content = `
+═══════════════════════════════════════
+         SECOND UNIT — INVOICE
+═══════════════════════════════════════
+
+Invoice #: INV-${payment.id}
+Issue date: ${payment.date}
+Status: ${String(payment.status).toUpperCase()}
+
+Bill to / Record for: ${viewer}
+${roleNote}
+
+───────────────────────────────────────
+LINE ITEMS
+───────────────────────────────────────
+
+${payment.description}
+Service provider (artist): ${payment.artistName}
+
+  Line subtotal                         $${payment.amount.toLocaleString()}
+  Platform facilitation fee (10%)      $${platformFee.toLocaleString()}
+───────────────────────────────────────
+  Total (incl. platform fee)           $${total.toLocaleString()}
+
+Payment reference: ${payment.id}
+Settlement: processed via Stripe on Second Unit
+
+═══════════════════════════════════════
+https://secondunit.com
+═══════════════════════════════════════
+`
+    const blob = new Blob([content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Invoice_${payment.id}.txt`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -153,12 +200,12 @@ https://secondunit.com
 
       {/* Payment Table */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', padding: '12px 20px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) 1fr 1fr 1fr minmax(200px, auto)', padding: '12px 20px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
           <span>Description</span>
           <span>{isArtist ? 'Payee' : 'Artist'}</span>
           <span>Date</span>
           <span style={{ textAlign: 'right' }}>Amount</span>
-          <span style={{ textAlign: 'center', width: 140 }}>Status</span>
+          <span style={{ textAlign: 'center' }}>Receipt · Invoice</span>
         </div>
 
         {filteredPayments.length === 0 ? (
@@ -170,7 +217,7 @@ https://secondunit.com
             const s = statusStyles[p.status] || statusStyles.pending
             return (
               <div key={p.id} className="slide-up" style={{
-                display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto',
+                display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) 1fr 1fr 1fr minmax(200px, auto)',
                 padding: '16px 20px', borderBottom: '1px solid var(--border)',
                 alignItems: 'center', transition: 'var(--transition)',
                 cursor: 'pointer',
@@ -187,10 +234,33 @@ https://secondunit.com
                 <span style={{ textAlign: 'right', fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700 }}>
                   ${p.amount.toLocaleString()}
                 </span>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'center', width: 140 }}>
+                <div
+                  style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  role="presentation"
+                >
                   <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: s.bg, color: s.color, display: 'flex', alignItems: 'center', gap: 4 }}>
                     {s.icon} {s.label}
                   </span>
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    title="Download receipt (.txt)"
+                    aria-label="Download receipt"
+                    onClick={() => handleDownloadReceipt(p)}
+                  >
+                    <Receipt size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    title="Download invoice (.txt)"
+                    aria-label="Download invoice"
+                    onClick={() => handleDownloadInvoice(p)}
+                  >
+                    <FileText size={16} />
+                  </button>
                 </div>
               </div>
             )
@@ -200,11 +270,11 @@ https://secondunit.com
 
       {/* Receipt Modal */}
       {showReceipt && (
-        <div className="modal-overlay" onClick={() => setShowReceipt(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => setShowReceipt(null)} role="presentation">
+          <div className="modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="receipt-modal-title">
             <div className="modal-header">
-              <h2>Receipt</h2>
-              <button className="btn-icon" onClick={() => setShowReceipt(null)}><X size={18} /></button>
+              <h2 id="receipt-modal-title">Receipt & invoice</h2>
+              <button type="button" className="btn-icon" onClick={() => setShowReceipt(null)}><X size={18} /></button>
             </div>
 
             <div style={{ textAlign: 'center', marginBottom: 24, paddingBottom: 24, borderBottom: '1px solid var(--border)' }}>
@@ -250,12 +320,15 @@ https://secondunit.com
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              <button className="btn btn-secondary" onClick={() => handleDownloadReceipt(showReceipt)}>
-                <Download size={16} /> Download Receipt
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => handleDownloadReceipt(showReceipt)}>
+                <Download size={16} /> Receipt (.txt)
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => handleDownloadInvoice(showReceipt)}>
+                <FileText size={16} /> Invoice (.txt)
               </button>
               {!isArtist && (showReceipt.status === 'pending' || showReceipt.status === 'upcoming') && (
-                <button className="btn btn-primary" onClick={() => { setShowReceipt(null); setSelectedPayment(showReceipt); setShowStripe(true) }}>
+                <button type="button" className="btn btn-primary" onClick={() => { setShowReceipt(null); setSelectedPayment(showReceipt); setShowStripe(true) }}>
                   <CreditCard size={16} /> Pay Now
                 </button>
               )}

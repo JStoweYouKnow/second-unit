@@ -31,15 +31,16 @@ export default function NotificationPanel() {
   const navigate = useNavigate()
   const { notifications, unreadCount, markRead, markAllRead, clearNotification } = useNotifications()
 
-  // Close on outside click
+  // Close on outside click — defer so we don't steal mousedown from controls below (e.g. Sign Out)
+  // before their click event fires.
   useEffect(() => {
-    function handleClick(e) {
+    function handlePointerDown(e) {
       if (panelRef.current && !panelRef.current.contains(e.target)) {
-        setOpen(false)
+        setTimeout(() => setOpen(false), 0)
       }
     }
-    if (open) document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    if (open) document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [open])
 
   const handleClick = (notif) => {
@@ -50,7 +51,7 @@ export default function NotificationPanel() {
 
   return (
     <div className="notif-container" ref={panelRef}>
-      <button className="notif-bell" onClick={() => setOpen(!open)}>
+      <button type="button" className="notif-bell" onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="true" aria-label="Notifications">
         <Bell size={20} />
         {unreadCount > 0 && <span className="notif-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
       </button>

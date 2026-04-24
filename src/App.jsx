@@ -128,9 +128,14 @@ function AppShell() {
   }
 
   const handleSignOut = async () => {
-    await signOut()
-    setMobileNavOpen(false)
-    navigate('/signin')
+    try {
+      await signOut()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setMobileNavOpen(false)
+      navigate('/signin', { replace: true })
+    }
   }
 
   useEffect(() => {
@@ -148,6 +153,8 @@ function AppShell() {
     setMobileNavOpen(false)
   }
 
+  const homePath = isArtistProfile(profile) ? '/dashboard' : '/'
+
   return (
     <AppContext.Provider value={ctx}>
       <a href="#main-content" className="skip-link">
@@ -155,10 +162,15 @@ function AppShell() {
       </a>
       <div className="app-layout">
         <header className="mobile-topbar">
-          <div className="mobile-topbar-brand">
+          <button
+            type="button"
+            className="mobile-topbar-brand mobile-topbar-brand--home"
+            onClick={() => goNav(homePath)}
+            aria-label="Second Unit — go to home"
+          >
             <div className="logo-icon" style={{ width: 32, height: 32, fontSize: 15 }}>S</div>
             <span>Second Unit</span>
-          </div>
+          </button>
           <button
             type="button"
             className="mobile-menu-btn"
@@ -180,10 +192,15 @@ function AppShell() {
         />
 
         <aside id="app-sidebar" className={`sidebar${mobileNavOpen ? ' sidebar--open' : ''}`}>
-          <div className="logo">
+          <button
+            type="button"
+            className="logo logo--home"
+            onClick={() => goNav(homePath)}
+            aria-label="Second Unit — go to home"
+          >
             <div className="logo-icon">S</div>
             <span className="logo-text">Second Unit</span>
-          </div>
+          </button>
           <nav>
             <div className="nav-section">
               <div className="nav-label">Main</div>

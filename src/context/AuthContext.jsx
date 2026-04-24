@@ -120,7 +120,15 @@ export function AuthProvider({ children }) {
       setProfile(null)
       return
     }
-    await supabase.auth.signOut()
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) console.error('[auth] signOut', error)
+    } catch (err) {
+      console.error('[auth] signOut', err)
+    } finally {
+      setUser(null)
+      setProfile(null)
+    }
   }
 
   function getAuthRedirectUrl() {

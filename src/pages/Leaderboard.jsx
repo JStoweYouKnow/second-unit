@@ -102,7 +102,6 @@ export default function Leaderboard() {
   return (
     <div className="page-container">
       <div className="spotlight-hero">
-        <p className="spotlight-hero__eyebrow">Launch-ready marketplace</p>
         <h2 className="spotlight-hero__title">Hire exceptional AI-native creative talent</h2>
         <p className="spotlight-hero__lede">
           Browse verified artists, compare rates, and move from discovery to booking without leaving the platform.

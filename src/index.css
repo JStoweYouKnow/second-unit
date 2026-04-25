@@ -1,28 +1,46 @@
-/* ===== Second Unit Design System ===== */
+/* ===== Second Unit Design System (brand: charcoal + electric blue) ===== */
 :root {
   color-scheme: dark;
-  --bg-primary: #0a0a0f;
-  --bg-secondary: #12121a;
-  --bg-card: #1a1a2e;
-  --bg-card-hover: #22223a;
-  --bg-glass: rgba(26, 26, 46, 0.7);
-  --bg-modal: rgba(0, 0, 0, 0.6);
-  --surface: #16162a;
-  --border: rgba(255, 255, 255, 0.06);
+  --brand-charcoal: #1f232b;
+  --brand-charcoal-deep: #14161c;
+  --brand-blue: #0066ff;
+  --brand-blue-hover: #3385ff;
+  --brand-blue-muted: #38bdf8;
+
+  --bg-primary: #13151a;
+  --bg-secondary: #1a1d24;
+  --bg-card: #22252c;
+  --bg-card-hover: #2a2e38;
+  --bg-glass: rgba(34, 37, 44, 0.85);
+  --bg-modal: rgba(10, 12, 18, 0.72);
+  --surface: #1e2128;
+  --border: rgba(255, 255, 255, 0.07);
   --border-hover: rgba(255, 255, 255, 0.12);
-  --text-primary: #f0f0f5;
-  --text-secondary: #9595b0;
-  --text-muted: #5e5e7a;
-  --accent: #7c5cfc;
-  --accent-hover: #9478ff;
-  --accent-glow: rgba(124, 92, 252, 0.25);
-  --accent2: #00d4aa;
-  --accent2-glow: rgba(0, 212, 170, 0.2);
+  --text-primary: #f4f5f7;
+  --text-secondary: #9aa3b2;
+  --text-muted: #6b7280;
+
+  --accent: var(--brand-blue);
+  --accent-hover: var(--brand-blue-hover);
+  --accent-glow: rgba(0, 102, 255, 0.28);
+  --accent-secondary: var(--brand-blue-muted);
+  --accent2: #0d9488;
+  --accent2-glow: rgba(13, 148, 136, 0.22);
+
+  /* UI tints derived from brand blue (replace hardcoded purple) */
+  --accent-tint-12: rgba(0, 102, 255, 0.12);
+  --accent-tint-10: rgba(0, 102, 255, 0.1);
+  --accent-tint-08: rgba(0, 102, 255, 0.08);
+  --accent-tint-05: rgba(0, 102, 255, 0.05);
+  --accent-tint-04: rgba(0, 102, 255, 0.04);
+  --accent-tint-border: rgba(0, 102, 255, 0.18);
+
   --gold: #f5c542;
   --silver: #c0c0d0;
   --bronze: #cd7f32;
   --danger: #ff4d6a;
-  --success: #00d4aa;
+  --success: #10b981;
+  --success-muted-bg: rgba(16, 185, 129, 0.14);
   --warning: #f5c542;
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -131,10 +149,29 @@ button.logo:focus-visible {
 }
 .logo-icon {
   width: 36px; height: 36px; border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, var(--accent), #00d4aa);
+  background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
   display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px;
 }
 .logo-text { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
+
+/* Full-color brand lockup */
+.brand-logo {
+  display: block;
+  height: 44px;
+  width: auto;
+  max-width: min(220px, 100%);
+  object-fit: contain;
+  object-position: left center;
+}
+.brand-logo--compact {
+  height: 30px;
+  max-width: 160px;
+}
+.auth-header .brand-logo {
+  height: 52px;
+  max-width: 280px;
+  margin: 0 auto;
+}
 
 /* ===== Nav ===== */
 .nav-section { margin-bottom: 24px; }
@@ -171,8 +208,8 @@ button.logo:focus-visible {
 .btn-primary:hover { background: var(--accent-hover); box-shadow: var(--shadow-glow); }
 .btn-secondary { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); }
 .btn-secondary:hover { border-color: var(--border-hover); background: var(--bg-card-hover); }
-.btn-success { background: var(--accent2); color: var(--bg-primary); }
-.btn-success:hover { filter: brightness(1.1); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { filter: brightness(1.08); }
 .btn-danger { background: var(--danger); color: white; }
 .btn-ghost { background: transparent; color: var(--text-secondary); padding: 8px 12px; }
 .btn-ghost:hover { color: var(--text-primary); background: var(--bg-card); }
@@ -232,7 +269,7 @@ button.logo:focus-visible {
 /* ===== Avatar ===== */
 .avatar {
   width: 40px; height: 40px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 16px; color: white; flex-shrink: 0;
 }
@@ -486,8 +523,8 @@ textarea.form-input { min-height: 100px; resize: vertical; }
   gap: 6px;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  background: rgba(124, 92, 252, 0.12);
-  border: 1px solid rgba(124, 92, 252, 0.22);
+  background: var(--accent-tint-12);
+  border: 1px solid var(--accent-tint-border);
   font-family: var(--font-display);
   font-size: 15px;
   font-weight: 700;
@@ -651,7 +688,7 @@ button.mobile-topbar-brand--home:focus-visible {
   padding: 22px 24px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  background: linear-gradient(135deg, rgba(124, 92, 252, 0.12), rgba(0, 212, 170, 0.06));
+  background: linear-gradient(135deg, var(--accent-tint-12), var(--accent-tint-05));
 }
 .spotlight-hero__title {
   font-family: var(--font-display);
@@ -783,8 +820,8 @@ button.mobile-topbar-brand--home:focus-visible {
 .auth-page {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
   background: var(--bg-primary); padding: 24px;
-  background-image: radial-gradient(ellipse at 30% 20%, rgba(124,92,252,0.08) 0%, transparent 50%),
-                    radial-gradient(ellipse at 70% 80%, rgba(0,212,170,0.06) 0%, transparent 50%);
+  background-image: radial-gradient(ellipse at 30% 20%, var(--accent-tint-08) 0%, transparent 50%),
+                    radial-gradient(ellipse at 70% 80%, rgba(56, 189, 248, 0.06) 0%, transparent 50%);
 }
 .auth-container {
   width: 100%; max-width: 460px; background: var(--bg-secondary);
@@ -823,7 +860,7 @@ button.mobile-topbar-brand--home:focus-visible {
   font-size: 13px; margin-bottom: 20px;
 }
 .auth-mock-banner {
-  background: rgba(124,92,252,0.1); border: 1px solid rgba(124,92,252,0.2);
+  background: var(--accent-tint-10); border: 1px solid var(--accent-tint-border);
   color: var(--accent); padding: 10px 16px; border-radius: var(--radius-sm);
   font-size: 13px; margin-bottom: 20px; text-align: center;
 }
@@ -876,7 +913,7 @@ button.mobile-topbar-brand--home:focus-visible {
   transition: var(--transition); position: relative; align-items: flex-start;
 }
 .notif-item:hover { background: var(--bg-card); }
-.notif-item.unread { background: rgba(124,92,252,0.04); }
+.notif-item.unread { background: var(--accent-tint-04); }
 .notif-item.unread::before {
   content: ''; position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
   width: 6px; height: 6px; border-radius: 50%; background: var(--accent);

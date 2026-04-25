@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Mail, Lock, LogIn, ArrowRight } from '../components/icons'
 import { useAuth } from '../context/AuthContext'
+import BrandLogo from '../components/BrandLogo'
 
 function readOAuthErrorFromUrl() {
   const q = new URLSearchParams(window.location.search)
@@ -60,9 +61,8 @@ export default function SignIn() {
     <div className="auth-page">
       <div className="auth-container slide-up">
         <div className="auth-header">
-          <div className="logo" style={{ justifyContent: 'center', borderBottom: 'none', paddingBottom: 0, marginBottom: 8 }}>
-            <div className="logo-icon">S</div>
-            <span className="logo-text">Second Unit</span>
+          <div className="logo" style={{ justifyContent: 'center', borderBottom: 'none', paddingBottom: 0, marginBottom: 16 }}>
+            <BrandLogo />
           </div>
           <h1>Welcome back</h1>
           <p>Sign in to your account to continue</p>

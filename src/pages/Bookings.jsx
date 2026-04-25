@@ -140,10 +140,10 @@ export default function Bookings() {
 
   const statusConfig = {
     pending: { bg: 'rgba(245,197,66,0.1)', color: 'var(--warning)', icon: <AlertCircle size={14} />, label: 'Pending' },
-    confirmed: { bg: 'rgba(0,212,170,0.1)', color: 'var(--success)', icon: <CheckCircle size={14} />, label: 'Confirmed' },
-    paid: { bg: 'rgba(124,92,252,0.1)', color: 'var(--accent)', icon: <CreditCard size={14} />, label: 'Paid' },
+    confirmed: { bg: 'var(--success-muted-bg)', color: 'var(--success)', icon: <CheckCircle size={14} />, label: 'Confirmed' },
+    paid: { bg: 'var(--accent-tint-10)', color: 'var(--accent)', icon: <CreditCard size={14} />, label: 'Paid' },
     cancelled: { bg: 'rgba(255,77,106,0.1)', color: 'var(--danger)', icon: <X size={14} />, label: 'Cancelled' },
-    completed: { bg: 'rgba(0,212,170,0.1)', color: 'var(--success)', icon: <CheckCircle size={14} />, label: 'Completed' },
+    completed: { bg: 'var(--success-muted-bg)', color: 'var(--success)', icon: <CheckCircle size={14} />, label: 'Completed' },
   }
 
   return (

@@ -195,7 +195,7 @@ END:VCALENDAR`
 
         {/* Selected Slot Actions */}
         {selectedSlot && selectedDateStr && (
-          <div className="slide-up" style={{ marginTop: 20, padding: 20, background: 'rgba(124,92,252,0.05)', border: '1px solid rgba(124,92,252,0.15)', borderRadius: 'var(--radius-sm)' }}>
+          <div className="slide-up" style={{ marginTop: 20, padding: 20, background: 'var(--accent-tint-05)', border: '1px solid var(--accent-tint-border)', borderRadius: 'var(--radius-sm)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div>
                 <div style={{ fontWeight: 600, marginBottom: 2 }}>

@@ -30,7 +30,7 @@ export default function ArtistProfile() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <h1>{artist.name}</h1>
               {artist.available && (
-                <span style={{ padding: '4px 12px', borderRadius: 20, background: 'rgba(0,212,170,0.15)', color: 'var(--success)', fontSize: 12, fontWeight: 600 }}>
+                <span style={{ padding: '4px 12px', borderRadius: 20, background: 'var(--success-muted-bg)', color: 'var(--success)', fontSize: 12, fontWeight: 600 }}>
                   ● Available
                 </span>
               )}
@@ -98,7 +98,7 @@ export default function ArtistProfile() {
                 {[1,2,3,4].map(i => (
                   <div key={i} className="card" style={{
                     height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: `linear-gradient(${135 + i * 30}deg, rgba(124,92,252,0.2), rgba(0,212,170,0.1))`,
+                    background: `linear-gradient(${135 + i * 30}deg, var(--accent-tint-12), rgba(56, 189, 248, 0.08))`,
                     fontSize: 14, color: 'var(--text-muted)'
                   }}>
                     Portfolio Piece {i}

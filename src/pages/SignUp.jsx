@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Mail, Lock, User, ArrowLeft, UserPlus, Palette, Briefcase } from '../components/icons'
 import { useAuth } from '../context/AuthContext'
+import BrandLogo from '../components/BrandLogo'
 
 export default function SignUp() {
   const navigate = useNavigate()
@@ -60,9 +61,8 @@ export default function SignUp() {
     <div className="auth-page">
       <div className="auth-container slide-up">
         <div className="auth-header">
-          <div className="logo" style={{ justifyContent: 'center', borderBottom: 'none', paddingBottom: 0, marginBottom: 8 }}>
-            <div className="logo-icon">S</div>
-            <span className="logo-text">Second Unit</span>
+          <div className="logo" style={{ justifyContent: 'center', borderBottom: 'none', paddingBottom: 0, marginBottom: 16 }}>
+            <BrandLogo />
           </div>
           <h1>Create your account</h1>
           <p>Join the premier AI artist marketplace</p>

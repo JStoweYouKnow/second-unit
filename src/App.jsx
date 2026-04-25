@@ -9,6 +9,7 @@ import { useFavorites } from './hooks/useData'
 import { messages as mockMessages } from './data/mockData'
 import NotificationPanel from './components/NotificationPanel'
 import ErrorBoundary from './components/ErrorBoundary'
+import BrandLogo from './components/BrandLogo'
 
 // Lazy loaded pages (Item 6)
 const Leaderboard = lazy(() => import('./pages/Leaderboard'))
@@ -165,8 +166,7 @@ function AppShell() {
             onClick={() => goNav(homePath)}
             aria-label="Second Unit — go to home"
           >
-            <div className="logo-icon" style={{ width: 32, height: 32, fontSize: 15 }}>S</div>
-            <span>Second Unit</span>
+            <BrandLogo variant="compact" />
           </button>
           <button
             type="button"
@@ -193,10 +193,10 @@ function AppShell() {
             type="button"
             className="logo logo--home"
             onClick={() => goNav(homePath)}
-            aria-label="Second Unit — go to home"
+            aria-label="Second Unit — AI artist platform, go to home"
           >
-            <div className="logo-icon">S</div>
-            <span className="logo-text">Second Unit</span>
+            <BrandLogo />
+            <span className="sr-only">Second Unit — AI artist platform</span>
           </button>
           <nav>
             <div className="nav-section">

@@ -641,7 +641,7 @@ ${divider}
                 <div style={{
                   padding: 20, borderRadius: 'var(--radius-sm)',
                   border: `2px dashed ${showView.signedByEmployer ? 'var(--success)' : 'var(--border)'}`,
-                  background: showView.signedByEmployer ? 'rgba(0,212,170,0.05)' : 'transparent',
+                  background: showView.signedByEmployer ? 'var(--success-muted-bg)' : 'transparent',
                   textAlign: 'center',
                 }}>
                   {showView.signedByEmployer ? (
@@ -665,7 +665,7 @@ ${divider}
                 <div style={{
                   padding: 20, borderRadius: 'var(--radius-sm)',
                   border: `2px dashed ${showView.signedByArtist ? 'var(--success)' : 'var(--border)'}`,
-                  background: showView.signedByArtist ? 'rgba(0,212,170,0.05)' : 'transparent',
+                  background: showView.signedByArtist ? 'var(--success-muted-bg)' : 'transparent',
                   textAlign: 'center',
                 }}>
                   {showView.signedByArtist ? (
@@ -726,7 +726,7 @@ ${divider}
             </div>
 
             {/* Agreement Summary */}
-            <div style={{ padding: 16, background: 'rgba(124,92,252,0.05)', border: '1px solid rgba(124,92,252,0.15)', borderRadius: 'var(--radius-sm)', marginBottom: 24, fontSize: 13 }}>
+            <div style={{ padding: 16, background: 'var(--accent-tint-05)', border: '1px solid var(--accent-tint-border)', borderRadius: 'var(--radius-sm)', marginBottom: 24, fontSize: 13 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontWeight: 600 }}>
                 <Shield size={16} style={{ color: 'var(--accent)' }} /> By signing, you agree to:
               </div>

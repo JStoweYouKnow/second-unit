@@ -31,9 +31,9 @@ export default function Payments() {
   const platformFees = Math.round(total * 0.1)
 
   const statusStyles = {
-    paid: { bg: 'rgba(0,212,170,0.1)', color: 'var(--success)', icon: <CheckCircle size={14} />, label: 'Paid' },
+    paid: { bg: 'var(--success-muted-bg)', color: 'var(--success)', icon: <CheckCircle size={14} />, label: 'Paid' },
     pending: { bg: 'rgba(245,197,66,0.1)', color: 'var(--warning)', icon: <Clock size={14} />, label: 'Pending' },
-    upcoming: { bg: 'rgba(124,92,252,0.1)', color: 'var(--accent)', icon: <Clock size={14} />, label: 'Scheduled' },
+    upcoming: { bg: 'var(--accent-tint-10)', color: 'var(--accent)', icon: <Clock size={14} />, label: 'Scheduled' },
     refunded: { bg: 'rgba(255,77,106,0.1)', color: 'var(--danger)', icon: <ArrowDownRight size={14} />, label: 'Refunded' },
   }
 
@@ -158,9 +158,9 @@ https://secondunit.com
       </div>
 
       {/* Stripe Banner */}
-      <div style={{ marginBottom: 24, padding: '16px 20px', background: 'linear-gradient(135deg, rgba(99,91,255,0.1), rgba(0,212,170,0.05))', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ marginBottom: 24, padding: '16px 20px', background: 'linear-gradient(135deg, var(--accent-tint-10), var(--accent-tint-05))', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ padding: 8, borderRadius: 'var(--radius-sm)', background: 'rgba(99,91,255,0.2)' }}>
+          <div style={{ padding: 8, borderRadius: 'var(--radius-sm)', background: 'var(--accent-tint-12)' }}>
             <CreditCard size={20} style={{ color: 'var(--accent)' }} />
           </div>
           <div>

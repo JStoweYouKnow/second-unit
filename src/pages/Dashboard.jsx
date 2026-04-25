@@ -18,7 +18,7 @@ function BarChart({ data, height = 160 }) {
           <div style={{
             width: '100%', borderRadius: '6px 6px 0 0',
             height: `${(d.value / max) * (height - 40)}px`,
-            background: `linear-gradient(180deg, var(--accent), ${i % 2 === 0 ? '#00d4aa' : 'var(--accent)'})`,
+            background: `linear-gradient(180deg, var(--accent), ${i % 2 === 0 ? 'var(--accent-secondary)' : 'var(--accent)'})`,
             transition: 'height 0.6s ease',
             minHeight: 4,
           }} />
@@ -103,24 +103,24 @@ export default function Dashboard() {
 
   const roleDistribution = [
     { label: 'Visual Artist', value: 3, color: 'var(--accent)' },
-    { label: 'Motion Designer', value: 2, color: '#00d4aa' },
+    { label: 'Motion Designer', value: 2, color: 'var(--accent-secondary)' },
     { label: 'Music Producer', value: 2, color: '#f5c542' },
     { label: '3D Artist', value: 1, color: '#ff4d6a' },
-    { label: 'Other', value: 2, color: '#6366f1' },
+    { label: 'Other', value: 2, color: '#64748b' },
   ]
 
   const recentActivity = [
     { type: 'booking', text: 'Booking confirmed with Maya Chen', time: '2h ago', color: 'var(--success)' },
     { type: 'payment', text: 'You sent $5,000 to an artist (milestone)', time: '5h ago', color: 'var(--accent)' },
     { type: 'contract', text: 'Contract signed by Theo Park', time: '1d ago', color: 'var(--warning)' },
-    { type: 'message', text: 'New message from Dex Okafor', time: '1d ago', color: '#6366f1' },
+    { type: 'message', text: 'New message from Dex Okafor', time: '1d ago', color: 'var(--accent-secondary)' },
     { type: 'booking', text: 'Booking request sent to Aria Nakamura', time: '2d ago', color: 'var(--success)' },
   ]
 
   const artistRecentActivity = [
     { type: 'booking', text: 'New booking request for a consultation', time: '2h ago', color: 'var(--success)' },
     { type: 'payment', text: 'Milestone marked paid by client', time: '5h ago', color: 'var(--accent)' },
-    { type: 'message', text: 'Client asked about timeline', time: '1d ago', color: '#6366f1' },
+    { type: 'message', text: 'Client asked about timeline', time: '1d ago', color: 'var(--accent-secondary)' },
     { type: 'contract', text: 'Contract ready for your signature', time: '1d ago', color: 'var(--warning)' },
   ]
 
@@ -135,7 +135,7 @@ export default function Dashboard() {
     for (const b of myBookings) {
       counts[b.type] = (counts[b.type] || 0) + 1
     }
-    const colors = ['var(--accent)', '#00d4aa', '#f5c542', '#ff4d6a', '#6366f1']
+    const colors = ['var(--accent)', 'var(--accent-secondary)', '#f5c542', '#ff4d6a', '#64748b']
     const entries = Object.entries(counts)
     if (entries.length === 0) {
       return [{ label: 'No gigs yet', value: 1, color: 'var(--text-muted)' }]
@@ -285,7 +285,7 @@ export default function Dashboard() {
                   <span style={{ fontSize: 14, fontWeight: 600 }}>${bookingSubtotal(b).toLocaleString()}</span>
                   <span style={{
                     padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                    background: b.status === 'confirmed' ? 'rgba(0,212,170,0.1)' : 'rgba(245,197,66,0.1)',
+                    background: b.status === 'confirmed' ? 'var(--success-muted-bg)' : 'rgba(245,197,66,0.1)',
                     color: b.status === 'confirmed' ? 'var(--success)' : 'var(--warning)',
                   }}>
                     {b.status}
@@ -434,7 +434,7 @@ export default function Dashboard() {
                 <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Negotiated with client</span>
                 <span style={{
                   padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                  background: a.available ? 'rgba(0,212,170,0.1)' : 'rgba(255,77,106,0.1)',
+                  background: a.available ? 'var(--success-muted-bg)' : 'rgba(255,77,106,0.1)',
                   color: a.available ? 'var(--success)' : 'var(--danger)'
                 }}>
                   {a.available ? '● Available' : '● Booked'}
@@ -461,7 +461,7 @@ export default function Dashboard() {
               <span style={{ fontSize: 14, fontWeight: 600 }}>${bookingSubtotal(b).toLocaleString()}</span>
               <span style={{
                 padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                background: b.status === 'confirmed' ? 'rgba(0,212,170,0.1)' : 'rgba(245,197,66,0.1)',
+                background: b.status === 'confirmed' ? 'var(--success-muted-bg)' : 'rgba(245,197,66,0.1)',
                 color: b.status === 'confirmed' ? 'var(--success)' : 'var(--warning)'
               }}>
                 {b.status}

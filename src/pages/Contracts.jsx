@@ -1,7 +1,8 @@
 import { useMemo, useState, useRef } from 'react'
 import { FileText, Plus, Download, Eye, CheckCircle, Clock, Archive, X, PenTool, Shield, Copy, Check, Upload, Receipt } from '../components/icons'
-import { contracts as mockContracts, artists } from '../data/mockData'
+import { artists } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
+import { useApp } from '../context/AppContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
 
 const STANDARD_TERMS = `INDEPENDENT CONTRACTOR AGREEMENT
@@ -64,9 +65,9 @@ function isAllowedCustomAgreementFile(file) {
 
 export default function Contracts() {
   const { profile } = useAuth()
+  const { localContracts, setLocalContracts } = useApp()
   const isArtist = isArtistProfile(profile)
   const me = demoArtistPersona(profile)
-  const [localContracts, setLocalContracts] = useState(mockContracts)
   const [showNew, setShowNew] = useState(false)
   const [showView, setShowView] = useState(null) // contract to view
   const [showSign, setShowSign] = useState(null) // contract to sign
@@ -166,6 +167,7 @@ export default function Contracts() {
       title: newContract.title,
       artistName: artist.name,
       artistId: artist.id,
+      clientName: profile?.full_name || 'Client',
       type: contractType,
       status: 'pending',
       value: parseInt(newContract.value) || 0,

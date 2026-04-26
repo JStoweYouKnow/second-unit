@@ -266,6 +266,113 @@ button.logo:focus-visible {
 }
 .artist-actions { display: flex; gap: 8px; align-items: center; }
 
+/* ===== Artist Gallery (Netflix style) ===== */
+.artist-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.artist-tile {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.4s ease;
+}
+
+.artist-tile:hover {
+  transform: scale(1.04) translateY(-4px);
+  z-index: 10;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), var(--shadow-glow);
+  border-color: var(--accent);
+}
+
+.artist-tile__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.3s ease;
+  background: linear-gradient(135deg, var(--bg-card), var(--surface));
+}
+
+.artist-tile__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.4) 40%, transparent 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 16px;
+  transition: background 0.3s ease;
+}
+
+.artist-tile:hover .artist-tile__overlay {
+  background: linear-gradient(to top, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.5) 50%, transparent 100%);
+}
+
+.artist-tile__name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 4px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.artist-tile__role {
+  font-size: 12px;
+  color: var(--accent-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.artist-tile__links {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+
+.artist-tile:hover .artist-tile__links {
+  opacity: 1;
+}
+
+.artist-tile__link-icon {
+  color: white;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.artist-tile__link-icon:hover {
+  transform: scale(1.2);
+  color: var(--accent);
+}
+
+.artist-tile__rank {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
 /* ===== Avatar ===== */
 .avatar {
   width: 40px; height: 40px; border-radius: 50%;
@@ -541,6 +648,19 @@ textarea.form-input { min-height: 100px; resize: vertical; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.project-phase-card {
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+
+.project-phase-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
 }
 
 /* ===== Pricing mode (hourly / daily / flat) ===== */

@@ -7,6 +7,8 @@ const defaultAppContext = {
   allMessages: [],
   sendMessage: () => {},
   startConversation: () => undefined,
+  localContracts: [],
+  setLocalContracts: () => {},
 }
 
 export const AppContext = createContext(defaultAppContext)

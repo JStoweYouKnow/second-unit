@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Calendar, Heart, Play, Star, MedalGold, MedalSilver, MedalBronze, Filter, DollarSign, MapPin } from '../components/icons'
+import { Search, Calendar, Heart, Play, Star, MedalGold, MedalSilver, MedalBronze, Filter, DollarSign, MapPin, Globe, AtSign, ExternalLink } from '../components/icons'
 import { artists, availableProjects } from '../data/mockData'
 import { useApp } from '../context/AppContext'
 import CalendarModal from '../components/CalendarModal'
@@ -254,158 +254,69 @@ export default function Leaderboard() {
         </section>
       </div>
 
-      <section className="spotlight-projects" aria-label="Available projects with budgets">
-        <div className="spotlight-projects__head">
-          <h2>Available projects</h2>
-          <p className="spotlight-projects__sub">
-            Client-listed budgets for scope reference — final compensation is always negotiated in your thread.
-          </p>
-        </div>
-        <div className="spotlight-projects__grid">
-          {availableProjects.map((proj) => (
-            <article key={proj.id} className="spotlight-project-card card slide-up">
-              <div className="spotlight-project-card__top">
-                <div>
-                  <h3 className="spotlight-project-card__title">{proj.title}</h3>
-                  <div className="spotlight-project-card__meta">
-                    <span className="spotlight-project-card__client">{proj.client}</span>
-                    <span className="spotlight-project-card__posted">Posted {proj.posted}</span>
-                  </div>
-                </div>
-                <div className="spotlight-project-card__budget" title="Client budget range for this brief">
-                  <DollarSign size={18} aria-hidden />
-                  <span>{formatBudgetRange(proj.budgetMin, proj.budgetMax)}</span>
-                </div>
-              </div>
-              <div className="spotlight-project-card__row">
-                <span className="spotlight-project-card__label"><MapPin size={14} aria-hidden /> {proj.location}</span>
-                <span className="spotlight-project-card__label">Timeline: {proj.timeline}</span>
-              </div>
-              <div className="artist-skills" style={{ marginTop: 10 }}>
-                {proj.skills.map((s) => (
-                  <span key={s} className="skill-tag">
-                    {s}
-                  </span>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="artist-gallery-grid">
         {filtered.map((artist, i) => {
           const rank = i + 1
-          const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : ''
+          // Use generated images for first few artists, fallback for others
+          const thumbUrl = i === 0 ? '/Users/v/.gemini/antigravity/brain/9dc5a748-79f9-42e5-ae4f-5345ea3cb839/ai_artist_portfolio_1_1777161530365.png' 
+                        : i === 1 ? '/Users/v/.gemini/antigravity/brain/9dc5a748-79f9-42e5-ae4f-5345ea3cb839/ai_artist_portfolio_2_1777161543445.png'
+                        : i === 2 ? '/Users/v/.gemini/antigravity/brain/9dc5a748-79f9-42e5-ae4f-5345ea3cb839/ai_artist_portfolio_3_1777161554677.png'
+                        : null
+
           return (
             <div
               key={artist.id}
-              className="artist-card slide-up"
+              className="artist-tile slide-up"
               style={{ animationDelay: `${i * 0.05}s` }}
-              tabIndex={0}
-              aria-label={`View profile: ${artist.name}`}
               onClick={() => navigate(`/artist/${artist.id}`)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  navigate(`/artist/${artist.id}`)
-                }
-              }}
             >
-              <div className={`artist-rank ${rankClass}`}>
-                {rank === 1 ? (
-                  <MedalGold size={22} />
-                ) : rank === 2 ? (
-                  <MedalSilver size={22} />
-                ) : rank === 3 ? (
-                  <MedalBronze size={22} />
-                ) : (
-                  `#${rank}`
-                )}
-              </div>
-              <div className="artist-info">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div className="avatar avatar-sm">{artist.avatar}</div>
-                  <div>
-                    <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {artist.name}
-                      {artist.available && (
-                        <span
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            background: 'var(--success)',
-                            display: 'inline-block',
-                          }}
-                        />
-                      )}
-                    </h3>
-                    <div className="artist-meta">
-                      <span className="artist-role">{artist.role}</span>
-                      <span style={{ color: 'var(--gold)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Star size={12} fill="var(--gold)" /> {artist.rating}
-                      </span>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{artist.projects} projects</span>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 6, flexWrap: 'wrap' }}>
-                  <div className="artist-skills">
-                    {artist.skills.slice(0, 4).map((s) => (
-                      <span key={s} className="skill-tag">
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                  {artist.videoLinks.length > 0 && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        window.open(artist.videoLinks[0], '_blank')
-                      }}
-                      style={{ color: 'var(--accent)', fontSize: 12 }}
-                    >
-                      <Play size={12} /> Reel
-                    </button>
+              <div className="artist-tile__rank">{rank}</div>
+              
+              {thumbUrl ? (
+                <img src={thumbUrl} alt={artist.name} className="artist-tile__img" />
+              ) : (
+                <div className="artist-tile__img" />
+              )}
+              
+              <div className="artist-tile__overlay">
+                <div className="artist-tile__role">{artist.role}</div>
+                <div className="artist-tile__name">{artist.name}</div>
+                
+                <div className="artist-tile__links" onClick={(e) => e.stopPropagation()}>
+                  {artist.socials?.website && (
+                    <a href={artist.socials.website} target="_blank" rel="noopener noreferrer" className="artist-tile__link-icon" title="Website">
+                      <Globe size={18} />
+                    </a>
                   )}
-                  <div className="artist-brands">
-                    {artist.brands.map((b) => (
-                      <span key={b} className="brand-logo" title={b}>
-                        {b[0]}
-                      </span>
-                    ))}
-                  </div>
+                  <a href="#" className="artist-tile__link-icon" title="Socials">
+                    <AtSign size={18} />
+                  </a>
+                  {artist.videoLinks?.length > 0 && (
+                    <a href={artist.videoLinks[0]} target="_blank" rel="noopener noreferrer" className="artist-tile__link-icon" title="Reel">
+                      <Play size={18} />
+                    </a>
+                  )}
+                  <button 
+                    type="button" 
+                    className="artist-tile__link-icon" 
+                    style={{ background: 'none', border: 'none', padding: 0 }}
+                    onClick={() => toggleFavorite(artist.id)}
+                    title="Favorite"
+                  >
+                    <Heart size={18} fill={favorites.includes(artist.id) ? 'var(--danger)' : 'none'} color={favorites.includes(artist.id) ? 'var(--danger)' : 'white'} />
+                  </button>
                 </div>
-              </div>
-              <div className="artist-actions" onClick={(e) => e.stopPropagation()}>
-                <span
-                  style={{
-                    color: 'var(--text-muted)',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    marginRight: 8,
-                    maxWidth: 200,
-                    textAlign: 'right',
-                    lineHeight: 1.35,
-                  }}
-                >
-                  Fees negotiated with client
-                </span>
-                <button type="button" className="btn-icon" title="View Calendar" onClick={() => setCalendarArtist(artist)}>
-                  <Calendar size={16} />
-                </button>
-                <button
-                  type="button"
-                  className="btn-icon"
-                  title="Favorite"
-                  onClick={() => toggleFavorite(artist.id)}
-                  style={favorites.includes(artist.id) ? { color: 'var(--danger)', borderColor: 'var(--danger)' } : {}}
-                >
-                  <Heart size={16} fill={favorites.includes(artist.id) ? 'var(--danger)' : 'none'} />
-                </button>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--gold)', fontSize: 13, fontWeight: 700 }}>
+                    <Star size={14} fill="var(--gold)" /> {artist.rating}
+                  </div>
+                  {artist.available && (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--success)', textTransform: 'uppercase' }}>
+                      ● Available
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           )

@@ -6,7 +6,7 @@ import { AppContext } from './context/AppContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
 import { useFavorites } from './hooks/useData'
-import { messages as mockMessages } from './data/mockData'
+import { messages as mockMessages, contracts as mockContracts } from './data/mockData'
 import NotificationPanel from './components/NotificationPanel'
 import ErrorBoundary from './components/ErrorBoundary'
 import BrandLogo from './components/BrandLogo'
@@ -66,6 +66,7 @@ function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const { favorites, toggleFavorite } = useFavorites(user?.id)
   const [allMessages, setAllMessages] = useState(mockMessages)
+  const [localContracts, setLocalContracts] = useState(mockContracts)
 
   const sendMessage = useCallback((conversationId, text, senderOverride) => {
     setAllMessages(prev => prev.map(m => {
@@ -123,6 +124,8 @@ function AppShell() {
     allMessages,
     sendMessage,
     startConversation,
+    localContracts,
+    setLocalContracts,
   }
 
   const handleSignOut = async () => {

@@ -83,3 +83,9 @@ export function durationUnitLabel(model) {
   if (model === 'flat') return ''
   return 'h'
 }
+
+export function formatBudgetRange(min, max) {
+  const a = Number(min) || 0
+  const b = Number(max) || 0
+  return `$${a.toLocaleString()} – $${b.toLocaleString()}`
+}

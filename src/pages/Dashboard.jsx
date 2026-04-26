@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Heart, Star, Calendar, TrendingUp, Users, DollarSign, FileText, ArrowUpRight, BarChart3, PieChart, Activity, User } from '../components/icons'
-import { artists, bookings, contracts, payments } from '../data/mockData'
+import { Heart, Star, Calendar, TrendingUp, Users, DollarSign, FileText, ArrowUpRight, BarChart3, PieChart, Activity, User, MapPin } from '../components/icons'
+import { artists, bookings, payments, availableProjects } from '../data/mockData'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
-import { bookingSubtotal } from '../lib/pricing'
+import { bookingSubtotal, formatBudgetRange } from '../lib/pricing'
 
 // Simple bar chart component (pure CSS)
 function BarChart({ data, height = 160 }) {
@@ -80,14 +80,14 @@ function Sparkline({ data, color = 'var(--accent)', height = 40 }) {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { favorites } = useApp()
+  const { favorites, localContracts } = useApp()
   const isArtist = isArtistProfile(profile)
   const me = demoArtistPersona(profile)
   const favArtists = artists.filter(a => favorites.includes(a.id))
   const [timeRange, setTimeRange] = useState('6m')
 
   const myBookings = useMemo(() => (me ? bookings.filter((b) => b.artistId === me.id) : []), [me])
-  const myContracts = useMemo(() => (me ? contracts.filter((c) => c.artistId === me.id) : []), [me])
+  const myContracts = useMemo(() => (me ? localContracts.filter((c) => c.artistId === me.id) : []), [me, localContracts])
   const myPayments = useMemo(() => (me ? payments.filter((p) => p.artistName === me.name) : []), [me])
 
   // Mock analytics data
@@ -145,6 +145,25 @@ export default function Dashboard() {
 
   const paidTotal = myPayments.filter((p) => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
   const upcomingGigs = myBookings.filter((b) => b.status === 'confirmed' || b.status === 'pending').length
+
+  const contractOffers = useMemo(() => {
+    if (!me) return []
+    return localContracts
+      .filter((c) => typeof c.id === 'string' && c.artistId === me.id)
+      .map((c) => ({
+        id: `offer-${c.id}`,
+        title: c.title,
+        client: c.clientName || 'Client',
+        budgetMin: c.value,
+        budgetMax: c.value,
+        location: 'Remote',
+        skills: [],
+        posted: c.createdAt ? c.createdAt.slice(0, 10) : 'Today',
+        timeline: c.startDate && c.endDate ? `${c.startDate} → ${c.endDate}` : '',
+        isOffer: true,
+        contractStatus: c.status,
+      }))
+  }, [me, localContracts])
 
   if (isArtist && me) {
     return (
@@ -266,7 +285,7 @@ export default function Dashboard() {
         </div>
 
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 16 }}>Upcoming bookings</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 32 }}>
           {myBookings.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
               No bookings assigned to this demo profile yet.
@@ -295,6 +314,50 @@ export default function Dashboard() {
             ))
           )}
         </div>
+
+        <section className="spotlight-projects" style={{ padding: 0 }}>
+          <div className="spotlight-projects__head">
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20 }}>Available projects</h2>
+            <p className="spotlight-projects__sub">
+              Client-listed budgets for scope reference — final compensation is always negotiated in your thread.
+            </p>
+          </div>
+          <div className="spotlight-projects__grid">
+            {[...contractOffers, ...availableProjects].map((proj) => (
+              <article key={proj.id} className="spotlight-project-card card slide-up" style={proj.isOffer ? { borderColor: 'var(--accent)', borderWidth: 1, borderStyle: 'solid' } : undefined}>
+                {proj.isOffer && (
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                    Contract offer
+                  </div>
+                )}
+                <div className="spotlight-project-card__top">
+                  <div>
+                    <h3 className="spotlight-project-card__title">{proj.title}</h3>
+                    <div className="spotlight-project-card__meta">
+                      <span className="spotlight-project-card__client">{proj.client}</span>
+                      <span className="spotlight-project-card__posted">Posted {proj.posted}</span>
+                    </div>
+                  </div>
+                  <div className="spotlight-project-card__budget" title="Client budget range for this brief">
+                    <DollarSign size={18} aria-hidden />
+                    <span>{formatBudgetRange(proj.budgetMin, proj.budgetMax)}</span>
+                  </div>
+                </div>
+                <div className="spotlight-project-card__row">
+                  <span className="spotlight-project-card__label"><MapPin size={14} aria-hidden /> {proj.location}</span>
+                  <span className="spotlight-project-card__label">Timeline: {proj.timeline}</span>
+                </div>
+                {proj.skills.length > 0 && (
+                  <div className="artist-skills" style={{ marginTop: 10 }}>
+                    {proj.skills.map((s) => (
+                      <span key={s} className="skill-tag">{s}</span>
+                    ))}
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
       </div>
     )
   }
@@ -335,8 +398,8 @@ export default function Dashboard() {
         </div>
         <div className="stat-card">
           <span className="stat-label"><FileText size={14} /> Contracts</span>
-          <span className="stat-value">{contracts.length}</span>
-          <span className="stat-change">${contracts.reduce((s, c) => s + c.value, 0).toLocaleString()} total</span>
+          <span className="stat-value">{localContracts.length}</span>
+          <span className="stat-change">${localContracts.reduce((s, c) => s + c.value, 0).toLocaleString()} total</span>
         </div>
       </div>
 
@@ -402,13 +465,64 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Favorites */}
+      {/* Projects in Phases */}
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 20 }}>Your Projects</h2>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 32 }}>
+        {/* Open Projects */}
+        <div className="card" style={{ padding: 20 }}>
+          <h3 style={{ fontSize: 15, marginBottom: 16, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} /> Open Briefs
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {availableProjects.slice(0, 2).map(p => (
+              <div key={p.id} className="project-phase-card">
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{p.title}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.posted} · {p.location}</div>
+              </div>
+            ))}
+            <button className="btn btn-ghost btn-sm" style={{ width: '100%', marginTop: 8 }}>View all open briefs</button>
+          </div>
+        </div>
+
+        {/* In Progress Projects */}
+        <div className="card" style={{ padding: 20 }}>
+          <h3 style={{ fontSize: 15, marginBottom: 16, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--warning)' }} /> In Progress
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {localContracts.filter(c => c.status === 'active' || c.status === 'pending').map(c => (
+              <div key={c.id} className="project-phase-card">
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{c.title}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.artistName} · {c.status}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Completed Projects */}
+        <div className="card" style={{ padding: 20 }}>
+          <h3 style={{ fontSize: 15, marginBottom: 16, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success)' }} /> Completed
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {localContracts.filter(c => c.status === 'completed').map(c => (
+              <div key={c.id} className="project-phase-card">
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{c.title}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.artistName} · Finished</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Favorites (moved down) */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, margin: 0 }}>Your Favorites</h2>
         <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Fees agreed per project with each artist</span>
       </div>
       {favArtists.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
+        <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)', marginBottom: 32 }}>
           <Heart size={32} style={{ marginBottom: 8, opacity: 0.5 }} />
           <p>No favorites yet. Browse Artist Spotlight to add artists.</p>
           <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => navigate('/')}>Browse Artists</button>
@@ -447,7 +561,7 @@ export default function Dashboard() {
 
       {/* Upcoming Bookings */}
       <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 16 }}>Upcoming Bookings</h2>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 40 }}>
         {bookings.map(b => (
           <div key={b.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px' }}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>

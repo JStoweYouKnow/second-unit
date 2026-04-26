@@ -170,9 +170,14 @@ https://secondunit.com
             </div>
           </div>
         </div>
-        <button className="btn btn-secondary btn-sm">
+        <a 
+          href="https://dashboard.stripe.com" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="btn btn-secondary btn-sm"
+        >
           <ArrowUpRight size={14} /> Stripe Dashboard
-        </button>
+        </a>
       </div>
 
       {/* Filters */}

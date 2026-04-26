@@ -69,10 +69,10 @@ export default function Projects() {
   const isArtist = isArtistProfile(profile)
   const me = demoArtistPersona(profile)
   const [showNew, setShowNew] = useState(false)
-  const [showView, setShowView] = useState(null) // contract to view
-  const [showSign, setShowSign] = useState(null) // contract to sign
-  const [contractType, setContractType] = useState('standard')
-  const [newContract, setNewContract] = useState({
+  const [showView, setShowView] = useState(null) // project to view
+  const [showSign, setShowSign] = useState(null) // project to sign
+  const [projectType, setProjectType] = useState('standard')
+  const [newProject, setNewProject] = useState({
     title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: ''
   })
   /** Pending upload in the modal only (blob URL revoked on discard). On create, URL is kept on the contract row. */
@@ -97,11 +97,11 @@ export default function Projects() {
     })
   }
 
-  function closeNewContractModal() {
+  function closeNewProjectModal() {
     discardCustomAgreementUpload()
     setCustomUploadError('')
-    setContractType('standard')
-    setNewContract({ title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: '' })
+    setProjectType('standard')
+    setNewProject({ title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: '' })
     setShowNew(false)
   }
 
@@ -129,17 +129,17 @@ export default function Projects() {
     })
   }
 
-  const handleCreateContract = (e) => {
+  const handleCreateProject = (e) => {
     e.preventDefault()
-    const hasCustomText = newContract.customTerms.trim().length > 0
+    const hasCustomText = newProject.customTerms.trim().length > 0
     const hasCustomFile = !!customAgreementUpload
-    if (contractType === 'custom' && !hasCustomText && !hasCustomFile) {
+    if (projectType === 'custom' && !hasCustomText && !hasCustomFile) {
       setCustomUploadError('Add terms in the text area or upload a PDF / Word document.')
       return
     }
     setCustomUploadError('')
 
-    const artist = artists.find(a => a.id === parseInt(newContract.artistId))
+    const artist = artists.find(a => a.id === parseInt(newProject.artistId))
     if (!artist) return
 
     let terms = STANDARD_TERMS
@@ -147,13 +147,13 @@ export default function Projects() {
     let attachmentName = null
     let attachmentMime = null
 
-    if (contractType === 'custom') {
+    if (projectType === 'custom') {
       const parts = []
-      if (hasCustomText) parts.push(newContract.customTerms.trim())
+      if (hasCustomText) parts.push(newProject.customTerms.trim())
       if (hasCustomFile) {
         const kb = (customAgreementUpload.size / 1024).toFixed(1)
         parts.push(
-          `[Uploaded agreement: ${customAgreementUpload.name} — ${kb} KB]\nUse “Download attachment” on this contract to retrieve the PDF or Word file.`
+          `[Uploaded agreement: ${customAgreementUpload.name} — ${kb} KB]\nUse “Download attachment” on this project to retrieve the PDF or Word file.`
         )
         attachmentUrl = customAgreementUpload.objectUrl
         attachmentName = customAgreementUpload.name
@@ -162,17 +162,17 @@ export default function Projects() {
       terms = parts.join('\n\n---\n\n')
     }
 
-    const contract = {
-      id: `ct_${Date.now()}`,
-      title: newContract.title,
+    const project = {
+      id: `pj_${Date.now()}`,
+      title: newProject.title,
       artistName: artist.name,
       artistId: artist.id,
       clientName: profile?.full_name || 'Client',
-      type: contractType,
+      type: projectType,
       status: 'pending',
-      value: parseInt(newContract.value) || 0,
-      startDate: newContract.startDate,
-      endDate: newContract.endDate,
+      value: parseInt(newProject.value) || 0,
+      startDate: newProject.startDate,
+      endDate: newProject.endDate,
       terms,
       attachmentUrl,
       attachmentName,
@@ -184,11 +184,11 @@ export default function Projects() {
       createdAt: new Date().toISOString(),
     }
 
-    setLocalContracts(prev => [contract, ...prev])
+    setLocalContracts(prev => [project, ...prev])
     setShowNew(false)
     setCustomAgreementUpload(null)
-    setNewContract({ title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: '' })
-    setContractType('standard')
+    setNewProject({ title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: '' })
+    setProjectType('standard')
   }
 
   const handleDownloadAttachment = (contract) => {
@@ -305,9 +305,9 @@ https://secondunit.com
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const displayContracts = useMemo(() => {
+  const displayProjects = useMemo(() => {
     if (!isArtist || !me) return localContracts
-    return localContracts.filter((c) => c.artistId === me.id)
+    return localContracts.filter((p) => p.artistId === me.id)
   }, [isArtist, me, localContracts])
 
   function generateContractText(contract) {
@@ -394,7 +394,7 @@ ${divider}
 
       {/* Project List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {displayContracts.map(c => {
+        {displayProjects.map(c => {
           const s = statusConfig[c.status] || statusConfig.draft
           return (
             <div key={c.id} className="contract-card slide-up">
@@ -454,40 +454,40 @@ ${divider}
 
       {/* ========== New Contract Modal ========== */}
       {showNew && (
-        <div className="modal-overlay" onClick={closeNewContractModal}>
+        <div className="modal-overlay" onClick={closeNewProjectModal}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Create New Project</h2>
-              <button type="button" className="btn-icon" onClick={closeNewContractModal}><X size={18} /></button>
+              <button type="button" className="btn-icon" onClick={closeNewProjectModal}><X size={18} /></button>
             </div>
 
             <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
               <button
                 type="button"
-                className={`btn ${contractType === 'standard' ? 'btn-primary' : 'btn-secondary'}`}
+                className={`btn ${projectType === 'standard' ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => {
                   discardCustomAgreementUpload()
                   setCustomUploadError('')
-                  setContractType('standard')
+                  setProjectType('standard')
                 }}
               >
                 <FileText size={14} /> Standard Agreement
               </button>
-              <button type="button" className={`btn ${contractType === 'custom' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setContractType('custom')}>
+              <button type="button" className={`btn ${projectType === 'custom' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setProjectType('custom')}>
                 <PenTool size={14} /> Custom Agreement
               </button>
             </div>
 
-            <form onSubmit={handleCreateContract}>
+            <form onSubmit={handleCreateProject}>
               <div className="form-group">
                 <label className="form-label">Project Title</label>
-                <input className="form-input" placeholder="e.g., Brand Campaign Q2 2026" value={newContract.title}
-                  onChange={e => setNewContract(p => ({ ...p, title: e.target.value }))} required />
+                <input className="form-input" placeholder="e.g., Brand Campaign Q2 2026" value={newProject.title}
+                  onChange={e => setNewProject(p => ({ ...p, title: e.target.value }))} required />
               </div>
               <div className="form-group">
                 <label className="form-label">Artist</label>
-                <select className="form-input" value={newContract.artistId}
-                  onChange={e => setNewContract(p => ({ ...p, artistId: e.target.value }))} required>
+                <select className="form-input" value={newProject.artistId}
+                  onChange={e => setNewProject(p => ({ ...p, artistId: e.target.value }))} required>
                   <option value="">Select an artist...</option>
                   {artists.map(a => <option key={a.id} value={a.id}>{a.name} — {a.role}</option>)}
                 </select>
@@ -495,22 +495,22 @@ ${divider}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
                 <div className="form-group">
                   <label className="form-label">Start Date</label>
-                  <input className="form-input" type="date" value={newContract.startDate}
-                    onChange={e => setNewContract(p => ({ ...p, startDate: e.target.value }))} required />
+                  <input className="form-input" type="date" value={newProject.startDate}
+                    onChange={e => setNewProject(p => ({ ...p, startDate: e.target.value }))} required />
                 </div>
                 <div className="form-group">
                   <label className="form-label">End Date</label>
-                  <input className="form-input" type="date" value={newContract.endDate}
-                    onChange={e => setNewContract(p => ({ ...p, endDate: e.target.value }))} required />
+                  <input className="form-input" type="date" value={newProject.endDate}
+                    onChange={e => setNewProject(p => ({ ...p, endDate: e.target.value }))} required />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Total Value ($)</label>
-                  <input className="form-input" type="number" placeholder="10000" value={newContract.value}
-                    onChange={e => setNewContract(p => ({ ...p, value: e.target.value }))} required />
+                  <input className="form-input" type="number" placeholder="10000" value={newProject.value}
+                    onChange={e => setNewProject(p => ({ ...p, value: e.target.value }))} required />
                 </div>
               </div>
 
-              {contractType === 'custom' && (
+              {projectType === 'custom' && (
                 <>
                   <div className="form-group">
                     <label className="form-label">Upload agreement (PDF or Word)</label>
@@ -557,8 +557,8 @@ ${divider}
                       className="form-input"
                       placeholder="Paste key terms, scope, or amendments here, or rely on your uploaded PDF / Word file only."
                       style={{ minHeight: 160, fontFamily: 'monospace', fontSize: 13 }}
-                      value={newContract.customTerms}
-                      onChange={e => setNewContract(p => ({ ...p, customTerms: e.target.value }))}
+                      value={newProject.customTerms}
+                      onChange={e => setNewProject(p => ({ ...p, customTerms: e.target.value }))}
                     />
                   </div>
                   {customUploadError && (
@@ -569,7 +569,7 @@ ${divider}
                 </>
               )}
 
-              {contractType === 'standard' && (
+              {projectType === 'standard' && (
                 <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
                   <strong style={{ color: 'var(--text-primary)' }}>Standard Agreement Includes:</strong><br />
                   • Scope of work & deliverables<br />
@@ -582,7 +582,7 @@ ${divider}
               )}
 
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-secondary" onClick={closeNewContractModal}>Cancel</button>
+                <button type="button" className="btn btn-secondary" onClick={closeNewProjectModal}>Cancel</button>
                 <button type="submit" className="btn btn-primary"><FileText size={16} /> Create Project</button>
               </div>
             </form>

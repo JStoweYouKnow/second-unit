@@ -80,14 +80,14 @@ function Sparkline({ data, color = 'var(--accent)', height = 40 }) {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { favorites, localContracts } = useApp()
+  const { favorites, localProjects } = useApp()
   const isArtist = isArtistProfile(profile)
   const me = demoArtistPersona(profile)
   const favArtists = artists.filter(a => favorites.includes(a.id))
   const [timeRange, setTimeRange] = useState('6m')
 
   const myBookings = useMemo(() => (me ? bookings.filter((b) => b.artistId === me.id) : []), [me])
-  const myContracts = useMemo(() => (me ? localContracts.filter((c) => c.artistId === me.id) : []), [me, localContracts])
+  const myProjects = useMemo(() => (me ? localProjects.filter((p) => p.artistId === me.id) : []), [me, localProjects])
   const myPayments = useMemo(() => (me ? payments.filter((p) => p.artistName === me.name) : []), [me])
 
   // Mock analytics data
@@ -148,7 +148,7 @@ export default function Dashboard() {
 
   const contractOffers = useMemo(() => {
     if (!me) return []
-    return localContracts
+    return localProjects
       .filter((c) => typeof c.id === 'string' && c.artistId === me.id)
       .map((c) => ({
         id: `offer-${c.id}`,
@@ -163,7 +163,7 @@ export default function Dashboard() {
         isOffer: true,
         contractStatus: c.status,
       }))
-  }, [me, localContracts])
+  }, [me, localProjects])
 
   if (isArtist && me) {
     return (
@@ -196,8 +196,8 @@ export default function Dashboard() {
           </div>
           <div className="stat-card">
             <span className="stat-label"><FileText size={14} /> Projects</span>
-            <span className="stat-value">{myContracts.length}</span>
-            <span className="stat-change">{myContracts.filter((c) => c.status === 'active').length} active</span>
+            <span className="stat-value">{myProjects.length}</span>
+            <span className="stat-change">{myProjects.filter((p) => p.contractStatus === 'active').length} active</span>
           </div>
           <div className="stat-card">
             <span className="stat-label"><Star size={14} /> Rating</span>
@@ -398,8 +398,8 @@ export default function Dashboard() {
         </div>
         <div className="stat-card">
           <span className="stat-label"><FileText size={14} /> Projects</span>
-          <span className="stat-value">{localContracts.length}</span>
-          <span className="stat-change">${localContracts.reduce((s, c) => s + c.value, 0).toLocaleString()} total</span>
+          <span className="stat-value">{localProjects.length}</span>
+          <span className="stat-change">${localProjects.reduce((s, p) => s + p.value, 0).toLocaleString()} total</span>
         </div>
       </div>
 
@@ -491,10 +491,10 @@ export default function Dashboard() {
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--warning)' }} /> In Progress
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {localContracts.filter(c => c.status === 'active' || c.status === 'pending').map(c => (
-              <div key={c.id} className="project-phase-card">
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{c.title}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.artistName} · {c.status}</div>
+            {localProjects.filter(p => p.status === 'active' || p.status === 'pending').map(p => (
+              <div key={p.id} className="project-phase-card">
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{p.title}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.artistName} · {p.status}</div>
               </div>
             ))}
           </div>
@@ -506,10 +506,10 @@ export default function Dashboard() {
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success)' }} /> Completed
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {localContracts.filter(c => c.status === 'completed').map(c => (
-              <div key={c.id} className="project-phase-card">
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{c.title}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.artistName} · Finished</div>
+            {localProjects.filter(p => p.status === 'completed').map(p => (
+              <div key={p.id} className="project-phase-card">
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{p.title}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.artistName}</div>
               </div>
             ))}
           </div>

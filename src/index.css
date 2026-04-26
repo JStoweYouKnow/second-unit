@@ -173,6 +173,12 @@ button.logo:focus-visible {
   margin: 0 auto;
 }
 
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
 /* ===== Nav ===== */
 .nav-section { margin-bottom: 24px; }
 .nav-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); padding: 0 12px; margin-bottom: 8px; }
@@ -190,6 +196,11 @@ button.logo:focus-visible {
 .nav-link .badge {
   margin-left: auto; background: var(--accent); color: white; font-size: 11px;
   padding: 2px 8px; border-radius: 10px; font-weight: 600;
+}
+
+.nav-link.sign-out-btn:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
 }
 
 /* ===== Page Header ===== */

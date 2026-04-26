@@ -21,6 +21,7 @@ const Contracts = lazy(() => import('./pages/Contracts'))
 const Payments = lazy(() => import('./pages/Payments'))
 const SignIn = lazy(() => import('./pages/SignIn'))
 const SignUp = lazy(() => import('./pages/SignUp'))
+const Account = lazy(() => import('./pages/Account'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
 function LoadingScreen() {
@@ -129,12 +130,15 @@ function AppShell() {
   }
 
   const handleSignOut = async () => {
+    console.log('[App] handleSignOut initiated')
     try {
       await signOut()
+      console.log('[App] signOut success')
     } catch (e) {
-      console.error(e)
+      console.error('[App] signOut error:', e)
     } finally {
       setMobileNavOpen(false)
+      console.log('[App] navigating to /signin')
       navigate('/signin', { replace: true })
     }
   }
@@ -225,7 +229,22 @@ function AppShell() {
             </div>
             <div className="nav-section" style={{ marginTop: 'auto' }}>
               <div className="nav-label">Account</div>
-              <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <div 
+                className="nav-link" 
+                onClick={() => goNav('/account')}
+                style={{ 
+                  padding: '8px 12px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 10, 
+                  marginBottom: 8,
+                  cursor: 'pointer',
+                  border: '1px solid transparent',
+                  transition: 'var(--transition)'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = 'transparent'}
+              >
                 <div className="avatar avatar-sm">
                   {(profile?.full_name || 'U').split(' ').map(n => n[0]).join('').slice(0, 2)}
                 </div>
@@ -239,7 +258,12 @@ function AppShell() {
                 </div>
                 <NotificationPanel />
               </div>
-              <button type="button" className="nav-link" onClick={handleSignOut}>
+              <button 
+                type="button" 
+                className="nav-link sign-out-btn" 
+                onClick={handleSignOut}
+                style={{ marginTop: 4 }}
+              >
                 <LogOut size={18} aria-hidden /> Sign Out
               </button>
             </div>
@@ -255,7 +279,8 @@ function AppShell() {
                 <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
                 <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
                 <Route path="/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
-                <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+                 <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+                <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

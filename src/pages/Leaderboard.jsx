@@ -26,9 +26,12 @@ function getEmbedUrl(url) {
   }
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
     let id = ''
-    if (url.includes('v=')) id = url.split('v=')[1].split('&')[0]
-    else id = url.split('/').pop()
-    return `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&controls=0&loop=1&playlist=${id}`
+    if (url.includes('v=')) {
+      id = url.split('v=')[1].split('&')[0]
+    } else {
+      id = url.split('/').pop().split('?')[0]
+    }
+    return id ? `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&controls=0&loop=1&playlist=${id}` : url
   }
   return url
 }
@@ -41,9 +44,13 @@ function getVideoThumbnail(url) {
   }
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
     let id = ''
-    if (url.includes('v=')) id = url.split('v=')[1].split('&')[0]
-    else id = url.split('/').pop()
-    return `https://img.youtube.com/vi/${id}/mqdefault.jpg`
+    if (url.includes('v=')) {
+      id = url.split('v=')[1].split('&')[0]
+    } else {
+      // Handle youtu.be/ID?params
+      id = url.split('/').pop().split('?')[0]
+    }
+    return id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : null
   }
   return null
 }

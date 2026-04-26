@@ -202,8 +202,68 @@ app.get('/api/bookings', async (req, res) => {
   res.json(bookingsStore)
 })
 
-// ... other endpoints (Stripe, Health, etc) ...
-// (Keeping it concise for the fix, but ensuring full functionality)
+// ---- Stripe Connect Routes ----
+app.post('/api/stripe/connect/create', async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Stripe not configured' })
+  try {
+    const { email, artistId } = req.body
+    const account = await stripe.accounts.create({
+      type: 'express',
+      email,
+      capabilities: { transfers: { requested: true }, card_payments: { requested: true } },
+    })
+    res.json({ accountId: account.id })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/stripe/connect/onboard', async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Stripe not configured' })
+  try {
+    const { accountId } = req.body
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${FRONTEND_URL}/payments?stripe_refresh=1`,
+      return_url: `${FRONTEND_URL}/payments?stripe_success=1`,
+      type: 'account_onboarding',
+    })
+    res.json({ url: accountLink.url })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ---- Payment Intent Routes ----
+app.post('/api/payments/create-intent', async (req, res) => {
+  if (!stripe) return res.json({ clientSecret: 'mock_secret_' + Date.now() })
+  try {
+    const { amount, artistStripeAccountId, bookingId, description } = req.body
+    const intent = await stripe.paymentIntents.create({
+      amount: amount * 100, // cents
+      currency: 'usd',
+      application_fee_amount: Math.round(amount * 10), // 10% platform fee
+      transfer_data: { destination: artistStripeAccountId },
+      metadata: { bookingId, description },
+    })
+    res.json({ clientSecret: intent.client_secret })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/bookings/:id/pay', async (req, res) => {
+  const { id } = req.params
+  // In a real app, this would trigger a payment or verify it
+  // For the demo, we just update the status
+  if (supabase) {
+    await supabase.from('bookings').update({ status: 'paid' }).eq('id', id)
+  } else {
+    const b = bookingsStore.find(x => x.id === id)
+    if (b) b.status = 'paid'
+  }
+  res.json({ success: true })
+})
 
 async function handleWebhook(req, res) {
   if (!stripe) return res.status(503).send('Stripe not configured')

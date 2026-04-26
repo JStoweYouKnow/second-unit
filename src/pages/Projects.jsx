@@ -65,7 +65,7 @@ function isAllowedCustomAgreementFile(file) {
 
 export default function Projects() {
   const { profile } = useAuth()
-  const { localContracts, setLocalContracts } = useApp()
+  const { localProjects, setLocalProjects } = useApp()
   const isArtist = isArtistProfile(profile)
   const me = demoArtistPersona(profile)
   const [showNew, setShowNew] = useState(false)
@@ -184,7 +184,7 @@ export default function Projects() {
       createdAt: new Date().toISOString(),
     }
 
-    setLocalContracts(prev => [project, ...prev])
+    setLocalProjects(prev => [project, ...prev])
     setShowNew(false)
     setCustomAgreementUpload(null)
     setNewProject({ title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: '' })
@@ -203,7 +203,7 @@ export default function Projects() {
   const handleSign = () => {
     if (!signatureName.trim() || !signatureAgreed || !showSign) return
 
-    setLocalContracts(prev => prev.map(c => {
+    setLocalProjects(prev => prev.map(c => {
       if (c.id !== showSign.id) return c
       if (isArtist) {
         const updated = {
@@ -306,9 +306,9 @@ https://secondunit.com
   }
 
   const displayProjects = useMemo(() => {
-    if (!isArtist || !me) return localContracts
-    return localContracts.filter((p) => p.artistId === me.id)
-  }, [isArtist, me, localContracts])
+    if (!isArtist || !me) return localProjects
+    return localProjects.filter((p) => p.artistId === me.id)
+  }, [isArtist, me, localProjects])
 
   function generateContractText(contract) {
     const divider = '═'.repeat(60)

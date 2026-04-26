@@ -65,7 +65,7 @@ function isAllowedCustomAgreementFile(file) {
 
 export default function Projects() {
   const { profile } = useAuth()
-  const { localProjects, setLocalProjects } = useApp()
+  const { localProjects, setLocalProjects, allMessages, sendMessage } = useApp()
   const isArtist = isArtistProfile(profile)
   const me = demoArtistPersona(profile)
   const [showNew, setShowNew] = useState(false)
@@ -205,21 +205,30 @@ export default function Projects() {
 
     setLocalProjects(prev => prev.map(c => {
       if (c.id !== showSign.id) return c
+      let updated = { ...c }
       if (isArtist) {
-        const updated = {
+        updated = {
           ...c,
           signedByArtist: true,
           artistSignature: { name: signatureName, date: new Date().toISOString(), ip: '127.0.0.1' },
         }
         if (updated.signedByEmployer) updated.status = 'active'
-        return updated
+      } else {
+        updated = {
+          ...c,
+          signedByEmployer: true,
+          employerSignature: { name: signatureName, date: new Date().toISOString(), ip: '127.0.0.1' },
+        }
+        if (updated.signedByArtist) updated.status = 'active'
       }
-      const updated = {
-        ...c,
-        signedByEmployer: true,
-        employerSignature: { name: signatureName, date: new Date().toISOString(), ip: '127.0.0.1' },
+
+      // Send automated message on signature
+      const conv = allMessages.find(m => m.artistId === updated.artistId)
+      if (conv) {
+        const sigNote = `✅ AGREEMENT SIGNED\nProject: ${updated.title}\nValue: $${updated.value?.toLocaleString()}\nStatus: ${updated.status.toUpperCase()}\n\nThis copy has been sent to both parties for their records.`
+        sendMessage(conv.id, sigNote, isArtist ? 'artist' : 'user')
       }
-      if (updated.signedByArtist) updated.status = 'active'
+
       return updated
     }))
 

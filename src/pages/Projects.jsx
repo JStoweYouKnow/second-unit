@@ -380,10 +380,10 @@ ${divider}
       {/* Project Stats */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         {[
-          { label: 'Active', value: displayContracts.filter(c => c.status === 'active').length, color: 'var(--success)' },
-          { label: 'Pending Signature', value: displayContracts.filter(c => c.status === 'pending').length, color: 'var(--warning)' },
-          { label: 'Completed', value: displayContracts.filter(c => c.status === 'completed').length, color: 'var(--text-muted)' },
-          { label: 'Total Value', value: '$' + displayContracts.reduce((s, c) => s + (c.value || 0), 0).toLocaleString(), color: 'var(--accent)' },
+          { label: 'Active', value: displayProjects.filter(c => c.status === 'active').length, color: 'var(--success)' },
+          { label: 'Pending Signature', value: displayProjects.filter(c => c.status === 'pending').length, color: 'var(--warning)' },
+          { label: 'Completed', value: displayProjects.filter(c => c.status === 'completed').length, color: 'var(--text-muted)' },
+          { label: 'Total Value', value: '$' + displayProjects.reduce((s, c) => s + (c.value || 0), 0).toLocaleString(), color: 'var(--accent)' },
         ].map(s => (
           <div key={s.label} className="stat-card">
             <span className="stat-label">{s.label}</span>

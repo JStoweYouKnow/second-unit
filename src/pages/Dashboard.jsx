@@ -90,12 +90,29 @@ export default function Dashboard() {
   const myProjects = useMemo(() => (me ? localProjects.filter((p) => p.artistId === me.id) : []), [me, localProjects])
   const myPayments = useMemo(() => (me ? payments.filter((p) => p.artistName === me.name) : []), [me])
 
+  const rangeMap = { '1m': 1, '3m': 3, '6m': 6, '1y': 12 }
+  const rangeMonths = rangeMap[timeRange] || 6
+
   // Mock analytics data
-  const monthlySpendData = [
-    { label: 'Oct', value: 4200 }, { label: 'Nov', value: 6800 }, { label: 'Dec', value: 3500 },
-    { label: 'Jan', value: 8200 }, { label: 'Feb', value: 5600 }, { label: 'Mar', value: 9800 },
-    { label: 'Apr', value: 7400 },
-  ]
+  const artistIncomeData = useMemo(() => {
+    const raw = [
+      { label: 'May', value: 1500 }, { label: 'Jun', value: 2900 }, { label: 'Jul', value: 3100 },
+      { label: 'Aug', value: 2400 }, { label: 'Sep', value: 3800 }, { label: 'Oct', value: 2100 },
+      { label: 'Nov', value: 3400 }, { label: 'Dec', value: 1800 }, { label: 'Jan', value: 4100 },
+      { label: 'Feb', value: 2800 }, { label: 'Mar', value: 4900 }, { label: 'Apr', value: 3700 },
+    ]
+    return raw.slice(-rangeMonths)
+  }, [rangeMonths])
+
+  const monthlySpendData = useMemo(() => {
+    const raw = [
+      { label: 'May', value: 3200 }, { label: 'Jun', value: 5100 }, { label: 'Jul', value: 4400 },
+      { label: 'Aug', value: 6200 }, { label: 'Sep', value: 5800 }, { label: 'Oct', value: 4200 },
+      { label: 'Nov', value: 6800 }, { label: 'Dec', value: 3500 }, { label: 'Jan', value: 8200 },
+      { label: 'Feb', value: 5600 }, { label: 'Mar', value: 9800 }, { label: 'Apr', value: 7400 },
+    ]
+    return raw.slice(-rangeMonths)
+  }, [rangeMonths])
 
   const bookingTrend = [3, 5, 4, 7, 6, 8, 5, 9, 7, 11, 8, 10]
   const totalPaidOut = payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
@@ -124,11 +141,7 @@ export default function Dashboard() {
     { type: 'contract', text: 'Contract ready for your signature', time: '1d ago', color: 'var(--warning)' },
   ]
 
-  const artistIncomeData = [
-    { label: 'Oct', value: 2100 }, { label: 'Nov', value: 3400 }, { label: 'Dec', value: 1800 },
-    { label: 'Jan', value: 4100 }, { label: 'Feb', value: 2800 }, { label: 'Mar', value: 4900 },
-    { label: 'Apr', value: 3700 },
-  ]
+
 
   const gigMix = useMemo(() => {
     const counts = {}
@@ -143,8 +156,17 @@ export default function Dashboard() {
     return entries.map(([label, value], i) => ({ label, value, color: colors[i % colors.length] }))
   }, [myBookings])
 
-  const paidTotal = myPayments.filter((p) => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
-  const upcomingGigs = myBookings.filter((b) => b.status === 'confirmed' || b.status === 'pending').length
+
+
+  const paidTotal = useMemo(() => {
+    // Filter payments by date (mock logic: last N payments)
+    const filtered = myPayments.filter((p) => p.status === 'paid').slice(0, rangeMonths * 2)
+    return filtered.reduce((s, p) => s + p.amount, 0)
+  }, [myPayments, rangeMonths])
+
+  const upcomingGigs = useMemo(() => {
+    return myBookings.filter((b) => b.status === 'confirmed' || b.status === 'pending').length
+  }, [myBookings])
 
   const contractOffers = useMemo(() => {
     if (!me) return []

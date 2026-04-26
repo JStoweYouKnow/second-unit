@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { getSocket } from '../lib/socket'
 
 export default function Messages() {
-  const { allMessages, sendMessage } = useApp()
+  const { allMessages, sendMessage, localProjects, setLocalProjects } = useApp()
   const { user } = useAuth()
   const [activeConv, setActiveConv] = useState(allMessages[0]?.id || null)
   const [input, setInput] = useState('')
@@ -165,8 +165,34 @@ export default function Messages() {
               </div>
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-              <button className="btn btn-success btn-sm"><Check size={14} /> Accept</button>
-              <button className="btn btn-secondary btn-sm"><HelpCircle size={14} /> Ask Question</button>
+              <button 
+                className="btn btn-success btn-sm"
+                onClick={() => {
+                  const project = localProjects.find(p => p.artistId === (conversation.artistId || 1))
+                  if (project) {
+                    setLocalProjects(prev => prev.map(p => 
+                      p.id === project.id 
+                        ? { ...p, status: 'active', signedByArtist: true, signedByEmployer: true } 
+                        : p
+                    ))
+                    sendMessage(activeConv, "I've accepted the project proposal! Let's get started.")
+                  } else {
+                    sendMessage(activeConv, "I'm ready to accept! Please send over the project details.")
+                  }
+                }}
+              >
+                <Check size={14} /> Accept
+              </button>
+              <button 
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setInput("I have a question regarding the timeline and deliverables: ")
+                  const inputEl = document.querySelector('.chat-input-bar input')
+                  if (inputEl) inputEl.focus()
+                }}
+              >
+                <HelpCircle size={14} /> Ask Question
+              </button>
             </div>
           </div>
 

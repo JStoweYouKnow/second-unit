@@ -172,7 +172,7 @@ export default function Dashboard() {
           <div className="page-header-row">
             <div>
               <h1>Studio</h1>
-              <p>Your bookings, contracts, and payouts in one place</p>
+              <p>Your bookings, projects, and payouts in one place</p>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {['1m', '3m', '6m', '1y'].map((r) => (
@@ -195,7 +195,7 @@ export default function Dashboard() {
             <span className="stat-change">{myBookings.length} total on record</span>
           </div>
           <div className="stat-card">
-            <span className="stat-label"><FileText size={14} /> Contracts</span>
+            <span className="stat-label"><FileText size={14} /> Projects</span>
             <span className="stat-value">{myContracts.length}</span>
             <span className="stat-change">{myContracts.filter((c) => c.status === 'active').length} active</span>
           </div>
@@ -397,7 +397,7 @@ export default function Dashboard() {
           <span className="stat-change">{favorites.length} favorited</span>
         </div>
         <div className="stat-card">
-          <span className="stat-label"><FileText size={14} /> Contracts</span>
+          <span className="stat-label"><FileText size={14} /> Projects</span>
           <span className="stat-value">{localContracts.length}</span>
           <span className="stat-change">${localContracts.reduce((s, c) => s + c.value, 0).toLocaleString()} total</span>
         </div>

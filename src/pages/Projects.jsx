@@ -63,7 +63,7 @@ function isAllowedCustomAgreementFile(file) {
   )
 }
 
-export default function Contracts() {
+export default function Projects() {
   const { profile } = useAuth()
   const { localContracts, setLocalContracts } = useApp()
   const isArtist = isArtistProfile(profile)
@@ -368,16 +368,16 @@ ${divider}
       <div className="page-header">
         <div className="page-header-row">
           <div>
-            <h1>Contracts</h1>
-            <p>{isArtist ? 'Agreements clients have sent you' : 'Manage agreements with your artists'}</p>
+            <h1>Projects</h1>
+            <p>{isArtist ? 'Engagements clients have sent you' : 'Manage agreements with your artists'}</p>
           </div>
           {!isArtist && (
-            <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New Contract</button>
+            <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New Project</button>
           )}
         </div>
       </div>
 
-      {/* Contract Stats */}
+      {/* Project Stats */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         {[
           { label: 'Active', value: displayContracts.filter(c => c.status === 'active').length, color: 'var(--success)' },
@@ -392,7 +392,7 @@ ${divider}
         ))}
       </div>
 
-      {/* Contract List */}
+      {/* Project List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {displayContracts.map(c => {
           const s = statusConfig[c.status] || statusConfig.draft
@@ -427,7 +427,7 @@ ${divider}
                 </div>
                 {c.status === 'pending' && ((!isArtist && !c.signedByEmployer) || (isArtist && !c.signedByArtist)) && (
                   <button type="button" className="btn btn-success btn-sm" onClick={() => setShowSign(c)}>
-                    <PenTool size={14} /> Sign
+                    <PenTool size={14} /> Sign Project
                   </button>
                 )}
                 <button type="button" className="btn-icon" title="View" onClick={() => setShowView(c)}><Eye size={16} /></button>
@@ -457,7 +457,7 @@ ${divider}
         <div className="modal-overlay" onClick={closeNewContractModal}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Create New Contract</h2>
+              <h2>Create New Project</h2>
               <button type="button" className="btn-icon" onClick={closeNewContractModal}><X size={18} /></button>
             </div>
 
@@ -480,7 +480,7 @@ ${divider}
 
             <form onSubmit={handleCreateContract}>
               <div className="form-group">
-                <label className="form-label">Contract Title</label>
+                <label className="form-label">Project Title</label>
                 <input className="form-input" placeholder="e.g., Brand Campaign Q2 2026" value={newContract.title}
                   onChange={e => setNewContract(p => ({ ...p, title: e.target.value }))} required />
               </div>
@@ -583,7 +583,7 @@ ${divider}
 
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                 <button type="button" className="btn btn-secondary" onClick={closeNewContractModal}>Cancel</button>
-                <button type="submit" className="btn btn-primary"><FileText size={16} /> Create Contract</button>
+                <button type="submit" className="btn btn-primary"><FileText size={16} /> Create Project</button>
               </div>
             </form>
           </div>
@@ -694,7 +694,7 @@ ${divider}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               {showView.status === 'pending' && ((!isArtist && !showView.signedByEmployer) || (isArtist && !showView.signedByArtist)) && (
                 <button type="button" className="btn btn-success" onClick={() => { setShowView(null); setShowSign(showView) }}>
-                  <PenTool size={16} /> Sign Contract
+                  <PenTool size={16} /> Sign Project
                 </button>
               )}
               <button type="button" className="btn btn-secondary" onClick={() => handleDownloadPDF(showView)}><Download size={16} /> Contract (.txt)</button>
@@ -715,7 +715,7 @@ ${divider}
         <div className="modal-overlay" onClick={() => setShowSign(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Sign Contract</h2>
+              <h2>Sign Project</h2>
               <button className="btn-icon" onClick={() => setShowSign(null)}><X size={18} /></button>
             </div>
 
@@ -786,7 +786,7 @@ ${divider}
                 onClick={handleSign}
                 style={{ opacity: (!signatureName.trim() || !signatureAgreed) ? 0.5 : 1 }}
               >
-                <PenTool size={18} /> Sign Contract
+                <PenTool size={18} /> Sign Project
               </button>
             </div>
 

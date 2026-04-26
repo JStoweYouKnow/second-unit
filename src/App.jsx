@@ -17,7 +17,7 @@ const ArtistProfile = lazy(() => import('./pages/ArtistProfile'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Messages = lazy(() => import('./pages/Messages'))
 const Bookings = lazy(() => import('./pages/Bookings'))
-const Contracts = lazy(() => import('./pages/Contracts'))
+const Projects = lazy(() => import('./pages/Projects'))
 const Payments = lazy(() => import('./pages/Payments'))
 const SignIn = lazy(() => import('./pages/SignIn'))
 const SignUp = lazy(() => import('./pages/SignUp'))
@@ -105,7 +105,7 @@ function AppShell() {
         { path: profilePath, icon: User, label: 'My profile', matchPrefix: profilePath },
         { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
         { path: '/bookings', icon: Calendar, label: 'Bookings' },
-        { path: '/contracts', icon: FileText, label: 'Contracts' },
+        { path: '/projects', icon: FileText, label: 'Projects' },
         { path: '/payments', icon: CreditCard, label: 'Earnings' },
       ]
     }
@@ -114,7 +114,7 @@ function AppShell() {
       { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
       { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
       { path: '/bookings', icon: Calendar, label: 'Bookings' },
-      { path: '/contracts', icon: FileText, label: 'Contracts' },
+      { path: '/projects', icon: FileText, label: 'Projects' },
       { path: '/payments', icon: CreditCard, label: 'Payments' },
     ]
   }, [profile?.role, profile?.full_name, unreadCount, demoPersona?.id])
@@ -278,7 +278,7 @@ function AppShell() {
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
                 <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
-                <Route path="/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
+                <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
                  <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
                 <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />

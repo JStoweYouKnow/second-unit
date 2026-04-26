@@ -228,7 +228,10 @@ function AppShell() {
               })}
             </div>
             <div className="nav-section" style={{ marginTop: 'auto' }}>
-              <div className="nav-label">Account</div>
+              <div className="nav-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Account
+                <NotificationPanel />
+              </div>
               <div 
                 className="nav-link" 
                 onClick={() => goNav('/account')}
@@ -256,7 +259,6 @@ function AppShell() {
                     {formatAccountRole(profile?.role)}{isMockMode ? ' · demo' : ''}
                   </div>
                 </div>
-                <NotificationPanel />
               </div>
               <button 
                 type="button" 

@@ -51,7 +51,7 @@ export default function NotificationPanel() {
 
   return (
     <div className="notif-container" ref={panelRef}>
-      <button type="button" className="notif-bell" onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="true" aria-label="Notifications">
+      <button type="button" className="notif-bell" onClick={(e) => { e.stopPropagation(); setOpen(!open); }} aria-expanded={open} aria-haspopup="true" aria-label="Notifications">
         <Bell size={20} />
         {unreadCount > 0 && <span className="notif-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
       </button>

@@ -17,7 +17,6 @@ export default function Bookings() {
   const [newBooking, setNewBooking] = useState({
     artistId: '',
     date: '',
-    time: '',
     duration: 2,
     durationUnit: 'hours',
     agreedTotal: '',
@@ -58,7 +57,6 @@ export default function Bookings() {
       artistId: artist.id,
       artistName: artist.name,
       date: newBooking.date,
-      time: newBooking.time,
       duration,
       durationUnit: newBooking.durationUnit,
       type: newBooking.type,
@@ -75,7 +73,6 @@ export default function Bookings() {
       setNewBooking({
         artistId: '',
         date: '',
-        time: '',
         duration: 2,
         durationUnit: 'hours',
         agreedTotal: '',
@@ -207,8 +204,7 @@ export default function Bookings() {
                       <Calendar size={14} /> {b.date}
                     </span>
                     <span style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Clock size={14} /> {b.time}
-                      {' · '}{bookingScheduleCaption(b)}
+                      <Clock size={14} /> {bookingScheduleCaption(b)}
                     </span>
                     <span className="skill-tag">{b.type}</span>
                   </div>
@@ -273,16 +269,10 @@ export default function Bookings() {
                   ))}
                 </select>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div className="form-group">
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
                   <label className="form-label">Date</label>
                   <input className="form-input" type="date" value={newBooking.date} onChange={e => setNewBooking(p => ({ ...p, date: e.target.value }))} required />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Time</label>
-                  <input className="form-input" type="time" value={newBooking.time} onChange={e => setNewBooking(p => ({ ...p, time: e.target.value }))} required />
-                </div>
-              </div>
 
               <div className="form-group">
                 <label className="form-label">Schedule length</label>
@@ -409,8 +399,7 @@ export default function Bookings() {
               </div>
               <div style={{ color: 'var(--text-muted)' }}>{showPay.type} with {showPay.artistName}</div>
               <div style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-                {showPay.date} at {showPay.time}
-                {' · '}{bookingScheduleCaption(showPay)}
+                {showPay.date} · {bookingScheduleCaption(showPay)}
               </div>
             </div>
 

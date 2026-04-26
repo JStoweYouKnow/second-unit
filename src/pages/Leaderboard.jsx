@@ -18,11 +18,42 @@ function toggleInSet(set, key) {
   return next
 }
 
+function getEmbedUrl(url) {
+  if (!url) return null
+  if (url.includes('vimeo.com')) {
+    const id = url.split('/').pop()
+    return `https://player.vimeo.com/video/${id}?autoplay=1&muted=1&background=1`
+  }
+  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    let id = ''
+    if (url.includes('v=')) id = url.split('v=')[1].split('&')[0]
+    else id = url.split('/').pop()
+    return `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&controls=0&loop=1&playlist=${id}`
+  }
+  return url
+}
+
+function getVideoThumbnail(url) {
+  if (!url) return null
+  if (url.includes('vimeo.com')) {
+    const id = url.split('/').pop()
+    return `https://vumbnail.com/${id}.jpg`
+  }
+  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    let id = ''
+    if (url.includes('v=')) id = url.split('v=')[1].split('&')[0]
+    else id = url.split('/').pop()
+    return `https://img.youtube.com/vi/${id}/mqdefault.jpg`
+  }
+  return null
+}
+
 export default function Leaderboard() {
   const navigate = useNavigate()
   const { favorites, toggleFavorite } = useApp()
   const [search, setSearch] = useState('')
   const [calendarArtist, setCalendarArtist] = useState(null)
+  const [hoveredId, setHoveredId] = useState(null)
 
   const [selectedRoles, setSelectedRoles] = useState(() => new Set())
   const [selectedSkills, setSelectedSkills] = useState(() => new Set())
@@ -257,11 +288,15 @@ export default function Leaderboard() {
       <div className="artist-gallery-grid">
         {filtered.map((artist, i) => {
           const rank = i + 1
-          // Use generated images for first few artists, fallback for others
-          const thumbUrl = i === 0 ? '/Users/v/.gemini/antigravity/brain/9dc5a748-79f9-42e5-ae4f-5345ea3cb839/ai_artist_portfolio_1_1777161530365.png' 
+          // Use video thumbnail if available, otherwise fallback to generated or null
+          const videoThumb = artist.videoLinks?.length > 0 ? getVideoThumbnail(artist.videoLinks[0]) : null
+          
+          const fallbackThumb = i === 0 ? '/Users/v/.gemini/antigravity/brain/9dc5a748-79f9-42e5-ae4f-5345ea3cb839/ai_artist_portfolio_1_1777161530365.png' 
                         : i === 1 ? '/Users/v/.gemini/antigravity/brain/9dc5a748-79f9-42e5-ae4f-5345ea3cb839/ai_artist_portfolio_2_1777161543445.png'
                         : i === 2 ? '/Users/v/.gemini/antigravity/brain/9dc5a748-79f9-42e5-ae4f-5345ea3cb839/ai_artist_portfolio_3_1777161554677.png'
                         : null
+          
+          const thumbUrl = videoThumb || fallbackThumb
 
           return (
             <div
@@ -272,11 +307,37 @@ export default function Leaderboard() {
             >
               <div className="artist-tile__rank">{rank}</div>
               
-              {thumbUrl ? (
-                <img src={thumbUrl} alt={artist.name} className="artist-tile__img" />
-              ) : (
-                <div className="artist-tile__img" />
-              )}
+              <div 
+                className="artist-tile__media-container"
+                onMouseEnter={() => setHoveredId(artist.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                style={{ position: 'relative', width: '100%', height: '100%' }}
+              >
+                {thumbUrl && (
+                  <img 
+                    src={thumbUrl} 
+                    alt={artist.name} 
+                    className={`artist-tile__img ${hoveredId === artist.id && artist.videoLinks?.length > 0 ? 'is-hidden' : ''}`} 
+                  />
+                )}
+                
+                {hoveredId === artist.id && artist.videoLinks?.length > 0 && (
+                  <div className="artist-tile__video-wrapper">
+                    <iframe
+                      src={getEmbedUrl(artist.videoLinks[0])}
+                      frameBorder="0"
+                      allow="autoplay; fullscreen; picture-in-picture"
+                      allowFullScreen
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+                      title={`${artist.name} reel`}
+                    />
+                  </div>
+                )}
+
+                {!thumbUrl && !artist.videoLinks?.length && (
+                  <div className="artist-tile__img" />
+                )}
+              </div>
               
               <div className="artist-tile__overlay">
                 <div className="artist-tile__role">{artist.role}</div>

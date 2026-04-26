@@ -12,7 +12,12 @@ import { createClient } from '@supabase/supabase-js'
 const app = express()
 const httpServer = createServer(app)
 const PORT = process.env.API_PORT || 3001
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173'
+let FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173'
+
+// Fix: Ensure FRONTEND_URL has a protocol (required by CORS policy)
+if (FRONTEND_URL && !FRONTEND_URL.startsWith('http')) {
+  FRONTEND_URL = `https://${FRONTEND_URL}`
+}
 
 // ---- Security Middleware (Items 2 & 3) ----
 app.use(helmet()) // Security headers
@@ -33,13 +38,17 @@ const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SEC
 
 // Socket.io setup
 const io = new Server(httpServer, {
-  cors: { origin: FRONTEND_URL, methods: ['GET', 'POST'] },
+  cors: { 
+    origin: FRONTEND_URL, 
+    methods: ['GET', 'POST'],
+    credentials: true
+  },
 })
 
 // Stripe webhook needs raw body
 app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), handleWebhook)
 
-app.use(cors({ origin: FRONTEND_URL }))
+app.use(cors({ origin: FRONTEND_URL, credentials: true }))
 app.use(express.json())
 
 // ---- Validation Schemas (Item 4) ----

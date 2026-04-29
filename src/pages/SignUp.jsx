@@ -38,7 +38,11 @@ export default function SignUp() {
     setOauthLoading(provider)
     const { error: oauthError } = await signInWithOAuth(provider)
     setOauthLoading(null)
-    if (oauthError) setError(oauthError.message)
+    if (oauthError) {
+      setError(oauthError.message)
+    } else if (isMockMode) {
+      navigate('/')
+    }
   }
 
   if (success) {

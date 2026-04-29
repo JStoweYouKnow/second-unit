@@ -36,7 +36,12 @@ export function AuthProvider({ children }) {
       return
     }
 
-    // Get initial session (always clear loading — otherwise ProtectedRoute hangs forever on reject)
+    // Fallback: if auth takes too long (e.g. unreachable API during token refresh), force load
+    const timeoutId = setTimeout(() => {
+      setLoading(false)
+    }, 5000)
+
+    // Get initial session
     supabase.auth
       .getSession()
       .then(({ data: { session } }) => {
@@ -47,7 +52,10 @@ export function AuthProvider({ children }) {
         console.error('Supabase getSession failed', err)
         setUser(null)
       })
-      .finally(() => setLoading(false))
+      .finally(() => {
+        clearTimeout(timeoutId)
+        setLoading(false)
+      })
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -58,10 +66,14 @@ export function AuthProvider({ children }) {
         } else {
           setProfile(null)
         }
+        setLoading(false)
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      clearTimeout(timeoutId)
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function fetchProfile(userId) {

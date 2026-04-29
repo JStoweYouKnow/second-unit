@@ -55,7 +55,11 @@ export default function SignIn() {
     const { error: oauthError } = await signInWithOAuth(provider)
     setOauthLoading(null)
     if (oauthError) {
-      setError(oauthError.message)
+      if (oauthError.message?.includes('Unsupported provider')) {
+        setError(`${provider} login is not enabled. Please enable it in your Supabase Dashboard under Authentication > Providers.`)
+      } else {
+        setError(oauthError.message)
+      }
     } else if (isMockMode) {
       navigate('/')
     }

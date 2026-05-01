@@ -48,7 +48,6 @@ export default function SignIn() {
     }
   }
 
-  }
 
   return (
     <div className="auth-page">

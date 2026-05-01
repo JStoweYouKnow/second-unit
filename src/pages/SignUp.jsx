@@ -32,7 +32,6 @@ export default function SignUp() {
     }
   }
 
-  }
 
   if (success) {
     return (

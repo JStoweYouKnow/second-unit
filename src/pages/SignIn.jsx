@@ -23,7 +23,6 @@ export default function SignIn() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [oauthLoading, setOauthLoading] = useState(null)
 
   useEffect(() => {
     const msg = readOAuthErrorFromUrl()
@@ -49,20 +48,6 @@ export default function SignIn() {
     }
   }
 
-  const handleOAuth = async (provider) => {
-    setError('')
-    setOauthLoading(provider)
-    const { error: oauthError } = await signInWithOAuth(provider)
-    setOauthLoading(null)
-    if (oauthError) {
-      if (oauthError.message?.includes('Unsupported provider')) {
-        setError(`${provider} login is not enabled. Please enable it in your Supabase Dashboard under Authentication > Providers.`)
-      } else {
-        setError(oauthError.message)
-      }
-    } else if (isMockMode) {
-      navigate('/')
-    }
   }
 
   return (
@@ -127,24 +112,7 @@ export default function SignIn() {
           </button>
         </form>
 
-        <div className="auth-divider"><span>or continue with</span></div>
-
-        <div className="auth-oauth-row">
-          <button type="button" className="btn btn-secondary auth-oauth-btn" disabled={!!oauthLoading}
-            onClick={() => handleOAuth('google')}>
-            {oauthLoading === 'google' ? 'Redirecting…' : 'Google'}
-          </button>
-          <button type="button" className="btn btn-secondary auth-oauth-btn" disabled={!!oauthLoading}
-            onClick={() => handleOAuth('github')}>
-            {oauthLoading === 'github' ? 'Redirecting…' : 'GitHub'}
-          </button>
-          <button type="button" className="btn btn-secondary auth-oauth-btn" disabled={!!oauthLoading}
-            onClick={() => handleOAuth('linkedin_oidc')}>
-            {oauthLoading === 'linkedin_oidc' ? 'Redirecting…' : 'LinkedIn'}
-          </button>
-        </div>
-
-        <p className="auth-footer">
+        <p className="auth-footer" style={{ marginTop: '24px' }}>
           Don't have an account? <Link to="/signup">Sign Up <ArrowRight size={14} /></Link>
         </p>
       </div>

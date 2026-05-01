@@ -13,7 +13,6 @@ export default function SignUp() {
   const [role, setRole] = useState('employer')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [oauthLoading, setOauthLoading] = useState(null)
   const [success, setSuccess] = useState(false)
 
   const handleSubmit = async (e) => {
@@ -33,20 +32,6 @@ export default function SignUp() {
     }
   }
 
-  const handleOAuth = async (provider) => {
-    setError('')
-    setOauthLoading(provider)
-    const { error: oauthError } = await signInWithOAuth(provider)
-    setOauthLoading(null)
-    if (oauthError) {
-      if (oauthError.message?.includes('Unsupported provider')) {
-        setError(`${provider} signup is not enabled. Please enable it in your Supabase Dashboard under Authentication > Providers.`)
-      } else {
-        setError(oauthError.message)
-      }
-    } else if (isMockMode) {
-      navigate('/')
-    }
   }
 
   if (success) {
@@ -149,31 +134,14 @@ export default function SignUp() {
           <button
             className="btn btn-primary btn-lg auth-submit"
             type="submit"
-            disabled={loading || !!oauthLoading}
+            disabled={loading}
             aria-busy={loading}
           >
             {loading ? 'Creating account...' : <><UserPlus size={18} aria-hidden /> Create Account</>}
           </button>
         </form>
 
-        <div className="auth-divider"><span>or continue with</span></div>
-
-        <div className="auth-oauth-row">
-          <button type="button" className="btn btn-secondary auth-oauth-btn" disabled={!!oauthLoading}
-            onClick={() => handleOAuth('google')}>
-            {oauthLoading === 'google' ? 'Redirecting…' : 'Google'}
-          </button>
-          <button type="button" className="btn btn-secondary auth-oauth-btn" disabled={!!oauthLoading}
-            onClick={() => handleOAuth('github')}>
-            {oauthLoading === 'github' ? 'Redirecting…' : 'GitHub'}
-          </button>
-          <button type="button" className="btn btn-secondary auth-oauth-btn" disabled={!!oauthLoading}
-            onClick={() => handleOAuth('linkedin_oidc')}>
-            {oauthLoading === 'linkedin_oidc' ? 'Redirecting…' : 'LinkedIn'}
-          </button>
-        </div>
-
-        <p className="auth-footer">
+        <p className="auth-footer" style={{ marginTop: '24px' }}>
           Already have an account? <Link to="/signin"><ArrowLeft size={14} /> Sign In</Link>
         </p>
       </div>

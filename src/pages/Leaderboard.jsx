@@ -330,14 +330,25 @@ export default function Leaderboard() {
                 
                 {hoveredId === artist.id && artist.videoLinks?.length > 0 && (
                   <div className="artist-tile__video-wrapper">
-                    <iframe
-                      src={getEmbedUrl(artist.videoLinks[0])}
-                      frameBorder="0"
-                      allow="autoplay; fullscreen; picture-in-picture"
-                      allowFullScreen
-                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-                      title={`${artist.name} reel`}
-                    />
+                    {artist.videoLinks[0].endsWith('.mp4') ? (
+                      <video
+                        src={artist.videoLinks[0]}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
+                      />
+                    ) : (
+                      <iframe
+                        src={getEmbedUrl(artist.videoLinks[0])}
+                        frameBorder="0"
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        allowFullScreen
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+                        title={`${artist.name} reel`}
+                      />
+                    )}
                   </div>
                 )}
 

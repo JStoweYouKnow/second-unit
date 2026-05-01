@@ -21,6 +21,7 @@ const Projects = lazy(() => import('./pages/Projects'))
 const Payments = lazy(() => import('./pages/Payments'))
 const SignIn = lazy(() => import('./pages/SignIn'))
 const SignUp = lazy(() => import('./pages/SignUp'))
+const UpdatePassword = lazy(() => import('./pages/UpdatePassword'))
 const Account = lazy(() => import('./pages/Account'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 const Landing = lazy(() => import('./pages/Landing'))
@@ -304,6 +305,7 @@ function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/signin" element={<SignIn />} />
               <Route path="/signup" element={<SignUp />} />
+              <Route path="/update-password" element={<UpdatePassword />} />
               <Route path="/*" element={<AppShell />} />
             </Routes>
           </Suspense>

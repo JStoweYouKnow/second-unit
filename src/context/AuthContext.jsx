@@ -166,6 +166,18 @@ export function AuthProvider({ children }) {
     return { data, error }
   }
 
+  async function resetPassword(email) {
+    if (!isSupabaseConfigured) return { error: null }
+    return await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/update-password`,
+    })
+  }
+
+  async function updatePassword(newPassword) {
+    if (!isSupabaseConfigured) return { error: null }
+    return await supabase.auth.updateUser({ password: newPassword })
+  }
+
   const value = {
     user,
     profile,
@@ -177,6 +189,8 @@ export function AuthProvider({ children }) {
     signIn,
     signOut,
     signInWithOAuth,
+    resetPassword,
+    updatePassword,
     fetchProfile,
   }
 

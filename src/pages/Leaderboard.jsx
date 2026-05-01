@@ -67,8 +67,6 @@ export default function Leaderboard() {
   const [selectedLocations, setSelectedLocations] = useState(() => new Set())
   const [skillMatchMode, setSkillMatchMode] = useState('any')
   const [availableOnly, setAvailableOnly] = useState(false)
-  const [minRating, setMinRating] = useState(0)
-
   const roleOptions = useMemo(
     () => [...new Set(artists.map(a => a.role))].sort(),
     []
@@ -85,7 +83,7 @@ export default function Leaderboard() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return artists.filter((a) => {
+    const filteredArray = artists.filter((a) => {
       if (selectedRoles.size > 0 && !selectedRoles.has(a.role)) return false
 
       if (selectedSkills.size > 0) {
@@ -99,7 +97,6 @@ export default function Leaderboard() {
 
       if (selectedLocations.size > 0 && !selectedLocations.has(a.location)) return false
       if (availableOnly && !a.available) return false
-      if (minRating > 0 && a.rating < minRating) return false
 
       if (q) {
         const hay = [
@@ -115,22 +112,14 @@ export default function Leaderboard() {
       }
       return true
     })
-  }, [
-    search,
-    selectedRoles,
-    selectedSkills,
-    selectedLocations,
-    skillMatchMode,
-    availableOnly,
-    minRating,
-  ])
+    return filteredArray.sort((a, b) => b.projects - a.projects)
+  }, [search, selectedRoles, selectedSkills, selectedLocations, skillMatchMode, availableOnly])
 
   const activeFilterCount = useMemo(() => {
     let n = selectedRoles.size + selectedSkills.size + selectedLocations.size
     if (availableOnly) n += 1
-    if (minRating > 0) n += 1
     return n
-  }, [selectedRoles, selectedSkills, selectedLocations, availableOnly, minRating])
+  }, [selectedRoles, selectedSkills, selectedLocations, availableOnly])
 
   const clearFilters = useCallback(() => {
     setSelectedRoles(new Set())
@@ -138,7 +127,6 @@ export default function Leaderboard() {
     setSelectedLocations(new Set())
     setSkillMatchMode('any')
     setAvailableOnly(false)
-    setMinRating(0)
   }, [])
 
   return (
@@ -255,7 +243,7 @@ export default function Leaderboard() {
             </fieldset>
 
             <fieldset>
-              <legend>Availability &amp; rating</legend>
+              <legend>Availability</legend>
               <label className="filter-checkbox" style={{ marginBottom: 10 }}>
                 <input
                   type="checkbox"
@@ -264,24 +252,6 @@ export default function Leaderboard() {
                 />
                 Available for new work only
               </label>
-              <div className="filter-row">
-                <label htmlFor="min-rating" className="form-label" style={{ marginBottom: 0 }}>
-                  Min. rating
-                </label>
-                <select
-                  id="min-rating"
-                  className="filter-select"
-                  value={minRating === 0 ? '' : String(minRating)}
-                  onChange={(e) => setMinRating(e.target.value ? Number(e.target.value) : 0)}
-                >
-                  <option value="">Any</option>
-                  <option value="4.5">4.5+</option>
-                  <option value="4.6">4.6+</option>
-                  <option value="4.7">4.7+</option>
-                  <option value="4.8">4.8+</option>
-                  <option value="4.9">4.9+</option>
-                </select>
-              </div>
             </fieldset>
           </div>
 
@@ -311,13 +281,12 @@ export default function Leaderboard() {
               className="artist-tile slide-up"
               style={{ animationDelay: `${i * 0.05}s` }}
               onClick={() => navigate(`/artist/${artist.id}`)}
+              onMouseEnter={() => setHoveredId(artist.id)}
+              onMouseLeave={() => setHoveredId(null)}
             >
-              <div className="artist-tile__rank">{rank}</div>
               
               <div 
                 className="artist-tile__media-container"
-                onMouseEnter={() => setHoveredId(artist.id)}
-                onMouseLeave={() => setHoveredId(null)}
                 style={{ position: 'relative', width: '100%', height: '100%' }}
               >
                 {thumbUrl && (

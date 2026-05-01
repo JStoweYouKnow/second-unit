@@ -37,9 +37,6 @@ export default function ArtistProfile() {
             </div>
             <div className="role">{artist.role}</div>
             <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--gold)' }}>
-                <Star size={14} fill="var(--gold)" /> {artist.rating}
-              </span>
               <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{artist.projects} projects</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-secondary)', fontSize: 14 }}>
                 <MapPin size={14} /> {artist.location}
@@ -164,10 +161,7 @@ export default function ArtistProfile() {
                 <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Projects</span>
                 <span style={{ fontWeight: 600 }}>{artist.projects}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Rating</span>
-                <span style={{ fontWeight: 600, color: 'var(--gold)' }}>{artist.rating} ★</span>
-              </div>
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                 <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Compensation</span>
                 <span style={{ fontWeight: 600, color: 'var(--text-secondary)', textAlign: 'right', fontSize: 13, maxWidth: '62%', lineHeight: 1.45 }}>

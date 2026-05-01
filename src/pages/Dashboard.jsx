@@ -148,7 +148,7 @@ export default function Dashboard() {
     for (const b of myBookings) {
       counts[b.type] = (counts[b.type] || 0) + 1
     }
-    const colors = ['var(--accent)', 'var(--accent-secondary)', '#f5c542', '#ff4d6a', '#64748b']
+    const colors = ['var(--accent)', 'var(--text-primary)', 'var(--border-hover)', 'var(--accent2)', 'var(--danger)']
     const entries = Object.entries(counts)
     if (entries.length === 0) {
       return [{ label: 'No gigs yet', value: 1, color: 'var(--text-muted)' }]

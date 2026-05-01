@@ -1,44 +1,44 @@
-/* ===== Second Unit Design System (brand: charcoal + electric blue) ===== */
+/* ===== Second Unit Design System (brand: studio black + cinematic gold) ===== */
 :root {
   color-scheme: dark;
-  --brand-charcoal: #1f232b;
-  --brand-charcoal-deep: #14161c;
-  --brand-blue: #0066ff;
-  --brand-blue-hover: #3385ff;
-  --brand-blue-muted: #38bdf8;
+  --brand-charcoal: #0a0a0c;
+  --brand-charcoal-deep: #050505;
+  --brand-gold: #f5c542;
+  --brand-gold-hover: #facc15;
+  --brand-gold-muted: #d97706;
 
-  --bg-primary: #13151a;
-  --bg-secondary: #1a1d24;
-  --bg-card: #22252c;
-  --bg-card-hover: #2a2e38;
-  --bg-glass: rgba(34, 37, 44, 0.85);
-  --bg-modal: rgba(10, 12, 18, 0.72);
-  --surface: #1e2128;
-  --border: rgba(255, 255, 255, 0.07);
+  --bg-primary: #050505;
+  --bg-secondary: #0a0a0c;
+  --bg-card: #121214;
+  --bg-card-hover: #18181b;
+  --bg-glass: rgba(18, 18, 20, 0.85);
+  --bg-modal: rgba(0, 0, 0, 0.85);
+  --surface: #141417;
+  --border: rgba(255, 255, 255, 0.06);
   --border-hover: rgba(255, 255, 255, 0.12);
-  --text-primary: #f4f5f7;
-  --text-secondary: #9aa3b2;
-  --text-muted: #6b7280;
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
 
-  --accent: var(--brand-blue);
-  --accent-hover: var(--brand-blue-hover);
-  --accent-glow: rgba(0, 102, 255, 0.28);
-  --accent-secondary: var(--brand-blue-muted);
-  --accent2: #0d9488;
-  --accent2-glow: rgba(13, 148, 136, 0.22);
+  --accent: var(--brand-gold);
+  --accent-hover: var(--brand-gold-hover);
+  --accent-glow: rgba(245, 197, 66, 0.15);
+  --accent-secondary: var(--brand-gold-muted);
+  --accent2: #0ea5e9;
+  --accent2-glow: rgba(14, 165, 233, 0.15);
 
-  /* UI tints derived from brand blue (replace hardcoded purple) */
-  --accent-tint-12: rgba(0, 102, 255, 0.12);
-  --accent-tint-10: rgba(0, 102, 255, 0.1);
-  --accent-tint-08: rgba(0, 102, 255, 0.08);
-  --accent-tint-05: rgba(0, 102, 255, 0.05);
-  --accent-tint-04: rgba(0, 102, 255, 0.04);
-  --accent-tint-border: rgba(0, 102, 255, 0.18);
+  /* UI tints derived from brand gold */
+  --accent-tint-12: rgba(245, 197, 66, 0.12);
+  --accent-tint-10: rgba(245, 197, 66, 0.1);
+  --accent-tint-08: rgba(245, 197, 66, 0.08);
+  --accent-tint-05: rgba(245, 197, 66, 0.05);
+  --accent-tint-04: rgba(245, 197, 66, 0.04);
+  --accent-tint-border: rgba(245, 197, 66, 0.18);
 
   --gold: #f5c542;
   --silver: #c0c0d0;
   --bronze: #cd7f32;
-  --danger: #ff4d6a;
+  --danger: #ef4444;
   --success: #10b981;
   --success-muted-bg: rgba(16, 185, 129, 0.14);
   --warning: #f5c542;
@@ -82,7 +82,7 @@ body.nav-drawer-open {
   z-index: 10000;
   padding: 10px 16px;
   background: var(--accent);
-  color: white;
+  color: var(--brand-charcoal-deep);
   font-weight: 600;
   font-size: 14px;
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
@@ -194,8 +194,8 @@ button.logo:focus-visible {
   outline-offset: 2px;
 }
 .nav-link .badge {
-  margin-left: auto; background: var(--accent); color: white; font-size: 11px;
-  padding: 2px 8px; border-radius: 10px; font-weight: 600;
+  margin-left: auto; background: var(--accent); color: var(--brand-charcoal-deep); font-size: 11px;
+  padding: 2px 8px; border-radius: 12px; font-weight: 700;
 }
 
 .nav-link.sign-out-btn:hover {
@@ -215,7 +215,7 @@ button.logo:focus-visible {
   border-radius: var(--radius-sm); font-size: 14px; font-weight: 600;
   border: none; transition: var(--transition); white-space: nowrap;
 }
-.btn-primary { background: var(--accent); color: white; }
+.btn-primary { background: var(--accent); color: var(--brand-charcoal-deep); }
 .btn-primary:hover { background: var(--accent-hover); box-shadow: var(--shadow-glow); }
 .btn-secondary { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); }
 .btn-secondary:hover { border-color: var(--border-hover); background: var(--bg-card-hover); }
@@ -930,7 +930,7 @@ button.mobile-topbar-brand--home:focus-visible {
 .chat-bubble {
   max-width: 70%; padding: 12px 16px; border-radius: var(--radius-md); font-size: 14px; line-height: 1.5;
 }
-.chat-bubble.sent { background: var(--accent); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+.chat-bubble.sent { background: var(--accent); color: var(--brand-charcoal-deep); align-self: flex-end; border-bottom-right-radius: 4px; }
 .chat-bubble.received { background: var(--bg-card); align-self: flex-start; border-bottom-left-radius: 4px; }
 .chat-input-bar {
   display: flex; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--border); align-items: center;

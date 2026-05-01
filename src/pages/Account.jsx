@@ -118,9 +118,19 @@ export default function Account() {
                       </div>
                     </div>
 
-                    <div className="form-group">
-                      <label className="form-label">Past Brands & Clients (comma separated)</label>
-                      <input className="filter-select" style={{ width: '100%' }} placeholder="Nike, Apple, Spotify" />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                      <div className="form-group">
+                        <label className="form-label">Past Brands & Clients (comma separated)</label>
+                        <input className="filter-select" style={{ width: '100%' }} placeholder="Nike, Apple, Spotify" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          Typical Project Rate (USD)
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, background: 'var(--surface)', padding: '2px 6px', borderRadius: 10 }}>Private</span>
+                        </label>
+                        <input className="filter-select" style={{ width: '100%' }} type="number" placeholder="e.g. 5000" />
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>We use this to filter out job inquiries with inadequate budgets.</span>
+                      </div>
                     </div>
 
                     <h4 style={{ marginTop: 16, marginBottom: 8 }}>Social & Portfolio Links</h4>

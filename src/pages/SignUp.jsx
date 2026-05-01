@@ -26,7 +26,7 @@ export default function SignUp() {
     if (error) {
       setError(error.message)
     } else if (isMockMode) {
-      navigate('/')
+      navigate('/home')
     } else {
       setSuccess(true)
     }

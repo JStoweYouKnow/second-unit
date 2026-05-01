@@ -23,6 +23,7 @@ const SignIn = lazy(() => import('./pages/SignIn'))
 const SignUp = lazy(() => import('./pages/SignUp'))
 const Account = lazy(() => import('./pages/Account'))
 const NotFound = lazy(() => import('./pages/NotFound'))
+const Landing = lazy(() => import('./pages/Landing'))
 
 function LoadingScreen() {
   return (
@@ -158,7 +159,7 @@ function AppShell() {
     setMobileNavOpen(false)
   }
 
-  const homePath = isArtistProfile(profile) ? '/dashboard' : '/'
+  const homePath = isArtistProfile(profile) ? '/dashboard' : '/home'
 
   return (
     <AppContext.Provider value={ctx}>
@@ -275,7 +276,7 @@ function AppShell() {
           <ErrorBoundary>
             <Suspense fallback={<LoadingScreen />}>
               <Routes>
-                <Route path="/" element={<ProtectedRoute><HomeGate /></ProtectedRoute>} />
+                <Route path="/home" element={<ProtectedRoute><HomeGate /></ProtectedRoute>} />
                 <Route path="/artist/:id" element={<ProtectedRoute><ArtistProfile /></ProtectedRoute>} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
@@ -300,6 +301,7 @@ function App() {
         <NotificationProvider>
           <Suspense fallback={<LoadingScreen />}>
             <Routes>
+              <Route path="/" element={<Landing />} />
               <Route path="/signin" element={<SignIn />} />
               <Route path="/signup" element={<SignUp />} />
               <Route path="/*" element={<AppShell />} />

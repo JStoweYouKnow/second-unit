@@ -7,7 +7,10 @@ export const artists = [
     rating: 4.9, projects: 127, hourlyRate: 250, dailyRate: 2000, projectFlatRate: 10000, available: true,
     bio: 'Award-winning AI visual artist specializing in fashion and luxury brand campaigns. Pioneering the fusion of generative AI with high-end commercial aesthetics.',
     portfolio: ['https://example.com/p1', 'https://example.com/p2'],
-    videoLinks: ['https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'],
+    videoLinks: [
+      'https://www.youtube.com/watch?v=aqz-KE-bpKQ', 
+      'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
+    ],
     socials: { twitter: '#', instagram: '#', website: 'https://mayachen.art', linkedin: '#' },
     location: 'Los Angeles, CA', joined: '2024-03-15',
     availability: [{ date: '2026-04-25', slots: ['10:00', '14:00', '16:00'] }, { date: '2026-04-28', slots: ['09:00', '11:00'] }],
@@ -18,7 +21,10 @@ export const artists = [
     brands: ['Tesla', 'Adidas', 'Spotify'],
     rating: 4.8, projects: 98, hourlyRate: 220, dailyRate: 1760, projectFlatRate: 8800, available: true,
     bio: 'Motion design specialist leveraging cutting-edge AI video generation tools to create stunning brand narratives and advertisements.',
-    portfolio: [], videoLinks: ['https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4'],
+    portfolio: [], videoLinks: [
+      'https://www.youtube.com/watch?v=uD9B5rK_Uxs',
+      'https://www.w3schools.com/html/mov_bbb.mp4'
+    ],
     socials: { twitter: '#', instagram: '#', website: 'https://kaireeves.io', linkedin: '#' },
     location: 'New York, NY', joined: '2024-01-10',
     availability: [{ date: '2026-04-24', slots: ['13:00', '15:00'] }],
@@ -40,7 +46,10 @@ export const artists = [
     brands: ['Meta', 'Epic Games', 'BMW'],
     rating: 4.7, projects: 84, hourlyRate: 280, dailyRate: 2240, projectFlatRate: 11200, available: true,
     bio: 'Specializing in photorealistic 3D environments and virtual production using neural radiance fields and AI-enhanced workflows.',
-    portfolio: [], videoLinks: ['https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4'],
+    portfolio: [], videoLinks: [
+      'https://www.w3schools.com/html/mov_bbb.mp4',
+      'https://www.youtube.com/watch?v=6O_fXIsiI78'
+    ],
     socials: { twitter: '#', instagram: '#', website: '#', linkedin: '#' },
     location: 'London, UK', joined: '2024-02-05',
     availability: [{ date: '2026-04-23', slots: ['10:00', '12:00', '14:00', '16:00'] }],

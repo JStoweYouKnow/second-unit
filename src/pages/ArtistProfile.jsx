@@ -6,6 +6,44 @@ import { useState } from 'react'
 import CalendarModal from '../components/CalendarModal'
 import { useAuth } from '../context/AuthContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
+function VideoPlayer({ url }) {
+  const getEmbedUrl = (url) => {
+    if (!url) return null;
+    if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
+      let id = '';
+      if (url.includes('v=')) id = new URL(url).searchParams.get('v');
+      else id = url.split('/').pop();
+      return `https://www.youtube.com/embed/${id}`;
+    }
+    if (url.includes('vimeo.com')) {
+      const id = url.split('/').pop();
+      return `https://player.vimeo.com/video/${id}`;
+    }
+    return null;
+  };
+
+  const embedUrl = getEmbedUrl(url);
+
+  if (embedUrl) {
+    return (
+      <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', background: '#000' }}>
+        <iframe
+          src={embedUrl}
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
+          allow="autoplay; fullscreen; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+    );
+  }
+
+  return (
+    <video controls style={{ width: '100%', display: 'block', background: '#000' }}>
+      <source src={url} type="video/mp4" />
+      Your browser does not support the video tag.
+    </video>
+  );
+}
 
 export default function ArtistProfile() {
   const { id } = useParams()
@@ -19,10 +57,10 @@ export default function ArtistProfile() {
   const isOwnProfile = isArtistProfile(profile) && String(demoArtistPersona(profile)?.id) === String(id)
 
   const [portfolioItems, setPortfolioItems] = useState([
-    { id: 1, title: 'Portfolio Piece 1', colorIdx: 1 },
-    { id: 2, title: 'Portfolio Piece 2', colorIdx: 2 },
-    { id: 3, title: 'Portfolio Piece 3', colorIdx: 3 },
-    { id: 4, title: 'Portfolio Piece 4', colorIdx: 4 },
+    { id: 1, title: 'Liquid Metal Campaign', image: '/demo/portfolio-1.png' },
+    { id: 2, title: 'Nature Motion Study', video: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4' },
+    { id: 3, title: 'Future Aesthetics', colorIdx: 3 },
+    { id: 4, title: 'AI Exploration', colorIdx: 4 },
   ])
   const [videoLinks, setVideoLinks] = useState(artist?.videoLinks || [])
 
@@ -117,13 +155,43 @@ export default function ArtistProfile() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
                 {portfolioItems.map((item, i) => (
                   <div key={item.id} className="card" style={{
-                    height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    background: `linear-gradient(${135 + item.colorIdx * 30}deg, var(--accent-tint-12), rgba(56, 189, 248, 0.08))`,
-                    fontSize: 14, color: 'var(--text-muted)',
+                    height: 250, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    background: item.image ? `url(${item.image}) center/cover no-repeat` : (item.video ? 'black' : `linear-gradient(${135 + item.colorIdx * 30}deg, var(--accent-tint-12), rgba(56, 189, 248, 0.08))`),
+                    fontSize: 14, color: (item.image || item.video) ? 'transparent' : 'var(--text-muted)',
                     position: 'relative',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    border: '1px solid var(--border)'
                   }}>
-                    {item.title}
+                    {item.video && (
+                      <video 
+                        autoPlay 
+                        muted 
+                        loop 
+                        playsInline 
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                      >
+                        <source src={item.video} type="video/mp4" />
+                      </video>
+                    )}
+                    
+                    {(!item.image && !item.video) && item.title}
+                    
+                    {(item.image || item.video) && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        padding: '12px 16px',
+                        background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
+                        color: 'white',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        zIndex: 1
+                      }}>
+                        {item.title}
+                      </div>
+                    )}
                     
                     {isOwnProfile && (
                       <div style={{
@@ -160,36 +228,39 @@ export default function ArtistProfile() {
               </div>
               {videoLinks.length > 0 && (
                 <div style={{ marginTop: 24 }}>
-                  <h3 style={{ marginBottom: 12 }}>Video Reels</h3>
+                  <h3 style={{ marginBottom: 16 }}>Video Reels</h3>
                   {videoLinks.map((v, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                      <a href={v} target="_blank" rel="noreferrer" className="card"
-                        style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, cursor: 'pointer' }}>
-                        <Play size={20} style={{ color: 'var(--accent)' }} />
-                        <span>Video Reel {i + 1}</span>
-                        <ExternalLink size={14} style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
-                      </a>
-                      
-                      {isOwnProfile && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <button 
-                            className="btn btn-ghost" 
-                            style={{ padding: 4, height: 'auto' }}
-                            onClick={() => moveItem(videoLinks, setVideoLinks, i, -1)}
-                            disabled={i === 0}
-                          >
-                            <ChevronUp size={14} />
-                          </button>
-                          <button 
-                            className="btn btn-ghost" 
-                            style={{ padding: 4, height: 'auto' }}
-                            onClick={() => moveItem(videoLinks, setVideoLinks, i, 1)}
-                            disabled={i === videoLinks.length - 1}
-                          >
-                            <ChevronDown size={14} />
-                          </button>
+                    <div key={i} style={{ marginBottom: 24, position: 'relative' }}>
+                      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                        <VideoPlayer url={v} />
+                        <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Play size={16} style={{ color: 'var(--accent)' }} />
+                            <span style={{ fontWeight: 500, fontSize: 14 }}>Video Reel {i + 1}</span>
+                          </div>
+                          
+                          {isOwnProfile && (
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button 
+                                className="btn btn-ghost btn-sm" 
+                                style={{ padding: '4px 8px' }}
+                                onClick={() => moveItem(videoLinks, setVideoLinks, i, -1)}
+                                disabled={i === 0}
+                              >
+                                <ChevronUp size={16} />
+                              </button>
+                              <button 
+                                className="btn btn-ghost btn-sm" 
+                                style={{ padding: '4px 8px' }}
+                                onClick={() => moveItem(videoLinks, setVideoLinks, i, 1)}
+                                disabled={i === videoLinks.length - 1}
+                              >
+                                <ChevronDown size={16} />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -14,9 +14,9 @@ export default function ArtistProfile() {
   const { profile } = useAuth()
   const [showCalendar, setShowCalendar] = useState(false)
   const [activeTab, setActiveTab] = useState('portfolio')
-  const artist = artists.find(a => a.id === parseInt(id))
+  const artist = artists.find(a => String(a.id) === String(id))
 
-  const isOwnProfile = isArtistProfile(profile) && demoArtistPersona(profile)?.id === parseInt(id)
+  const isOwnProfile = isArtistProfile(profile) && String(demoArtistPersona(profile)?.id) === String(id)
 
   const [portfolioItems, setPortfolioItems] = useState([
     { id: 1, title: 'Portfolio Piece 1', colorIdx: 1 },

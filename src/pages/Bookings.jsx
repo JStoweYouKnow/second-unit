@@ -1,13 +1,15 @@
-import { useMemo, useState } from 'react'
-import { Calendar, Clock, Plus, CheckCircle, AlertCircle, X, Send, CreditCard, Loader2, Shield } from '../components/icons'
+import { useMemo, useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { Calendar, Clock, Plus, CheckCircle, AlertCircle, X, Send, CreditCard, Loader2, Shield, ExternalLink } from '../components/icons'
 import { bookings as mockBookings, artists } from '../data/mockData'
-import { bookings as bookingsApi } from '../lib/api'
+import { bookings as bookingsApi, payments as paymentsApi } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
 import { bookingSubtotal, bookingScheduleCaption } from '../lib/pricing'
 
 export default function Bookings() {
   const { profile } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const isArtist = isArtistProfile(profile)
   const myArtist = demoArtistPersona(profile)
   const [tab, setTab] = useState('upcoming')
@@ -17,14 +19,29 @@ export default function Bookings() {
   const [newBooking, setNewBooking] = useState({
     artistId: '',
     date: '',
+    time: '',
     duration: 2,
     durationUnit: 'hours',
     agreedTotal: '',
     type: 'Consultation',
     notes: '',
   })
-  const [loading, setLoading] = useState(null) // ID of booking being processed
+  const [loading, setLoading] = useState(null)
   const [error, setError] = useState(null)
+
+  // Handle return from Stripe Checkout
+  useEffect(() => {
+    const success = searchParams.get('payment_success')
+    const bookingId = searchParams.get('booking_id')
+    if (success) {
+      if (bookingId) {
+        setLocalBookings(prev =>
+          prev.map(b => b.id === bookingId ? { ...b, status: 'paid' } : b)
+        )
+      }
+      setSearchParams({}, { replace: true })
+    }
+  }, [])
 
   const roleBookings = useMemo(() => {
     if (!isArtist || !myArtist) return localBookings
@@ -57,6 +74,7 @@ export default function Bookings() {
       artistId: artist.id,
       artistName: artist.name,
       date: newBooking.date,
+      time: newBooking.time || '09:00',
       duration,
       durationUnit: newBooking.durationUnit,
       type: newBooking.type,
@@ -67,12 +85,14 @@ export default function Bookings() {
 
     setLoading('new')
     try {
-      await bookingsApi.create({ ...booking, employerId: 'current-user' })
+      // employerId is set server-side from the authenticated JWT
+      await bookingsApi.create(booking)
       setLocalBookings(prev => [booking, ...prev])
       setShowNew(false)
       setNewBooking({
         artistId: '',
         date: '',
+        time: '',
         duration: 2,
         durationUnit: 'hours',
         agreedTotal: '',
@@ -124,13 +144,15 @@ export default function Bookings() {
     setError(null)
     setLoading(showPay.id)
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      setLocalBookings(prev => prev.map(b => b.id === showPay.id ? { ...b, status: 'paid' } : b))
-      setShowPay(null)
+      const { url } = await paymentsApi.createCheckout({
+        amount: bookingSubtotal(showPay),
+        artistName: showPay.artistName,
+        description: `${showPay.type} with ${showPay.artistName}`,
+        bookingId: showPay.id,
+      })
+      window.location.href = url
     } catch (err) {
-      setError('Payment failed. Please check your card details.')
-      console.error(err)
-    } finally {
+      setError('Could not start checkout. Please try again.')
       setLoading(null)
     }
   }
@@ -269,9 +291,19 @@ export default function Bookings() {
                   ))}
                 </select>
               </div>
-                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <div className="form-group">
                   <label className="form-label">Date</label>
-                  <input className="form-input" type="date" value={newBooking.date} onChange={e => setNewBooking(p => ({ ...p, date: e.target.value }))} required />
+                  <input className="form-input" type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={newBooking.date}
+                    onChange={e => setNewBooking(p => ({ ...p, date: e.target.value }))}
+                    required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Start time</label>
+                  <input className="form-input" type="time"
+                    value={newBooking.time}
+                    onChange={e => setNewBooking(p => ({ ...p, time: e.target.value }))} />
                 </div>
 
               <div className="form-group">
@@ -418,24 +450,15 @@ export default function Bookings() {
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Card Number</label>
-              <input className="form-input" placeholder="4242 4242 4242 4242" />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <div className="form-group">
-                <label className="form-label">Expiry</label>
-                <input className="form-input" placeholder="MM/YY" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">CVC</label>
-                <input className="form-input" placeholder="123" />
-              </div>
+            <div style={{ padding: '14px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <Shield size={14} style={{ color: 'var(--success)', marginTop: 1, flexShrink: 0 }} />
+              <span>You'll be taken to Stripe's secure checkout to enter your card details. Second Unit never handles card data directly.</span>
             </div>
 
             <button type="button" className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }} onClick={handlePaymentSubmit} disabled={loading === showPay.id}>
-              {loading === showPay.id ? <Loader2 size={18} className="animate-spin" /> : <CreditCard size={18} />}
-              Pay ${(bookingSubtotal(showPay) + Math.round(bookingSubtotal(showPay) * 0.1)).toLocaleString()} via Stripe
+              {loading === showPay.id
+                ? <Loader2 size={18} className="animate-spin" />
+                : <><CreditCard size={18} /> Continue to Stripe Checkout <ExternalLink size={14} /></>}
             </button>
             <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
               <Shield size={12} style={{ marginRight: 4 }} /> Secured by Stripe. Your payment information is encrypted.

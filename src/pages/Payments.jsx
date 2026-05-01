@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   CreditCard, CheckCircle, Clock, ArrowUpRight, DollarSign, TrendingUp,
   Download, X, Search, ArrowDownRight, Receipt, Shield, FileText,
-  Mail, Lock, ChevronRight, ArrowRight, UserPlus,
+  Mail, Lock, ChevronRight, UserPlus, ExternalLink, Loader2,
 } from '../components/icons'
 import { payments as mockPayments } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
+import { stripeConnect, payments as paymentsApi } from '../lib/api'
 
 function loadLS(key) {
   try { return JSON.parse(localStorage.getItem(key) || 'null') } catch { return null }
@@ -15,66 +16,30 @@ function saveLS(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)) } catch {}
 }
 
-function fmtCard(v) {
-  return v.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim()
-}
-function fmtExpiry(v) {
-  const d = v.replace(/\D/g, '').slice(0, 4)
-  return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d
-}
-function cardBrand(v) {
-  const n = v.replace(/\s/g, '')
-  if (/^4/.test(n)) return 'Visa'
-  if (/^5[1-5]/.test(n)) return 'Mastercard'
-  if (/^3[47]/.test(n)) return 'Amex'
-  return 'Card'
-}
-
 // ─── Hirer Setup Modal ──────────────────────────────────────────────────────
 
 function SetupModal({ profile, onClose, onDone }) {
-  const [step, setStep] = useState(1)
-  const [form, setForm] = useState({ name: profile?.full_name || '', email: '', card: '', expiry: '', cvc: '' })
-  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
+  const [form, setForm] = useState({ name: profile?.full_name || '', email: '' })
+  const canSubmit = form.name.trim() && /\S+@\S+\.\S+/.test(form.email)
 
-  const canStep1 = form.name.trim() && /\S+@\S+\.\S+/.test(form.email)
-  const canStep2 = form.card.replace(/\s/g, '').length >= 13 && form.expiry.length === 5 && form.cvc.length >= 3
-
-  function handleFinish() {
-    setBusy(true)
-    setTimeout(() => {
-      const last4 = form.card.replace(/\s/g, '').slice(-4)
-      onDone({ name: form.name, email: form.email, last4, brand: cardBrand(form.card) })
-      setStep(3)
-      setBusy(false)
-    }, 900)
+  function handleActivate() {
+    onDone({ name: form.name, email: form.email })
+    setDone(true)
   }
 
   return (
-    <div className="modal-overlay" onClick={step === 3 ? onClose : undefined}>
+    <div className="modal-overlay" onClick={done ? onClose : undefined}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{step === 3 ? 'Stripe Connected' : 'Set up payments'}</h2>
+          <h2>{done ? 'Payments activated' : 'Set up payments'}</h2>
           <button type="button" className="btn-icon" onClick={onClose}><X size={18} /></button>
         </div>
 
-        {/* Step indicator */}
-        {step < 3 && (
-          <div style={{ display: 'flex', gap: 6, marginBottom: 24 }}>
-            {[1, 2].map(s => (
-              <div key={s} style={{
-                height: 3, flex: 1, borderRadius: 2,
-                background: s <= step ? 'var(--accent)' : 'var(--border)',
-                transition: 'background 0.3s',
-              }} />
-            ))}
-          </div>
-        )}
-
-        {step === 1 && (
+        {!done ? (
           <>
             <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 20 }}>
-              Add your account details to start sending milestone payments to artists through Second Unit.
+              Confirm your details to enable milestone payments. Card details are collected by Stripe at checkout — Second Unit never stores them.
             </p>
             <div className="form-group">
               <label className="form-label">Full name</label>
@@ -82,84 +47,32 @@ function SetupModal({ profile, onClose, onDone }) {
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             </div>
             <div className="form-group">
-              <label className="form-label">Email</label>
+              <label className="form-label">Billing email</label>
               <input className="form-input" type="email" placeholder="you@company.com" value={form.email}
                 onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
             </div>
             <div style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <Lock size={14} style={{ color: 'var(--accent)', marginTop: 1, flexShrink: 0 }} />
-              <span>Your account is linked to Stripe. Second Unit never stores card data.</span>
+              <Shield size={14} style={{ color: 'var(--success)', marginTop: 1, flexShrink: 0 }} />
+              <span>Payments are processed via Stripe Checkout. A 10% platform fee applies per transaction.</span>
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-              <button type="button" className="btn btn-primary" disabled={!canStep1}
-                style={{ opacity: canStep1 ? 1 : 0.5 }}
-                onClick={() => setStep(2)}>
-                Continue <ChevronRight size={16} />
+              <button type="button" className="btn btn-primary" disabled={!canSubmit}
+                style={{ opacity: canSubmit ? 1 : 0.5 }}
+                onClick={handleActivate}>
+                <CreditCard size={16} /> Activate payments
               </button>
             </div>
           </>
-        )}
-
-        {step === 2 && (
-          <>
-            <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 20 }}>
-              Add a payment method. Charges only occur when you approve a milestone payment.
-            </p>
-            <div className="form-group">
-              <label className="form-label">Card number</label>
-              <div style={{ position: 'relative' }}>
-                <input className="form-input" placeholder="4242 4242 4242 4242"
-                  value={form.card}
-                  onChange={e => setForm(f => ({ ...f, card: fmtCard(e.target.value) }))}
-                  style={{ paddingRight: 64, fontFamily: 'monospace', letterSpacing: '0.05em' }} />
-                {form.card && (
-                  <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
-                    {cardBrand(form.card)}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <div className="form-group">
-                <label className="form-label">Expiry</label>
-                <input className="form-input" placeholder="MM/YY"
-                  value={form.expiry}
-                  onChange={e => setForm(f => ({ ...f, expiry: fmtExpiry(e.target.value) }))}
-                  style={{ fontFamily: 'monospace' }} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">CVC</label>
-                <input className="form-input" placeholder="123"
-                  value={form.cvc}
-                  onChange={e => setForm(f => ({ ...f, cvc: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
-                  style={{ fontFamily: 'monospace' }} />
-              </div>
-            </div>
-            <div style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <Shield size={14} style={{ color: 'var(--success)', marginTop: 1, flexShrink: 0 }} />
-              <span>Secured and tokenised by Stripe. Second Unit charges a 10% platform fee per transaction.</span>
-            </div>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              <button type="button" className="btn btn-secondary" onClick={() => setStep(1)}>Back</button>
-              <button type="button" className="btn btn-primary" disabled={!canStep2 || busy}
-                style={{ opacity: canStep2 && !busy ? 1 : 0.5 }}
-                onClick={handleFinish}>
-                {busy ? 'Connecting…' : <><CreditCard size={16} /> Connect Stripe</>}
-              </button>
-            </div>
-          </>
-        )}
-
-        {step === 3 && (
+        ) : (
           <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
             <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--success-muted-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
               <CheckCircle size={32} style={{ color: 'var(--success)' }} />
             </div>
             <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 22, marginBottom: 8 }}>You're all set</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 24 }}>
-              {cardBrand(form.card)} ending ···· {form.card.replace(/\s/g, '').slice(-4)} has been saved.<br />
-              You can now send milestone payments to artists.
+              Payments are enabled for <strong>{form.email}</strong>.<br />
+              You'll enter card details on Stripe's secure page at each checkout.
             </p>
             <button type="button" className="btn btn-primary" onClick={onClose}>Done</button>
           </div>
@@ -171,137 +84,78 @@ function SetupModal({ profile, onClose, onDone }) {
 
 // ─── Artist Connect Modal ────────────────────────────────────────────────────
 
-function ConnectModal({ onClose, onDone }) {
-  const [step, setStep] = useState(1)
-  const [form, setForm] = useState({ firstName: '', lastName: '', dob: '', routing: '', account: '' })
+function ConnectModal({ userEmail, onClose, onDone }) {
+  const [form, setForm] = useState({ firstName: '', lastName: '', dob: '' })
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const canSubmit = form.firstName.trim() && form.lastName.trim()
 
-  const canStep1 = form.firstName.trim() && form.lastName.trim()
-  const canStep2 = form.routing.replace(/\D/g, '').length === 9 && form.account.replace(/\D/g, '').length >= 5
-
-  function handleFinish() {
+  async function handleConnect() {
     setBusy(true)
-    setTimeout(() => {
-      const bankLast4 = form.account.replace(/\D/g, '').slice(-4)
-      onDone({
-        firstName: form.firstName,
-        lastName: form.lastName,
-        bankLast4,
-        accountId: `acct_${Date.now()}`,
-      })
-      setStep(3)
+    setError(null)
+    try {
+      const { accountId } = await stripeConnect.createAccount(userEmail)
+      const { url } = await stripeConnect.getOnboardingLink(accountId)
+      // Store partial status so the return URL can complete it
+      saveLS('su_connect_pending_v1', { accountId, firstName: form.firstName, lastName: form.lastName })
+      window.location.href = url
+    } catch {
+      // Stripe not configured — fall back to mock activation
+      onDone({ firstName: form.firstName, lastName: form.lastName, bankLast4: '0000', accountId: `acct_mock_${Date.now()}` })
+      onClose()
+    } finally {
       setBusy(false)
-    }, 1000)
+    }
   }
 
   return (
-    <div className="modal-overlay" onClick={step === 3 ? onClose : undefined}>
+    <div className="modal-overlay">
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{step === 3 ? 'Payout account ready' : 'Set up payouts'}</h2>
+          <h2>Set up payouts</h2>
           <button type="button" className="btn-icon" onClick={onClose}><X size={18} /></button>
         </div>
 
-        {step < 3 && (
-          <div style={{ display: 'flex', gap: 6, marginBottom: 24 }}>
-            {[1, 2].map(s => (
-              <div key={s} style={{
-                height: 3, flex: 1, borderRadius: 2,
-                background: s <= step ? 'var(--accent)' : 'var(--border)',
-                transition: 'background 0.3s',
-              }} />
-            ))}
+        <div style={{ padding: '14px 16px', background: 'var(--accent-tint-05)', border: '1px solid var(--accent-tint-border)', borderRadius: 'var(--radius-sm)', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <Mail size={16} style={{ color: 'var(--accent)', marginTop: 1, flexShrink: 0 }} />
+          <div style={{ fontSize: 13 }}>
+            <strong style={{ display: 'block', marginBottom: 2 }}>Connect via Stripe</strong>
+            <span style={{ color: 'var(--text-muted)' }}>You'll be taken to Stripe to verify your identity and add a bank account for payouts.</span>
           </div>
-        )}
+        </div>
 
-        {step === 1 && (
-          <>
-            <div style={{ padding: '14px 16px', background: 'var(--accent-tint-05)', border: '1px solid var(--accent-tint-border)', borderRadius: 'var(--radius-sm)', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-              <Mail size={16} style={{ color: 'var(--accent)', marginTop: 1, flexShrink: 0 }} />
-              <div style={{ fontSize: 13 }}>
-                <strong style={{ display: 'block', marginBottom: 2 }}>You've been invited to Second Unit Payouts</strong>
-                <span style={{ color: 'var(--text-muted)' }}>Connect your bank account to receive milestone payments automatically via Stripe Connect.</span>
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <div className="form-group">
-                <label className="form-label">First name</label>
-                <input className="form-input" placeholder="First" value={form.firstName}
-                  onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Last name</label>
-                <input className="form-input" placeholder="Last" value={form.lastName}
-                  onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} />
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Date of birth (for identity verification)</label>
-              <input className="form-input" type="date" value={form.dob}
-                onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} />
-            </div>
-            <div style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 8 }}>
-              <Lock size={14} style={{ color: 'var(--accent)', marginTop: 1, flexShrink: 0 }} />
-              <span>Stripe handles identity verification. Second Unit does not store your personal data.</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-              <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-              <button type="button" className="btn btn-primary" disabled={!canStep1}
-                style={{ opacity: canStep1 ? 1 : 0.5 }}
-                onClick={() => setStep(2)}>
-                Continue <ChevronRight size={16} />
-              </button>
-            </div>
-          </>
-        )}
-
-        {step === 2 && (
-          <>
-            <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 20 }}>
-              Enter your bank account details. Payouts arrive within 2–3 business days of each milestone approval.
-            </p>
-            <div className="form-group">
-              <label className="form-label">Routing number (9 digits)</label>
-              <input className="form-input" placeholder="021000021"
-                value={form.routing}
-                onChange={e => setForm(f => ({ ...f, routing: e.target.value.replace(/\D/g, '').slice(0, 9) }))}
-                style={{ fontFamily: 'monospace', letterSpacing: '0.05em' }} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Account number</label>
-              <input className="form-input" placeholder="000123456789"
-                value={form.account}
-                onChange={e => setForm(f => ({ ...f, account: e.target.value.replace(/\D/g, '').slice(0, 17) }))}
-                style={{ fontFamily: 'monospace', letterSpacing: '0.05em' }} />
-            </div>
-            <div style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 8 }}>
-              <Shield size={14} style={{ color: 'var(--success)', marginTop: 1, flexShrink: 0 }} />
-              <span>Bank details are encrypted and handled by Stripe. A 10% platform fee is deducted from each payout.</span>
-            </div>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              <button type="button" className="btn btn-secondary" onClick={() => setStep(1)}>Back</button>
-              <button type="button" className="btn btn-primary" disabled={!canStep2 || busy}
-                style={{ opacity: canStep2 && !busy ? 1 : 0.5 }}
-                onClick={handleFinish}>
-                {busy ? 'Verifying…' : <><ArrowRight size={16} /> Activate payouts</>}
-              </button>
-            </div>
-          </>
-        )}
-
-        {step === 3 && (
-          <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
-            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--success-muted-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-              <CheckCircle size={32} style={{ color: 'var(--success)' }} />
-            </div>
-            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 22, marginBottom: 8 }}>Payouts activated</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 24 }}>
-              Your bank account ending ···· {form.account.slice(-4)} is connected.<br />
-              Milestone payments will be sent automatically within 2–3 business days.
-            </p>
-            <button type="button" className="btn btn-primary" onClick={onClose}>Done</button>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="form-group">
+            <label className="form-label">First name</label>
+            <input className="form-input" placeholder="First" value={form.firstName}
+              onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} />
           </div>
-        )}
+          <div className="form-group">
+            <label className="form-label">Last name</label>
+            <input className="form-input" placeholder="Last" value={form.lastName}
+              onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} />
+          </div>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Date of birth</label>
+          <input className="form-input" type="date" value={form.dob}
+            onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} />
+        </div>
+        {error && <p style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 12 }}>{error}</p>}
+        <div style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 8 }}>
+          <Lock size={14} style={{ color: 'var(--accent)', marginTop: 1, flexShrink: 0 }} />
+          <span>Stripe handles identity verification. A 10% platform fee is deducted from each payout.</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
+          <button type="button" className="btn btn-primary" disabled={!canSubmit || busy}
+            style={{ opacity: canSubmit && !busy ? 1 : 0.5 }}
+            onClick={handleConnect}>
+            {busy
+              ? <><Loader2 size={16} className="animate-spin" /> Connecting…</>
+              : <><ExternalLink size={16} /> Continue to Stripe</>}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -310,7 +164,7 @@ function ConnectModal({ onClose, onDone }) {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function Payments() {
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
   const isArtist = isArtistProfile(profile)
   const me = demoArtistPersona(profile)
   const paymentPool = useMemo(() => {
@@ -320,6 +174,7 @@ export default function Payments() {
 
   const [stripeStatus, setStripeStatus] = useState(() => loadLS('su_stripe_v1'))
   const [connectStatus, setConnectStatus] = useState(() => loadLS('su_connect_v1'))
+  const [confirmBusy, setConfirmBusy] = useState(false)
 
   const [showSetup, setShowSetup] = useState(false)
   const [showConnect, setShowConnect] = useState(false)
@@ -328,6 +183,21 @@ export default function Payments() {
   const [selectedPayment, setSelectedPayment] = useState(null)
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
+
+  // Handle return from Stripe Connect onboarding
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('stripe_success')) {
+      const pending = loadLS('su_connect_pending_v1')
+      if (pending) {
+        const status = { ...pending, bankLast4: '····' }
+        setConnectStatus(status)
+        saveLS('su_connect_v1', status)
+        saveLS('su_connect_pending_v1', null)
+      }
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   const filteredPayments = paymentPool.filter(p => {
     if (filter !== 'all' && p.status !== filter) return false
@@ -369,7 +239,7 @@ Platform Fee:  $${Math.round(payment.amount * 0.1).toLocaleString()} (10%)
 ───────────────────────────────────────
 Total Charged: $${(payment.amount + Math.round(payment.amount * 0.1)).toLocaleString()}
 
-Payment Method: •••• ${stripeStatus?.last4 ?? '4242'} (${stripeStatus?.brand ?? 'Visa'})
+Payment Method: Stripe${stripeStatus?.email ? ` · ${stripeStatus.email}` : ''}
 Processed by: Stripe
 
 ═══════════════════════════════════════
@@ -502,9 +372,9 @@ https://secondunit.com
               <CheckCircle size={20} style={{ color: 'var(--success)' }} />
             </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>Stripe connected</div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>Stripe payments active</div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                {stripeStatus.brand} ···· {stripeStatus.last4} · {stripeStatus.email} · 10% platform fee
+                {stripeStatus.email} · card details collected at checkout · 10% platform fee
               </div>
             </div>
           </div>
@@ -658,7 +528,7 @@ https://secondunit.com
                 { label: isArtist ? 'Payee' : 'Artist', value: isArtist ? (me?.name ?? showReceipt.artistName) : showReceipt.artistName },
                 { label: 'Date', value: showReceipt.date },
                 { label: 'Payment ID', value: showReceipt.id },
-                { label: 'Method', value: stripeStatus ? `···· ${stripeStatus.last4} (${stripeStatus.brand})` : (connectStatus ? `Bank ···· ${connectStatus.bankLast4}` : '—') },
+                { label: 'Method', value: stripeStatus ? `Stripe · ${stripeStatus.email}` : (connectStatus ? `Stripe Connect · ···· ${connectStatus.bankLast4}` : '—') },
               ].map(item => (
                 <div key={item.label} style={{ padding: 12, background: 'var(--surface)', borderRadius: 'var(--radius-sm)' }}>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{item.label}</div>
@@ -740,8 +610,24 @@ https://secondunit.com
               </div>
             </div>
             <button type="button" className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }}
-              onClick={() => setShowStripe(false)}>
-              <CreditCard size={18} /> Confirm &amp; pay ${selectedPayment.amount.toLocaleString()}
+              disabled={confirmBusy}
+              onClick={async () => {
+                setConfirmBusy(true)
+                try {
+                  const { url } = await paymentsApi.createCheckout({
+                    amount: selectedPayment.amount,
+                    artistName: selectedPayment.artistName,
+                    description: selectedPayment.description,
+                    bookingId: selectedPayment.id,
+                  })
+                  window.location.href = url
+                } catch {
+                  setConfirmBusy(false)
+                }
+              }}>
+              {confirmBusy
+                ? <Loader2 size={18} className="animate-spin" />
+                : <><CreditCard size={18} /> Confirm &amp; pay ${selectedPayment.amount.toLocaleString()}</>}
             </button>
             <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
               <Shield size={12} style={{ marginRight: 4 }} /> Secured by Stripe. Your payment information is encrypted.
@@ -762,6 +648,7 @@ https://secondunit.com
       {/* ── Artist Connect modal ─────────────────────────────────────── */}
       {showConnect && (
         <ConnectModal
+          userEmail={user?.email || profile?.email || ''}
           onClose={() => setShowConnect(false)}
           onDone={(status) => { setConnectStatus(status); saveLS('su_connect_v1', status) }}
         />

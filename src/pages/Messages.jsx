@@ -17,8 +17,16 @@ export default function Messages() {
     return allMessages
   }, [allMessages, profile])
 
-  const [activeConv, setActiveConv] = useState(visibleMessages[0]?.id || null)
+  const [activeConv, setActiveConv] = useState(null)
   const [input, setInput] = useState('')
+
+  // Sync active conversation when visible messages change (e.g. on role switch)
+  useEffect(() => {
+    if (visibleMessages.length > 0 && (!activeConv || !visibleMessages.find(m => m.id === activeConv))) {
+      setActiveConv(visibleMessages[0].id)
+    }
+  }, [visibleMessages, activeConv])
+
   const [typingIndicator, setTypingIndicator] = useState({}) // { conversationId: senderName }
   const [socketOk, setSocketOk] = useState(false)
   const chatEndRef = useRef(null)

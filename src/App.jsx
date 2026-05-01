@@ -132,15 +132,12 @@ function AppShell() {
   }
 
   const handleSignOut = async () => {
-    console.log('[App] handleSignOut initiated')
     try {
       await signOut()
-      console.log('[App] signOut success')
     } catch (e) {
       console.error('[App] signOut error:', e)
     } finally {
       setMobileNavOpen(false)
-      console.log('[App] navigating to /signin')
       navigate('/signin', { replace: true })
     }
   }

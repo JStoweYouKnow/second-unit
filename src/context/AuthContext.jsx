@@ -116,9 +116,12 @@ export function AuthProvider({ children }) {
       localStorage.setItem('mock_user_name', fullName)
       localStorage.setItem('mock_user_email', email)
       
-      setUser({ ...MOCK_USER, email, user_metadata: { full_name: fullName, role } })
-      setProfile({ ...MOCK_PROFILE, email, full_name: fullName, role })
-      return { data: { user: MOCK_USER }, error: null }
+      const newUser = { ...MOCK_USER, email, user_metadata: { full_name: fullName, role } }
+      const newProfile = { ...MOCK_PROFILE, email, full_name: fullName, role }
+      
+      setUser(newUser)
+      setProfile(newProfile)
+      return { data: { user: newUser }, error: null }
     }
 
     const { data, error } = await supabase.auth.signUp({

@@ -1,8 +1,22 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+import { supabase, isSupabaseConfigured } from './supabase.js'
+
+// Relative URL in production (Vercel Functions at same origin).
+// VITE_API_URL can override for local dev without the Vite proxy.
+const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 async function request(path, options = {}) {
+  let token = null
+  if (isSupabaseConfigured) {
+    const { data: { session } } = await supabase.auth.getSession()
+    token = session?.access_token ?? null
+  }
+
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
     ...options,
   })
   const data = await res.json()
@@ -36,15 +50,14 @@ export const payments = {
       body: JSON.stringify({ amount, artistStripeAccountId, bookingId, description }),
     }),
 
+  createCheckout: ({ amount, artistName, description, bookingId, artistStripeAccountId }) =>
+    request('/api/payments/create-checkout', {
+      method: 'POST',
+      body: JSON.stringify({ amount, artistName, description, bookingId, artistStripeAccountId }),
+    }),
+
   getStatus: (paymentIntentId) =>
     request(`/api/payments/${paymentIntentId}`),
-
-  // Mock fallback
-  createMockIntent: (amount) =>
-    request('/api/mock/payment-intent', {
-      method: 'POST',
-      body: JSON.stringify({ amount }),
-    }),
 }
 
 // ---- Bookings ----

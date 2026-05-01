@@ -252,6 +252,24 @@ app.post('/api/payments/create-intent', async (req, res) => {
   }
 })
 
+app.patch('/api/bookings/:id/respond', async (req, res) => {
+  const { id } = req.params
+  const { action } = req.body
+  if (!['confirm', 'decline'].includes(action)) {
+    return res.status(400).json({ error: 'action must be "confirm" or "decline"' })
+  }
+  const status = action === 'confirm' ? 'confirmed' : 'cancelled'
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('bookings').update({ status }).eq('id', id).select().single()
+    if (error) return res.status(500).json({ error: error.message })
+    return res.json(data)
+  }
+  const booking = bookingsStore.find(b => b.id === id)
+  if (booking) booking.status = status
+  res.json(booking || { id, status })
+})
+
 app.post('/api/bookings/:id/pay', async (req, res) => {
   const { id } = req.params
   // In a real app, this would trigger a payment or verify it

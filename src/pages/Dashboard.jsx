@@ -187,15 +187,16 @@ export default function Dashboard() {
       }))
   }, [me, localProjects])
 
-  if (isArtist && me) {
+  if (isArtist) {
+    const artistPersona = me || artists[0]
     return (
       <div className="page-container">
         <div className="page-header">
           <div className="page-header-row">
-            <div>
-              <h1>Studio</h1>
-              <p>Your bookings, projects, and payouts in one place</p>
-            </div>
+          <div>
+            <h1>Studio</h1>
+            <p>Your bookings, projects, and payouts in one place</p>
+          </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {['1m', '3m', '6m', '1y'].map((r) => (
                 <button key={r} className={`btn btn-sm ${timeRange === r ? 'btn-primary' : 'btn-secondary'}`}
@@ -297,7 +298,7 @@ export default function Dashboard() {
             <h3 style={{ fontSize: 18, marginBottom: 4 }}>{me.name}</h3>
             <span className="artist-role">{me.role}</span>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 12, marginBottom: 0 }}>
-              Demo mapping: your account is linked to this roster profile so bookings and payouts stay in sync while we wire real profiles.
+              Bookings and payouts for this profile are shown below.
             </p>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -310,7 +311,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 32 }}>
           {myBookings.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-              No bookings assigned to this demo profile yet.
+              No upcoming bookings.
             </div>
           ) : (
             myBookings.map((b) => (

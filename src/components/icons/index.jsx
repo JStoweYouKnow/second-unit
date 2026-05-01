@@ -564,6 +564,22 @@ export function ChevronRight({ size = 24, color = 'currentColor', className = ''
   )
 }
 
+export function ChevronUp({ size = 24, color = 'currentColor', className = '', style } = {}) {
+  return (
+    <Svg {...p(size, color, className, style)}>
+      <polyline points="18 15 12 9 6 15" />
+    </Svg>
+  )
+}
+
+export function ChevronDown({ size = 24, color = 'currentColor', className = '', style } = {}) {
+  return (
+    <Svg {...p(size, color, className, style)}>
+      <polyline points="6 9 12 15 18 9" />
+    </Svg>
+  )
+}
+
 export function Bell({ size = 24, color = 'currentColor', className = '', style } = {}) {
   return (
     <Svg {...p(size, color, className, style)}>

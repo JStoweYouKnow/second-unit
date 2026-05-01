@@ -1,17 +1,40 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Heart, Star, MapPin, Calendar, ExternalLink, Play, Globe, AtSign, Camera, Briefcase, Send } from '../components/icons'
+import { ArrowLeft, Heart, Star, MapPin, Calendar, ExternalLink, Play, Globe, AtSign, Camera, Briefcase, Send, ChevronUp, ChevronDown } from '../components/icons'
 import { artists } from '../data/mockData'
 import { useApp } from '../context/AppContext'
 import { useState } from 'react'
 import CalendarModal from '../components/CalendarModal'
+import { useAuth } from '../context/AuthContext'
+import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
 
 export default function ArtistProfile() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { favorites, toggleFavorite, startConversation } = useApp()
+  const { profile } = useAuth()
   const [showCalendar, setShowCalendar] = useState(false)
   const [activeTab, setActiveTab] = useState('portfolio')
   const artist = artists.find(a => a.id === parseInt(id))
+
+  const isOwnProfile = isArtistProfile(profile) && demoArtistPersona(profile)?.id === parseInt(id)
+
+  const [portfolioItems, setPortfolioItems] = useState([
+    { id: 1, title: 'Portfolio Piece 1', colorIdx: 1 },
+    { id: 2, title: 'Portfolio Piece 2', colorIdx: 2 },
+    { id: 3, title: 'Portfolio Piece 3', colorIdx: 3 },
+    { id: 4, title: 'Portfolio Piece 4', colorIdx: 4 },
+  ])
+  const [videoLinks, setVideoLinks] = useState(artist?.videoLinks || [])
+
+  const moveItem = (list, setList, index, direction) => {
+    const newList = [...list]
+    const targetIndex = index + direction
+    if (targetIndex < 0 || targetIndex >= newList.length) return
+    const temp = newList[index]
+    newList[index] = newList[targetIndex]
+    newList[targetIndex] = temp
+    setList(newList)
+  }
 
   if (!artist) return <div className="page-container"><p>Artist not found.</p></div>
 
@@ -92,26 +115,82 @@ export default function ArtistProfile() {
           {activeTab === 'portfolio' && (
             <div className="slide-up">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-                {[1,2,3,4].map(i => (
-                  <div key={i} className="card" style={{
-                    height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: `linear-gradient(${135 + i * 30}deg, var(--accent-tint-12), rgba(56, 189, 248, 0.08))`,
-                    fontSize: 14, color: 'var(--text-muted)'
+                {portfolioItems.map((item, i) => (
+                  <div key={item.id} className="card" style={{
+                    height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    background: `linear-gradient(${135 + item.colorIdx * 30}deg, var(--accent-tint-12), rgba(56, 189, 248, 0.08))`,
+                    fontSize: 14, color: 'var(--text-muted)',
+                    position: 'relative',
+                    overflow: 'hidden'
                   }}>
-                    Portfolio Piece {i}
+                    {item.title}
+                    
+                    {isOwnProfile && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 10,
+                        right: 10,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 4,
+                        background: 'rgba(0,0,0,0.5)',
+                        padding: 4,
+                        borderRadius: 8,
+                        backdropFilter: 'blur(4px)',
+                        border: '1px solid rgba(255,255,255,0.1)'
+                      }}>
+                        <button 
+                          onClick={() => moveItem(portfolioItems, setPortfolioItems, i, -1)} 
+                          disabled={i === 0}
+                          style={{ background: 'none', border: 'none', color: i === 0 ? 'rgba(255,255,255,0.2)' : 'white', cursor: i === 0 ? 'default' : 'pointer', padding: 2 }}
+                        >
+                          <ChevronUp size={16} />
+                        </button>
+                        <button 
+                          onClick={() => moveItem(portfolioItems, setPortfolioItems, i, 1)} 
+                          disabled={i === portfolioItems.length - 1}
+                          style={{ background: 'none', border: 'none', color: i === portfolioItems.length - 1 ? 'rgba(255,255,255,0.2)' : 'white', cursor: i === portfolioItems.length - 1 ? 'default' : 'pointer', padding: 2 }}
+                        >
+                          <ChevronDown size={16} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
-              {artist.videoLinks.length > 0 && (
+              {videoLinks.length > 0 && (
                 <div style={{ marginTop: 24 }}>
                   <h3 style={{ marginBottom: 12 }}>Video Reels</h3>
-                  {artist.videoLinks.map((v, i) => (
-                    <a key={i} href={v} target="_blank" rel="noreferrer" className="card"
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, cursor: 'pointer' }}>
-                      <Play size={20} style={{ color: 'var(--accent)' }} />
-                      <span>Video Reel {i + 1}</span>
-                      <ExternalLink size={14} style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
-                    </a>
+                  {videoLinks.map((v, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                      <a href={v} target="_blank" rel="noreferrer" className="card"
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, cursor: 'pointer' }}>
+                        <Play size={20} style={{ color: 'var(--accent)' }} />
+                        <span>Video Reel {i + 1}</span>
+                        <ExternalLink size={14} style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
+                      </a>
+                      
+                      {isOwnProfile && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <button 
+                            className="btn btn-ghost" 
+                            style={{ padding: 4, height: 'auto' }}
+                            onClick={() => moveItem(videoLinks, setVideoLinks, i, -1)}
+                            disabled={i === 0}
+                          >
+                            <ChevronUp size={14} />
+                          </button>
+                          <button 
+                            className="btn btn-ghost" 
+                            style={{ padding: 4, height: 'auto' }}
+                            onClick={() => moveItem(videoLinks, setVideoLinks, i, 1)}
+                            disabled={i === videoLinks.length - 1}
+                          >
+                            <ChevronDown size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}

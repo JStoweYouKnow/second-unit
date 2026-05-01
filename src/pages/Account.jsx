@@ -5,6 +5,18 @@ import { User, Mail, Shield, Bell, CreditCard, ChevronRight, Camera } from '../c
 export default function Account() {
   const { profile, user } = useAuth()
   const [activeTab, setActiveTab] = useState('profile')
+  const [isSaving, setIsSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  const handleSave = () => {
+    setIsSaving(true)
+    setSaved(false)
+    setTimeout(() => {
+      setIsSaving(false)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    }, 800)
+  }
 
   return (
     <div className="page-container">
@@ -79,8 +91,75 @@ export default function Account() {
                 </div>
               </div>
 
-              <div style={{ marginTop: 32, display: 'flex', justifyContent: 'flex-end' }}>
-                <button className="btn btn-primary">Save Changes</button>
+
+              {profile?.role === 'artist' && (
+                <>
+                  <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
+                  <h3 style={{ marginBottom: 24 }}>Artist Profile Details</h3>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20 }}>
+                    <div className="form-group">
+                      <label className="form-label">Professional Bio</label>
+                      <textarea 
+                        className="filter-select" 
+                        style={{ width: '100%', minHeight: '100px', padding: '12px', resize: 'vertical' }} 
+                        placeholder="Award-winning AI visual artist specializing in..."
+                      />
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                      <div className="form-group">
+                        <label className="form-label">Core Skills (comma separated)</label>
+                        <input className="filter-select" style={{ width: '100%' }} placeholder="Midjourney, Stable Diffusion, Runway" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Location</label>
+                        <input className="filter-select" style={{ width: '100%' }} placeholder="Los Angeles, CA" />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Past Brands & Clients (comma separated)</label>
+                      <input className="filter-select" style={{ width: '100%' }} placeholder="Nike, Apple, Spotify" />
+                    </div>
+
+                    <h4 style={{ marginTop: 16, marginBottom: 8 }}>Social & Portfolio Links</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                      <div className="form-group">
+                        <label className="form-label">Website Portfolio</label>
+                        <input className="filter-select" style={{ width: '100%' }} placeholder="https://yourwebsite.com" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Instagram</label>
+                        <input className="filter-select" style={{ width: '100%' }} placeholder="https://instagram.com/username" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Twitter / X</label>
+                        <input className="filter-select" style={{ width: '100%' }} placeholder="https://twitter.com/username" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">LinkedIn</label>
+                        <input className="filter-select" style={{ width: '100%' }} placeholder="https://linkedin.com/in/username" />
+                      </div>
+                    </div>
+
+                    <div className="form-group" style={{ marginTop: 8 }}>
+                      <label className="form-label">Video Reels (YouTube/Vimeo URLs, comma separated)</label>
+                      <input className="filter-select" style={{ width: '100%' }} placeholder="https://youtube.com/..., https://vimeo.com/..." />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div style={{ marginTop: 32, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16 }}>
+                {saved && <span style={{ color: 'var(--success)', fontSize: 14, fontWeight: 500 }}>Profile updated successfully!</span>}
+                <button 
+                  className="btn btn-primary" 
+                  onClick={handleSave} 
+                  disabled={isSaving}
+                >
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </button>
               </div>
             </div>
           )}

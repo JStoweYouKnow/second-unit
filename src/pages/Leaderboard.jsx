@@ -67,6 +67,7 @@ export default function Leaderboard() {
   const [selectedLocations, setSelectedLocations] = useState(() => new Set())
   const [skillMatchMode, setSkillMatchMode] = useState('any')
   const [availableOnly, setAvailableOnly] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
   const roleOptions = useMemo(
     () => [...new Set(artists.map(a => a.role))].sort(),
     []
@@ -162,22 +163,27 @@ export default function Leaderboard() {
         </div>
 
         <section className="spotlight-filters" aria-label="Filter artists">
-          <div className="spotlight-filters-top">
-            <h2>
+          <div className="spotlight-filters-top" onClick={() => setShowFilters(!showFilters)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
               <Filter size={16} aria-hidden />
-              Refine results
+              {showFilters ? 'Hide filters' : 'Show filters'}
               {activeFilterCount > 0 && (
                 <span className="filter-badge">{activeFilterCount} active</span>
               )}
             </h2>
             {activeFilterCount > 0 && (
-              <button type="button" className="btn btn-secondary btn-sm" onClick={clearFilters}>
+              <button 
+                type="button" 
+                className="btn btn-secondary btn-sm" 
+                onClick={(e) => { e.stopPropagation(); clearFilters(); }}
+              >
                 Clear all filters
               </button>
             )}
           </div>
 
-          <div className="spotlight-filters-grid">
+          {showFilters && (
+            <div className="spotlight-filters-grid slide-up" style={{ marginTop: 24 }}>
             <fieldset>
               <legend>Role</legend>
               <p className="filter-hint">Select one or more specialties. Leave empty to include all roles.</p>
@@ -254,6 +260,7 @@ export default function Leaderboard() {
               </label>
             </fieldset>
           </div>
+          )}
 
           <p className="spotlight-results-meta">
             Showing <strong>{filtered.length}</strong> of {artists.length} artists

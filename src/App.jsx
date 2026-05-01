@@ -133,7 +133,9 @@ function AppShell() {
 
   const handleSignOut = async () => {
     try {
-      await signOut()
+      if (signOut) {
+        await signOut()
+      }
     } catch (e) {
       console.error('[App] signOut error:', e)
     } finally {

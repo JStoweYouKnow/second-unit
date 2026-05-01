@@ -1,20 +1,30 @@
-import { useState, useEffect, useRef } from 'react'
-import { Send, Check, HelpCircle, Wifi, WifiOff } from '../components/icons'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { Send, Check, HelpCircle, Wifi, WifiOff, User } from '../components/icons'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { getSocket } from '../lib/socket'
+import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
 
 export default function Messages() {
   const { allMessages, sendMessage, localProjects, setLocalProjects } = useApp()
-  const { user } = useAuth()
-  const [activeConv, setActiveConv] = useState(allMessages[0]?.id || null)
+  const { user, profile } = useAuth()
+
+  const visibleMessages = useMemo(() => {
+    if (isArtistProfile(profile)) {
+      const persona = demoArtistPersona(profile)
+      return allMessages.filter(m => m.artistId === persona?.id)
+    }
+    return allMessages
+  }, [allMessages, profile])
+
+  const [activeConv, setActiveConv] = useState(visibleMessages[0]?.id || null)
   const [input, setInput] = useState('')
   const [typingIndicator, setTypingIndicator] = useState({}) // { conversationId: senderName }
   const [socketOk, setSocketOk] = useState(false)
   const chatEndRef = useRef(null)
   const typingTimeout = useRef(null)
 
-  const conversation = allMessages.find(m => m.id === activeConv)
+  const conversation = visibleMessages.find(m => m.id === activeConv) || visibleMessages[0]
 
   // Socket.io real-time listeners
   useEffect(() => {
@@ -129,16 +139,21 @@ export default function Messages() {
           </div>
         </div>
         <div className="message-list" style={{ flex: 1, overflow: 'auto', padding: 8 }}>
-          {allMessages.map(m => (
-            <div key={m.id}
-              className={`message-item ${m.id === activeConv ? 'active' : ''} ${m.unread ? 'unread' : ''}`}
-              onClick={() => setActiveConv(m.id)}>
-              <div className="avatar avatar-sm">{m.avatar}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span className="message-name">{m.artistName}</span>
-                  <span className="message-time">{m.time}</span>
-                </div>
+          {visibleMessages.length === 0 ? (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
+              No messages yet.
+            </div>
+          ) : (
+            visibleMessages.map(m => (
+              <div key={m.id}
+                className={`message-item ${m.id === (activeConv || visibleMessages[0]?.id) ? 'active' : ''} ${m.unread ? 'unread' : ''}`}
+                onClick={() => setActiveConv(m.id)}>
+                <div className="avatar avatar-sm">{isArtistProfile(profile) ? <User size={16} /> : m.avatar}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span className="message-name">{isArtistProfile(profile) ? 'Client' : m.artistName}</span>
+                    <span className="message-time">{m.time}</span>
+                  </div>
                 <div className="message-preview">
                   {typingIndicator[m.id]
                     ? <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>typing...</span>
@@ -155,9 +170,9 @@ export default function Messages() {
       {conversation ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div className="avatar avatar-sm">{conversation.avatar}</div>
+            <div className="avatar avatar-sm">{isArtistProfile(profile) ? <User size={16} /> : conversation.avatar}</div>
             <div>
-              <div style={{ fontWeight: 600 }}>{conversation.artistName}</div>
+              <div style={{ fontWeight: 600 }}>{isArtistProfile(profile) ? 'Client' : conversation.artistName}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 {typingIndicator[activeConv]
                   ? <span style={{ color: 'var(--accent)' }}>typing...</span>
@@ -197,12 +212,15 @@ export default function Messages() {
           </div>
 
           <div className="chat-messages">
-            {conversation.thread.map(msg => (
-              <div key={msg.id} className={`chat-bubble ${msg.sender === 'user' ? 'sent' : 'received'}`}>
-                {msg.text}
-                <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4, textAlign: msg.sender === 'user' ? 'right' : 'left' }}>{msg.time}</div>
-              </div>
-            ))}
+            {conversation.thread.map(msg => {
+              const isMe = isArtistProfile(profile) ? msg.sender === 'artist' : msg.sender === 'user'
+              return (
+                <div key={msg.id} className={`chat-bubble ${isMe ? 'sent' : 'received'}`}>
+                  {msg.text}
+                  <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4, textAlign: isMe ? 'right' : 'left' }}>{msg.time}</div>
+                </div>
+              )
+            })}
             <div ref={chatEndRef} />
           </div>
 

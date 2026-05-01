@@ -154,15 +154,16 @@ export default function Messages() {
                     <span className="message-name">{isArtistProfile(profile) ? 'Client' : m.artistName}</span>
                     <span className="message-time">{m.time}</span>
                   </div>
-                <div className="message-preview">
-                  {typingIndicator[m.id]
-                    ? <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>typing...</span>
-                    : m.lastMessage}
+                  <div className="message-preview">
+                    {typingIndicator[m.id]
+                      ? <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>typing...</span>
+                      : m.lastMessage}
+                  </div>
                 </div>
+                {m.unread && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, alignSelf: 'center' }} />}
               </div>
-              {m.unread && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, alignSelf: 'center' }} />}
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { User, Mail, Shield, Bell, CreditCard, ChevronRight, Camera } from '../components/icons'
+import { User, Mail, Shield, Bell, CreditCard, Camera } from '../components/icons'
 
 export default function Account() {
   const { profile, user } = useAuth()
@@ -174,13 +174,104 @@ export default function Account() {
             </div>
           )}
 
-          {activeTab !== 'profile' && (
-            <div style={{ textAlign: 'center', padding: '40px 0' }}>
-              <div style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
-                <ChevronRight size={48} style={{ opacity: 0.2 }} />
+          {activeTab === 'security' && (
+            <div className="slide-up">
+              <h3 style={{ marginBottom: 24 }}>Security Settings</h3>
+              
+              <div style={{ display: 'grid', gap: 20, maxWidth: 500 }}>
+                <div className="form-group">
+                  <label className="form-label">Current Password</label>
+                  <input className="filter-select" type="password" style={{ width: '100%' }} placeholder="••••••••" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">New Password</label>
+                  <input className="filter-select" type="password" style={{ width: '100%' }} placeholder="••••••••" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Confirm New Password</label>
+                  <input className="filter-select" type="password" style={{ width: '100%' }} placeholder="••••••••" />
+                </div>
+                <div>
+                  <button className="btn btn-secondary" style={{ marginTop: 8 }}>Update Password</button>
+                </div>
               </div>
-              <h3>Section Under Construction</h3>
-              <p style={{ color: 'var(--text-muted)' }}>We're currently polishing the {activeTab} settings.</p>
+
+              <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0' }}>Two-Factor Authentication</h4>
+                  <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 14 }}>Add an extra layer of security to your account.</p>
+                </div>
+                <button className="btn btn-primary btn-sm">Enable 2FA</button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <div className="slide-up">
+              <h3 style={{ marginBottom: 24 }}>Notification Preferences</h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 600 }}>
+                {[
+                  { id: 'n1', label: 'New Messages', desc: 'When a client or artist sends you a direct message.' },
+                  { id: 'n2', label: 'Project Updates', desc: 'Milestone approvals, contract changes, and status updates.' },
+                  { id: 'n3', label: 'Billing Alerts', desc: 'Invoices, payment receipts, and escrow releases.' },
+                  { id: 'n4', label: 'Marketing & News', desc: 'Product updates, beta features, and community highlights.' }
+                ].map(n => (
+                  <label key={n.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: 16, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', background: 'var(--surface)' }}>
+                    <input type="checkbox" defaultChecked={n.id !== 'n4'} style={{ marginTop: 4 }} />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{n.label}</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{n.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              
+              <div style={{ marginTop: 32 }}>
+                <button className="btn btn-primary">Save Preferences</button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'billing' && (
+            <div className="slide-up">
+              <h3 style={{ marginBottom: 24 }}>Billing & Payments</h3>
+              
+              <div className="card" style={{ padding: 24, background: 'rgba(245, 197, 66, 0.05)', borderColor: 'var(--gold)', marginBottom: 24 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--gold)' }}>Private Beta Plan</h4>
+                    <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 14 }}>You are currently enjoying fee-free early access.</p>
+                  </div>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>$0<span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-muted)' }}>/mo</span></div>
+                </div>
+              </div>
+
+              <h4 style={{ marginBottom: 16 }}>Payment Methods</h4>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', marginBottom: 32 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ background: 'var(--bg-app)', padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)', fontSize: 12, fontWeight: 700 }}>VISA</div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>Visa ending in 4242</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Expires 12/2028</div>
+                  </div>
+                </div>
+                <button className="btn-link" style={{ color: 'var(--text-muted)' }}>Edit</button>
+              </div>
+
+              <h4 style={{ marginBottom: 16 }}>Billing History</h4>
+              <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', padding: '12px 16px', background: 'var(--surface)', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
+                  <div>Date</div>
+                  <div>Description</div>
+                  <div style={{ textAlign: 'right' }}>Amount</div>
+                </div>
+                <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+                  No billing history available yet.
+                </div>
+              </div>
             </div>
           )}
         </main>

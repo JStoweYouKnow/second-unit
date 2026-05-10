@@ -592,7 +592,7 @@ https://secondunit.com
               <div style={{ padding: '14px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, fontSize: 14 }}>
                 <CreditCard size={18} style={{ color: 'var(--accent)' }} />
                 <div>
-                  <div style={{ fontWeight: 600 }}>{stripeStatus.brand} ···· {stripeStatus.last4}</div>
+                  <div style={{ fontWeight: 600 }}>Stripe Checkout</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{stripeStatus.email}</div>
                 </div>
               </div>

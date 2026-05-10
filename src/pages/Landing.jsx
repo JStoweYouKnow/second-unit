@@ -96,9 +96,9 @@ export default function Landing() {
       <footer style={{ padding: '40px 48px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
         <div>&copy; 2026 Second Unit. All rights reserved.</div>
         <div style={{ display: 'flex', gap: 24 }}>
-          <a href="#" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Terms</a>
-          <a href="#" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Privacy</a>
-          <a href="#" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Contact</a>
+          <Link to="/terms" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Terms</Link>
+          <Link to="/privacy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Privacy</Link>
+          <a href="mailto:support@secondunit.com" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Contact</a>
         </div>
       </footer>
     </div>

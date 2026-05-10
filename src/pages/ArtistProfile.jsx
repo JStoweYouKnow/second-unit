@@ -1,11 +1,11 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Heart, Star, MapPin, Calendar, ExternalLink, Play, Globe, AtSign, Camera, Briefcase, Send, ChevronUp, ChevronDown } from '../components/icons'
-import { artists } from '../data/mockData'
 import { useApp } from '../context/AppContext'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import CalendarModal from '../components/CalendarModal'
 import { useAuth } from '../context/AuthContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
+import { useArtist } from '../hooks/useData'
 function VideoPlayer({ url }) {
   const getEmbedUrl = (url) => {
     if (!url) return null;
@@ -45,6 +45,13 @@ function VideoPlayer({ url }) {
   );
 }
 
+const DEFAULT_PORTFOLIO = [
+  { id: 1, title: 'Liquid Metal Campaign', image: '/demo/portfolio-1.png' },
+  { id: 2, title: 'Nature Motion Study', video: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4' },
+  { id: 3, title: 'Future Aesthetics', colorIdx: 3 },
+  { id: 4, title: 'AI Exploration', colorIdx: 4 },
+]
+
 export default function ArtistProfile() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -52,17 +59,31 @@ export default function ArtistProfile() {
   const { profile } = useAuth()
   const [showCalendar, setShowCalendar] = useState(false)
   const [activeTab, setActiveTab] = useState('portfolio')
-  const artist = artists.find(a => String(a.id) === String(id))
+  const { artist, loading: artistLoading } = useArtist(id)
 
   const isOwnProfile = isArtistProfile(profile) && String(demoArtistPersona(profile)?.id) === String(id)
 
-  const [portfolioItems, setPortfolioItems] = useState([
-    { id: 1, title: 'Liquid Metal Campaign', image: '/demo/portfolio-1.png' },
-    { id: 2, title: 'Nature Motion Study', video: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4' },
-    { id: 3, title: 'Future Aesthetics', colorIdx: 3 },
-    { id: 4, title: 'AI Exploration', colorIdx: 4 },
-  ])
-  const [videoLinks, setVideoLinks] = useState(artist?.videoLinks || [])
+  const [portfolioItems, setPortfolioItems] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`su_portfolio_order_${id}`)
+      if (saved) {
+        const order = JSON.parse(saved)
+        return [...DEFAULT_PORTFOLIO].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
+      }
+    } catch {}
+    return DEFAULT_PORTFOLIO
+  })
+  const [videoLinks, setVideoLinks] = useState([])
+
+  useEffect(() => {
+    if (artist?.videoLinks) setVideoLinks(artist.videoLinks)
+  }, [artist?.videoLinks])
+
+  useEffect(() => {
+    if (portfolioItems.length > 0) {
+      localStorage.setItem(`su_portfolio_order_${id}`, JSON.stringify(portfolioItems.map(p => p.id)))
+    }
+  }, [portfolioItems, id])
 
   const moveItem = (list, setList, index, direction) => {
     const newList = [...list]
@@ -74,6 +95,7 @@ export default function ArtistProfile() {
     setList(newList)
   }
 
+  if (artistLoading) return <div className="page-container" style={{ paddingTop: 80, textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
   if (!artist) return <div className="page-container"><p>Artist not found.</p></div>
 
   const isFav = favorites.includes(artist.id)
@@ -270,11 +292,7 @@ export default function ArtistProfile() {
 
           {activeTab === 'reviews' && (
             <div className="slide-up" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {[
-                { name: 'Sarah M.', company: 'Nike Creative', rating: 5, text: 'Incredible work. Maya delivered beyond our expectations for the campaign.' },
-                { name: 'James L.', company: 'Freelance', rating: 5, text: 'Professional, responsive, and the quality was outstanding. Would hire again instantly.' },
-                { name: 'Alex K.', company: 'Studio XYZ', rating: 4, text: 'Great creative vision and excellent communication throughout the project.' },
-              ].map((r, i) => (
+              {(artist.reviews || []).map((r, i) => (
                 <div key={i} className="card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                     <div>

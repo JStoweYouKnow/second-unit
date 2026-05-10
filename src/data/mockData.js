@@ -14,6 +14,11 @@ export const artists = [
     socials: { twitter: '#', instagram: '#', website: 'https://mayachen.art', linkedin: '#' },
     location: 'Los Angeles, CA', joined: '2024-03-15',
     availability: [{ date: '2026-04-25', slots: ['10:00', '14:00', '16:00'] }, { date: '2026-04-28', slots: ['09:00', '11:00'] }],
+    reviews: [
+      { name: 'Jordan T.', company: 'Nike Creative', rating: 5, text: 'Maya delivered a campaign that stopped us in our tracks. The generative imagery pushed our brand into territory we didn\'t know was possible.' },
+      { name: 'Priya S.', company: 'Apple Design', rating: 5, text: 'Exceptionally collaborative and technically precise. She understood our brand language immediately and the results spoke for themselves.' },
+      { name: 'Marco V.', company: 'Gucci Studio', rating: 5, text: 'The luxury aesthetic she brought to our SS26 lookbook was flawless. Would not hesitate to bring her back for future campaigns.' },
+    ],
   },
   {
     id: 2, name: 'Kai Reeves', role: 'AI Motion Designer', avatar: 'KR',
@@ -28,6 +33,11 @@ export const artists = [
     socials: { twitter: '#', instagram: '#', website: 'https://kaireeves.io', linkedin: '#' },
     location: 'New York, NY', joined: '2024-01-10',
     availability: [{ date: '2026-04-24', slots: ['13:00', '15:00'] }],
+    reviews: [
+      { name: 'Dana M.', company: 'Tesla Brand', rating: 5, text: 'Kai\'s motion work for our product launch exceeded every benchmark. The AI-generated sequences felt completely intentional and cinematic.' },
+      { name: 'Olu A.', company: 'Adidas Originals', rating: 5, text: 'Turned our brief around in 72 hours without sacrificing an ounce of quality. The motion design was exactly the energy we needed.' },
+      { name: 'Carmen R.', company: 'Spotify Design', rating: 4, text: 'Great creative instincts and very quick to iterate. A few revision cycles but the final output was outstanding.' },
+    ],
   },
   {
     id: 3, name: 'Aria Nakamura', role: 'AI Music Producer', avatar: 'AN',
@@ -39,6 +49,11 @@ export const artists = [
     socials: { twitter: '#', instagram: '#', website: 'https://aria.music', linkedin: '#' },
     location: 'Tokyo, Japan', joined: '2023-11-20',
     availability: [],
+    reviews: [
+      { name: 'Yuki H.', company: 'Sony Music Japan', rating: 5, text: 'Aria composed a complete sonic identity for our label in under two weeks. Every track sounded like it had decades of craft behind it.' },
+      { name: 'Simone K.', company: 'Beats by Dre', rating: 5, text: 'She understands sound at a level that\'s difficult to articulate. The brand soundscape she created is now central to our identity.' },
+      { name: 'Leo T.', company: 'TikTok Originals', rating: 5, text: 'Fast, communicative, and the results are undeniably scroll-stopping. Aria is in a different league.' },
+    ],
   },
   {
     id: 4, name: 'Dex Okafor', role: 'AI 3D Artist', avatar: 'DO',
@@ -53,6 +68,11 @@ export const artists = [
     socials: { twitter: '#', instagram: '#', website: '#', linkedin: '#' },
     location: 'London, UK', joined: '2024-02-05',
     availability: [{ date: '2026-04-23', slots: ['10:00', '12:00', '14:00', '16:00'] }],
+    reviews: [
+      { name: 'Felix B.', company: 'Meta Reality Labs', rating: 5, text: 'Dex built virtual environments for our spatial computing demos that looked genuinely photoreal. Technically exceptional.' },
+      { name: 'Naomi C.', company: 'Epic Games', rating: 5, text: 'His Gaussian splatting pipeline cut our production time in half while improving visual fidelity. A rare combination of speed and craft.' },
+      { name: 'Hans R.', company: 'BMW Designworks', rating: 4, text: 'Delivered high-quality renders on a tight deadline. Communication was great and he was flexible with revisions.' },
+    ],
   },
   {
     id: 5, name: 'Luna Vasquez', role: 'AI Fashion Designer', avatar: 'LV',
@@ -64,6 +84,11 @@ export const artists = [
     socials: { twitter: '#', instagram: '#', website: '#', linkedin: '#' },
     location: 'Milan, Italy', joined: '2024-04-01',
     availability: [{ date: '2026-04-26', slots: ['09:00', '11:00', '15:00'] }],
+    reviews: [
+      { name: 'Isabelle D.', company: 'Balenciaga Studio', rating: 5, text: 'Luna created an entire digital collection that captured our house\'s DNA perfectly. The AI garments were indistinguishable from real couture.' },
+      { name: 'Tom W.', company: 'H&M Design', rating: 5, text: 'Incredible turnaround on our capsule collection brief. Luna\'s work bridged AI generation and real-world wearability in a way we hadn\'t seen before.' },
+      { name: 'Chiara M.', company: 'Vogue Italia', rating: 5, text: 'Her editorial vision is sharp and her execution is flawless. The digital fashion spread she created for us drove our highest engagement of the year.' },
+    ],
   },
   {
     id: 6, name: 'Theo Park', role: 'AI Concept Artist', avatar: 'TP',
@@ -75,6 +100,11 @@ export const artists = [
     socials: { twitter: '#', instagram: '#', website: '#', linkedin: '#' },
     location: 'Seoul, South Korea', joined: '2023-09-15',
     availability: [{ date: '2026-04-24', slots: ['10:00', '14:00'] }, { date: '2026-04-25', slots: ['09:00'] }],
+    reviews: [
+      { name: 'Ethan J.', company: 'Marvel Studios', rating: 5, text: 'Theo\'s concept art elevated our pre-production in ways that changed the final film. His AI-assisted world-building is extraordinary.' },
+      { name: 'Grace L.', company: 'Netflix Animation', rating: 5, text: 'We\'ve worked with many concept artists but Theo\'s pipeline is uniquely fast without ever feeling rushed. He has a strong point of view.' },
+      { name: 'Jin-ho K.', company: 'Riot Games', rating: 5, text: 'He delivered 40 character concepts in three weeks. Every single one was production-ready. An absolute professional.' },
+    ],
   },
   {
     id: 7, name: 'Sage Williams', role: 'AI Animator', avatar: 'SW',
@@ -86,6 +116,11 @@ export const artists = [
     socials: { twitter: '#', instagram: '#', website: '#', linkedin: '#' },
     location: 'Vancouver, Canada', joined: '2024-06-20',
     availability: [{ date: '2026-04-27', slots: ['11:00', '13:00', '15:00'] }],
+    reviews: [
+      { name: 'Rosa M.', company: 'Disney Animation', rating: 5, text: 'Sage brought a warmth and precision to our project that perfectly matched our studio\'s style. Incredibly talented animator.' },
+      { name: 'Chris P.', company: 'Pixar', rating: 4, text: 'Strong technical skills and a good eye for character motion. Would collaborate again on the right project.' },
+      { name: 'Lena F.', company: 'Coca-Cola Creative', rating: 5, text: 'Our ad campaign came alive with Sage\'s animation. Playful, precise, and delivered ahead of schedule.' },
+    ],
   },
   {
     id: 8, name: 'Zara Kim', role: 'AI UX Designer', avatar: 'ZK',
@@ -97,6 +132,11 @@ export const artists = [
     socials: { twitter: '#', instagram: '#', website: '#', linkedin: '#' },
     location: 'San Francisco, CA', joined: '2024-05-10',
     availability: [],
+    reviews: [
+      { name: 'Amir N.', company: 'Stripe Design', rating: 5, text: 'Zara redesigned our onboarding flow using AI-generated interface variants and it cut drop-off by 34%. Data-driven and beautifully crafted.' },
+      { name: 'Hana B.', company: 'Notion', rating: 5, text: 'Her AI-augmented design process is years ahead of where most studios are. The component system she built for us scales effortlessly.' },
+      { name: 'Wei C.', company: 'Figma', rating: 5, text: 'Zara designed tooling that our own team learned from. Rare to find someone with both the strategic and execution capability she brings.' },
+    ],
   },
 ];
 

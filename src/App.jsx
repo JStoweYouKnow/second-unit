@@ -25,6 +25,8 @@ const UpdatePassword = lazy(() => import('./pages/UpdatePassword'))
 const Account = lazy(() => import('./pages/Account'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 const Landing = lazy(() => import('./pages/Landing'))
+const Terms = lazy(() => import('./pages/Terms'))
+const Privacy = lazy(() => import('./pages/Privacy'))
 
 function LoadingScreen() {
   return (
@@ -305,6 +307,8 @@ function App() {
               <Route path="/signin" element={<SignIn />} />
               <Route path="/signup" element={<SignUp />} />
               <Route path="/update-password" element={<UpdatePassword />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
               <Route path="/*" element={<AppShell />} />
             </Routes>
           </Suspense>

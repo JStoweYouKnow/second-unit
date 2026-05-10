@@ -8,6 +8,11 @@ import { Server } from 'socket.io'
 import Stripe from 'stripe'
 import { z } from 'zod'
 import { createClient } from '@supabase/supabase-js'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const app = express()
 const httpServer = createServer(app)
@@ -316,6 +321,18 @@ app.get('/api/health', (req, res) => {
     mode: stripe ? 'live' : 'mock',
     connections: onlineUsers.size,
   })
+})
+
+// =============================================
+// FRONTEND SERVING (Monolith Fallback)
+// =============================================
+const distPath = path.join(__dirname, '../dist')
+app.use(express.static(distPath))
+
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(distPath, 'index.html'))
+  }
 })
 
 httpServer.on('error', (err) => {

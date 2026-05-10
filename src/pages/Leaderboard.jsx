@@ -1,7 +1,8 @@
 import { useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Calendar, Heart, Play, Star, MedalGold, MedalSilver, MedalBronze, Filter, DollarSign, MapPin, Globe, AtSign, ExternalLink } from '../components/icons'
-import { artists, availableProjects } from '../data/mockData'
+import { availableProjects } from '../data/mockData'
+import { useArtists } from '../hooks/useData'
 import { useApp } from '../context/AppContext'
 import CalendarModal from '../components/CalendarModal'
 
@@ -62,6 +63,8 @@ export default function Leaderboard() {
   const [calendarArtist, setCalendarArtist] = useState(null)
   const [hoveredId, setHoveredId] = useState(null)
 
+  const { artists, loading: artistsLoading } = useArtists()
+
   const [selectedRoles, setSelectedRoles] = useState(() => new Set())
   const [selectedSkills, setSelectedSkills] = useState(() => new Set())
   const [selectedLocations, setSelectedLocations] = useState(() => new Set())
@@ -70,16 +73,16 @@ export default function Leaderboard() {
   const [showFilters, setShowFilters] = useState(false)
   const roleOptions = useMemo(
     () => [...new Set(artists.map(a => a.role))].sort(),
-    []
+    [artists]
   )
   const skillOptions = useMemo(() => {
     const s = new Set()
     artists.forEach(a => a.skills.forEach(x => s.add(x)))
     return [...s].sort((a, b) => a.localeCompare(b))
-  }, [])
+  }, [artists])
   const locationOptions = useMemo(
     () => [...new Set(artists.map(a => a.location))].sort(),
-    []
+    [artists]
   )
 
   const filtered = useMemo(() => {
@@ -114,7 +117,7 @@ export default function Leaderboard() {
       return true
     })
     return filteredArray.sort((a, b) => b.projects - a.projects)
-  }, [search, selectedRoles, selectedSkills, selectedLocations, skillMatchMode, availableOnly])
+  }, [artists, search, selectedRoles, selectedSkills, selectedLocations, skillMatchMode, availableOnly])
 
   const activeFilterCount = useMemo(() => {
     let n = selectedRoles.size + selectedSkills.size + selectedLocations.size
@@ -270,7 +273,12 @@ export default function Leaderboard() {
       </div>
 
       <div className="artist-gallery-grid">
-        {filtered.map((artist, i) => {
+        {artistsLoading && (
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
+            Loading artists…
+          </div>
+        )}
+        {!artistsLoading && filtered.map((artist, i) => {
           const rank = i + 1
           // Use video thumbnail if available, otherwise fallback to generated or null
           const videoThumb = artist.videoLinks?.length > 0 ? getVideoThumbnail(artist.videoLinks[0]) : null

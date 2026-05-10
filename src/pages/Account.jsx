@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { User, Mail, Shield, Bell, CreditCard, Camera } from '../components/icons'
 
 export default function Account() {
-  const { profile, user } = useAuth()
+  const { profile, user, isMockMode } = useAuth()
   const [activeTab, setActiveTab] = useState('profile')
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -160,6 +160,34 @@ export default function Account() {
                   </div>
                 </>
               )}
+
+              <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
+              <h3 style={{ marginBottom: 12 }}>Backend Connection Status</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20 }}>Verify where your data is being stored and processed.</p>
+              
+              <div style={{ 
+                padding: '16px 20px', 
+                borderRadius: 'var(--radius-md)', 
+                border: '1px solid var(--border)', 
+                background: 'var(--surface)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: isMockMode ? 'var(--warning)' : 'var(--success)' }}></div>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>{isMockMode ? 'Mock Mode (Local Storage)' : 'Supabase (Production Database)'}</span>
+                  </div>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: 0 }}>
+                    {isMockMode 
+                      ? 'The app is running without a backend connection. All changes are temporary and saved only in your browser.' 
+                      : 'Successfully connected to the live Supabase database. All data is persistent and synced across devices.'}
+                  </p>
+                </div>
+                {!isMockMode && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--success)', textTransform: 'uppercase' }}>Connected</span>}
+                {isMockMode && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--warning)', textTransform: 'uppercase' }}>No Backend</span>}
+              </div>
 
               <div style={{ marginTop: 32, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16 }}>
                 {saved && <span style={{ color: 'var(--success)', fontSize: 14, fontWeight: 500 }}>Profile updated successfully!</span>}

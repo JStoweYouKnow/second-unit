@@ -88,7 +88,7 @@ export default function CalendarModal({ artist, onClose, onBook }) {
     const dateObj = new Date(`${date}T${convertTo24h(time)}:00`)
     const endObj = new Date(dateObj.getTime() + 60 * 60 * 1000) // 1 hour
     const fmt = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
-    return `https://calendar.google.com/calendar/event?action=TEMPLATE&text=${encodeURIComponent(`Session with ${artist.name}`)}&dates=${fmt(dateObj)}/${fmt(endObj)}&details=${encodeURIComponent(`Booked through Second Unit\nArtist: ${artist.name}\n${CAL_COMP_NOTE}`)}`
+    return `https://calendar.google.com/calendar/event?action=TEMPLATE&text=${encodeURIComponent(`Session with ${artist.name}`)}&dates=${fmt(dateObj)}/${fmt(endObj)}&details=${encodeURIComponent(`Booked through The Callsheet\nArtist: ${artist.name}\n${CAL_COMP_NOTE}`)}`
   }
 
   // .ics file download
@@ -102,7 +102,7 @@ BEGIN:VEVENT
 DTSTART:${fmt(dateObj)}
 DTEND:${fmt(endObj)}
 SUMMARY:Session with ${artist.name}
-DESCRIPTION:Booked through Second Unit\\n${CAL_COMP_NOTE.replace(/\\/g, '\\\\').replace(/\n/g, '\\n')}
+DESCRIPTION:Booked through The Callsheet\\n${CAL_COMP_NOTE.replace(/\\/g, '\\\\').replace(/\n/g, '\\n')}
 END:VEVENT
 END:VCALENDAR`
     const blob = new Blob([ics], { type: 'text/calendar' })

@@ -12,10 +12,10 @@ export default function Terms() {
       
       <div style={{ lineHeight: 1.6, color: 'var(--text-primary)' }}>
         <h2 style={{ fontSize: 24, marginTop: 32, marginBottom: 16 }}>1. Acceptance of Terms</h2>
-        <p style={{ marginBottom: 16 }}>By accessing and using Second Unit, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our platform.</p>
+        <p style={{ marginBottom: 16 }}>By accessing and using The Callsheet, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our platform.</p>
         
         <h2 style={{ fontSize: 24, marginTop: 32, marginBottom: 16 }}>2. Description of Service</h2>
-        <p style={{ marginBottom: 16 }}>Second Unit provides a marketplace platform connecting AI artists and creative professionals with employers and studios for project-based work.</p>
+        <p style={{ marginBottom: 16 }}>The Callsheet provides a marketplace platform connecting AI artists and creative professionals with employers and studios for project-based work.</p>
         
         <h2 style={{ fontSize: 24, marginTop: 32, marginBottom: 16 }}>3. User Accounts</h2>
         <p style={{ marginBottom: 16 }}>You are responsible for safeguarding the password that you use to access the service and for any activities or actions under your password. You agree not to disclose your password to any third party.</p>

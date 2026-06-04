@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Callsheet — Partner Deck</title>
+<style>
+  :root {
+    --gold: #C9A84C;
+    --gold-light: #E8C96A;
+    --gold-dim: rgba(201,168,76,0.15);
+    --bg: #0A0A0A;
+    --surface: #111111;
+    --surface2: #181818;
+    --border: rgba(201,168,76,0.2);
+    --text: #F0EDE8;
+    --muted: #888;
+    --accent-blue: #3B82F6;
+    --accent-green: #10B981;
+    --accent-purple: #8B5CF6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; overflow: hidden; }
+
+  /* ── DECK SHELL ──────────────────────────────── */
+  #deck { width: 100vw; height: 100vh; position: relative; }
+  .slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    padding: 60px 80px;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.45s ease;
+  }
+  .slide.active { opacity: 1; pointer-events: all; }
+
+  /* ── NAV ─────────────────────────────────────── */
+  #nav {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 16px; z-index: 99;
+    background: rgba(10,10,10,0.85); border: 1px solid var(--border);
+    padding: 10px 20px; border-radius: 40px; backdrop-filter: blur(12px);
+  }
+  #nav button {
+    background: none; border: 1px solid var(--border); color: var(--gold);
+    padding: 6px 16px; border-radius: 20px; cursor: pointer; font-size: 13px;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  #nav button:hover { background: var(--gold-dim); border-color: var(--gold); }
+  #slide-counter { color: var(--muted); font-size: 13px; min-width: 56px; text-align: center; }
+  .pip-row { display: flex; gap: 6px; }
+  .pip {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--muted);
+    cursor: pointer; transition: background 0.2s, transform 0.2s;
+  }
+  .pip.active { background: var(--gold); transform: scale(1.35); }
+
+  /* ── SHARED LAYOUT HELPERS ───────────────────── */
+  .slide-inner { width: 100%; max-width: 1040px; }
+  .label { font-size: 11px; letter-spacing: 3px; color: var(--gold); text-transform: uppercase; margin-bottom: 12px; }
+  h1 { font-size: clamp(2rem, 4vw, 3.6rem); font-weight: 700; line-height: 1.1; }
+  h2 { font-size: clamp(1.4rem, 2.5vw, 2.2rem); font-weight: 700; }
+  h3 { font-size: 1.1rem; font-weight: 600; color: var(--gold); margin-bottom: 6px; }
+  p  { line-height: 1.7; color: #ccc; }
+  .gold { color: var(--gold); }
+  .muted { color: var(--muted); }
+
+  .divider { width: 48px; height: 2px; background: var(--gold); border-radius: 1px; margin: 20px 0; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; width: 100%; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; width: 100%; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; width: 100%; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px;
+  }
+  .card.glow { box-shadow: 0 0 24px rgba(201,168,76,0.08); }
+
+  /* ── STAT CARDS ──────────────────────────────── */
+  .stat-val { font-size: 2.4rem; font-weight: 800; color: var(--gold); line-height: 1; }
+  .stat-lbl { font-size: 12px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* ── FEATURE LIST ────────────────────────────── */
+  .feat-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .feat-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: #ccc; }
+  .feat-list li::before { content: '◆'; color: var(--gold); font-size: 8px; margin-top: 5px; flex-shrink: 0; }
+
+  /* ── LOGO / WORDMARK ─────────────────────────── */
+  .wordmark { font-size: 1.1rem; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--gold); }
+  .wordmark span { color: var(--text); }
+
+  /* ── TAG PILLS ───────────────────────────────── */
+  .pill {
+    display: inline-block; padding: 4px 12px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .pill-gold  { background: var(--gold-dim); color: var(--gold); border: 1px solid rgba(201,168,76,0.3); }
+  .pill-blue  { background: rgba(59,130,246,0.12); color: #60A5FA; border: 1px solid rgba(59,130,246,0.25); }
+  .pill-green { background: rgba(16,185,129,0.12); color: #34D399; border: 1px solid rgba(16,185,129,0.25); }
+  .pill-purple{ background: rgba(139,92,246,0.12); color: #A78BFA; border: 1px solid rgba(139,92,246,0.25); }
+
+  /* ── PARTNER ROW ─────────────────────────────── */
+  .partner-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .partner-icon { font-size: 1.6rem; }
+
+  /* ── TIMELINE ─────────────────────────────────── */
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .tl-row { display: flex; gap: 20px; }
+  .tl-line-col { display: flex; flex-direction: column; align-items: center; width: 20px; flex-shrink: 0; }
+  .tl-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--gold); flex-shrink: 0; margin-top: 4px; }
+  .tl-bar { flex: 1; width: 2px; background: var(--border); }
+  .tl-content { padding-bottom: 24px; }
+  .tl-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .tl-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ── SLIDE-SPECIFIC ───────────────────────────── */
+
+  /* 0: Title */
+  #s0 { background: radial-gradient(ellipse 70% 60% at 60% 40%, rgba(201,168,76,0.06) 0%, transparent 70%), var(--bg); }
+  #s0 .big { font-size: clamp(3rem, 6vw, 5.5rem); font-weight: 900; letter-spacing: -2px; line-height: 1; }
+  #s0 .sub { font-size: 1.25rem; color: #aaa; margin-top: 20px; max-width: 560px; }
+  .tag-row { display: flex; gap: 10px; margin-top: 28px; }
+
+  /* 1: Problem */
+  #s1 .problem-card { border-left: 3px solid var(--gold); padding-left: 20px; }
+
+  /* 5: Monetization bar */
+  .fee-bar { display: flex; border-radius: 8px; overflow: hidden; height: 44px; width: 100%; margin-top: 8px; }
+  .fee-artist { background: linear-gradient(90deg, #10B981, #059669); flex: 9; display: flex; align-items: center; padding-left: 16px; font-weight: 700; font-size: 14px; }
+  .fee-platform { background: linear-gradient(90deg, #C9A84C, #A87D30); flex: 1; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #000; }
+
+  /* 7: Tech badges */
+  .tech-badge {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px; font-size: 13px; font-weight: 600;
+    text-align: center;
+  }
+  .tech-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; width: 100%; }
+
+  /* 10: CTA */
+  #s10 { background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(201,168,76,0.07) 0%, transparent 70%), var(--bg); text-align: center; }
+  .cta-email { font-size: 1.3rem; color: var(--gold); margin-top: 16px; letter-spacing: 1px; }
+
+  /* keyboard hint */
+  #hint { position: fixed; top: 24px; right: 32px; font-size: 11px; color: #444; }
+</style>
+</head>
+<body>
+
+<div id="deck">
+
+  <!-- ─────────── 0: TITLE ─────────── -->
+  <section class="slide active" id="s0">
+    <div class="slide-inner">
+      <div class="wordmark" style="margin-bottom: 32px;">THE <span>CALLSHEET</span></div>
+      <div class="label">Partner Overview · 2026</div>
+      <div class="big">The Premium<br><span class="gold">AI Creative</span><br>Marketplace</div>
+      <p class="sub">Connecting elite AI artists with world-class studios — with built-in payments, contracts, and real-time collaboration.</p>
+      <div class="tag-row">
+        <span class="pill pill-gold">B2B Marketplace</span>
+        <span class="pill pill-blue">AI-Native</span>
+        <span class="pill pill-green">Invite-Only</span>
+        <span class="pill pill-purple">Stripe Connect</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── 1: PROBLEM ─────────── -->
+  <section class="slide" id="s1">
+    <div class="slide-inner">
+      <div class="label">The Problem</div>
+      <h2>Studios can't reliably hire<br>elite AI creative talent</h2>
+      <div class="divider"></div>
+      <div class="grid-3" style="margin-top: 24px;">
+        <div class="card problem-card">
+          <h3>No Curation</h3>
+          <p style="font-size:14px;">Freelance platforms are flooded with low-quality work. Finding a verified, top-tier AI artist takes weeks of vetting.</p>
+        </div>
+        <div class="card problem-card">
+          <h3>No Trust Layer</h3>
+          <p style="font-size:14px;">No standardized contracts, milestone tracking, or escrow for AI creative projects. Disputes are common, resolution is manual.</p>
+        </div>
+        <div class="card problem-card">
+          <h3>No Workflow</h3>
+          <p style="font-size:14px;">Payments, messaging, scheduling, and contracts live across 4–6 disconnected tools. Every engagement is a reinvention.</p>
+        </div>
+      </div>
+      <div style="margin-top: 28px; padding: 20px; background: var(--gold-dim); border-radius: 10px; border: 1px solid var(--border);">
+        <p style="font-size:15px; color: var(--text);">Studios working with Nike, Apple, Disney, and Netflix need a professional-grade pipeline — not a Fiverr profile and a PayPal link.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── 2: SOLUTION ─────────── -->
+  <section class="slide" id="s2">
+    <div class="slide-inner">
+      <div class="label">The Solution</div>
+      <h2>The Callsheet — The Full-Stack<br>Creative Talent OS</h2>
+      <div class="divider"></div>
+      <div class="grid-2" style="margin-top: 24px; align-items: start;">
+        <div>
+          <p style="font-size:15px; margin-bottom: 20px;">The Callsheet is an <strong style="color:var(--text);">invite-only marketplace</strong> where the world's top 1% of AI creative professionals meet enterprise studios. Every transaction is covered end-to-end.</p>
+          <ul class="feat-list">
+            <li>Curated artist discovery with skill-based filtering</li>
+            <li>Instant booking with availability calendars</li>
+            <li>Real-time messaging with typing indicators</li>
+            <li>E-signature contracts with milestone billing</li>
+            <li>Stripe Connect payouts with automatic 10% platform fee</li>
+            <li>Analytics dashboards for studios & artists</li>
+          </ul>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="card" style="text-align:center;">
+            <div style="font-size: 2.8rem; margin-bottom: 8px;">🎨</div>
+            <div style="font-weight:700;">For AI Artists</div>
+            <p style="font-size:13px; margin-top:6px;">Premium positioning, secure payouts, portfolio showcase, and contract protection — without the hustle.</p>
+          </div>
+          <div class="card" style="text-align:center;">
+            <div style="font-size: 2.8rem; margin-bottom: 8px;">🏢</div>
+            <div style="font-weight:700;">For Studios & Brands</div>
+            <p style="font-size:13px; margin-top:6px;">Hire verified AI talent, manage projects, and pay — all from one dashboard. No chase emails.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── 3: MARKET ─────────── -->
+  <section class="slide" id="s3">
+    <div class="slide-inner">
+      <div class="label">Market Opportunity</div>
+      <h2>AI-Generated Creative Content<br>Is Reshaping Every Industry</h2>
+      <div class="divider"></div>
+      <div class="grid-4" style="margin-top: 28px;">
+        <div class="card glow" style="text-align:center;">
+          <div class="stat-val">$1.8T</div>
+          <div class="stat-lbl">Global Creative Economy</div>
+        </div>
+        <div class="card glow" style="text-align:center;">
+          <div class="stat-val">$89B</div>
+          <div class="stat-lbl">Creative Freelance Market (2026)</div>
+        </div>
+        <div class="card glow" style="text-align:center;">
+          <div class="stat-val">320%</div>
+          <div class="stat-lbl">Growth in AI Art Tool Adoption (2023–2025)</div>
+        </div>
+        <div class="card glow" style="text-align:center;">
+          <div class="stat-val">Top 1%</div>
+          <div class="stat-lbl">Artists We Target — Not Mass Market</div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top: 20px;">
+        <div class="card">
+          <h3>Who Hires on The Callsheet</h3>
+          <ul class="feat-list" style="margin-top: 8px;">
+            <li>Motion design & VFX studios</li>
+            <li>Advertising agencies (campaigns for Nike, Gucci, Tesla tier)</li>
+            <li>Streaming platforms (original content production)</li>
+            <li>Game studios & interactive media companies</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>AI Disciplines Represented</h3>
+          <ul class="feat-list" style="margin-top: 8px;">
+            <li>Visual art (Midjourney, Stable Diffusion, Firefly)</li>
+            <li>Motion & animation (Runway, Pika Labs, AnimateDiff)</li>
+            <li>3D & NeRF / Gaussian Splatting</li>
+            <li>AI music & audio (Suno, Udio)</li>
+            <li>Fashion & concept design</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── 4: PLATFORM FEATURES ─────────── -->
+  <section class="slide" id="s4">
+    <div class="slide-inner">
+      <div class="label">Platform Capabilities</div>
+      <h2>Everything a Studio Needs<br>in One Place</h2>
+      <div class="divider"></div>
+      <div class="grid-3" style="margin-top: 24px;">
+        <div class="card">
+          <div style="font-size:1.5rem; margin-bottom:10px;">🔍</div>
+          <h3>Talent Discovery</h3>
+          <ul class="feat-list">
+            <li>Filter by skill, role, location & availability</li>
+            <li>Video portfolio showcases</li>
+            <li>Verified brand credits</li>
+            <li>Star ratings & testimonials</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div style="font-size:1.5rem; margin-bottom:10px;">📅</div>
+          <h3>Booking & Scheduling</h3>
+          <ul class="feat-list">
+            <li>Real-time availability calendar</li>
+            <li>Hourly, daily, or flat-rate pricing</li>
+            <li>Confirm / decline workflow</li>
+            <li>Google Calendar & .ics export</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div style="font-size:1.5rem; margin-bottom:10px;">💬</div>
+          <h3>Real-Time Messaging</h3>
+          <ul class="feat-list">
+            <li>Socket.io instant chat</li>
+            <li>Typing indicators</li>
+            <li>Read receipts</li>
+            <li>Unread notification badges</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div style="font-size:1.5rem; margin-bottom:10px;">📝</div>
+          <h3>Contracts & E-Signatures</h3>
+          <ul class="feat-list">
+            <li>Pre-built legal templates</li>
+            <li>Custom document upload</li>
+            <li>Legally binding e-signatures</li>
+            <li>Milestone payment schedules</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div style="font-size:1.5rem; margin-bottom:10px;">💳</div>
+          <h3>Payments & Payouts</h3>
+          <ul class="feat-list">
+            <li>Stripe Connect for artists</li>
+            <li>Automatic platform fee (10%)</li>
+            <li>Full payment history & receipts</li>
+            <li>Multi-rate pricing models</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div style="font-size:1.5rem; margin-bottom:10px;">📊</div>
+          <h3>Analytics</h3>
+          <ul class="feat-list">
+            <li>Spend tracking dashboards</li>
+            <li>Booking distribution charts</li>
+            <li>KPI cards & trend sparklines</li>
+            <li>Role-specific views</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── 5: BUSINESS MODEL ─────────── -->
+  <section class="slide" id="s5">
+    <div class="slide-inner">
+      <div class="label">Business Model</div>
+      <h2>Simple, Transparent<br>Transaction Revenue</h2>
+      <div class="divider"></div>
+      <div class="grid-2" style="margin-top: 28px; align-items: start;">
+        <div>
+          <h3 style="color: var(--text); font-size: 1.1rem; margin-bottom: 16px;">How We Earn</h3>
+          <div style="margin-bottom: 8px;">
+            <p style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">Every transaction (e.g. $1,000 booking)</p>
+            <div class="fee-bar">
+              <div class="fee-artist">Artist receives 90% · $900</div>
+              <div class="fee-platform">10%</div>
+            </div>
+          </div>
+          <p style="font-size: 13px; color: var(--muted); margin-top: 12px;">The 10% platform fee is deducted automatically via Stripe Connect <code>application_fee_amount</code>. Fully disclosed to both parties upfront.</p>
+          <div style="margin-top: 24px; padding: 16px; background: var(--gold-dim); border-radius: 8px; border: 1px solid var(--border);">
+            <p style="font-size: 14px;"><strong style="color:var(--gold);">Revenue at scale:</strong><br>100 bookings/mo @ avg $2,500 = <strong>$25,000/mo GMV → $2,500/mo platform revenue</strong></p>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div class="card">
+            <h3>Current Model</h3>
+            <ul class="feat-list" style="margin-top: 8px;">
+              <li>10% transaction fee on all bookings</li>
+              <li>Stripe standard processing (~2.9% + 30¢) borne by hirer</li>
+              <li>No listing fees or subscription required</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Future Revenue Streams</h3>
+            <ul class="feat-list" style="margin-top: 8px;">
+              <li>Studio subscription tiers (Pro access, advanced analytics)</li>
+              <li>Featured artist placement</li>
+              <li>White-label API for agency partners</li>
+              <li>Tax & compliance add-ons (1099, international)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── 6: ARTIST EXPERIENCE ─────────── -->
+  <section class="slide" id="s6">
+    <div class="slide-inner">
+      <div class="label">Artist Experience</div>
+      <h2>Why Top Talent Chooses<br>The Callsheet</h2>
+      <div class="divider"></div>
+      <div class="grid-2" style="margin-top: 24px; align-items: start;">
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div class="card">
+            <div style="display:flex; gap: 12px; align-items: flex-start;">
+              <div style="font-size:1.4rem;">🏆</div>
+              <div>
+                <h3>Elite Positioning</h3>
+                <p style="font-size:13px;">Invite-only network signals prestige. Artists are showcased alongside peers who've worked with Disney, Marvel, Netflix — not buried in a marketplace of millions.</p>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div style="display:flex; gap: 12px; align-items: flex-start;">
+              <div style="font-size:1.4rem;">💰</div>
+              <div>
+                <h3>Guaranteed Payouts</h3>
+                <p style="font-size:13px;">Stripe Connect deposits funds directly to the artist's bank. No chasing invoices. Platform processes payment before work is delivered on milestone projects.</p>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div style="display:flex; gap: 12px; align-items: flex-start;">
+              <div style="font-size:1.4rem;">🛡️</div>
+              <div>
+                <h3>Legal Protection</h3>
+                <p style="font-size:13px;">Pre-built contracts with IP ownership, liability caps, and milestone billing. Artists don't need a lawyer for every project.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px;">
+            <div style="font-size:11px; letter-spacing:2px; color:var(--muted); text-transform:uppercase; margin-bottom:16px;">Sample Artist Profile</div>
+            <div style="display:flex; align-items:center; gap: 14px; margin-bottom: 16px;">
+              <div style="width:48px; height:48px; border-radius:50%; background:linear-gradient(135deg, #C9A84C, #8B5CF6); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px;">MC</div>
+              <div>
+                <div style="font-weight:700;">Maya Chen</div>
+                <div style="font-size:12px; color:var(--muted);">AI Visual Artist · Los Angeles</div>
+              </div>
+              <div style="margin-left:auto; font-size:13px; color:var(--gold);">⭐ 4.9</div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 14px;">
+              <span class="pill pill-purple">Midjourney</span>
+              <span class="pill pill-blue">Runway</span>
+              <span class="pill pill-gold">NeRF</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align:center;">
+              <div style="background:var(--surface2); border-radius:8px; padding:10px;">
+                <div style="font-weight:700; color:var(--gold);">$450</div>
+                <div style="font-size:11px; color:var(--muted);">per hour</div>
+              </div>
+              <div style="background:var(--surface2); border-radius:8px; padding:10px;">
+                <div style="font-weight:700; color:var(--gold);">$2,800</div>
+                <div style="font-size:11px; color:var(--muted);">per day</div>
+              </div>
+              <div style="background:var(--surface2); border-radius:8px; padding:10px;">
+                <div style="font-weight:700; color:var(--gold);">Available</div>
+                <div style="font-size:11px; color:var(--muted);">status</div>
+              </div>
+            </div>
+            <div style="margin-top:14px; font-size:12px; color:var(--muted);">Worked with: Nike · Apple · Gucci</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── 7: TECH STACK ─────────── -->
+  <section class="slide" id="s7">
+    <div class="slide-inner">
+      <div class="label">Technology</div>
+      <h2>Production-Grade Stack<br>Built to Scale</h2>
+      <div class="divider"></div>
+      <div class="grid-2" style="margin-top: 24px; align-items: start; gap: 32px;">
+        <div>
+          <h3 style="color:var(--muted); font-size:11px; letter-spacing:2px; text-transform:uppercase; margin-bottom:12px;">Frontend</h3>
+          <div class="tech-grid" style="margin-bottom:20px;">
+            <div class="tech-badge" style="color:#61DAFB;">React 19</div>
+            <div class="tech-badge" style="color:#646CFF;">Vite 8</div>
+            <div class="tech-badge" style="color:#F8942E;">React Router 7</div>
+            <div class="tech-badge" style="color:#25C19F;">Socket.io</div>
+            <div class="tech-badge" style="color:#F6C90E;">date-fns</div>
+            <div class="tech-badge" style="color:#E3527F;">Zod</div>
+          </div>
+          <h3 style="color:var(--muted); font-size:11px; letter-spacing:2px; text-transform:uppercase; margin-bottom:12px;">Backend</h3>
+          <div class="tech-grid">
+            <div class="tech-badge" style="color:#68A063;">Node.js</div>
+            <div class="tech-badge" style="color:#fff;">Express 5</div>
+            <div class="tech-badge" style="color:#635BFF;">Stripe SDK</div>
+            <div class="tech-badge" style="color:#3ECF8E;">Supabase</div>
+            <div class="tech-badge" style="color:#f8c555;">Helmet</div>
+            <div class="tech-badge" style="color:#aaa;">Rate Limit</div>
+          </div>
+        </div>
+        <div>
+          <h3 style="color:var(--muted); font-size:11px; letter-spacing:2px; text-transform:uppercase; margin-bottom:12px;">Infrastructure</h3>
+          <div class="tech-grid" style="margin-bottom: 20px;">
+            <div class="tech-badge" style="color:#fff;">Vercel</div>
+            <div class="tech-badge" style="color:#B044D4;">Railway</div>
+            <div class="tech-badge" style="color:#3ECF8E;">Supabase DB</div>
+            <div class="tech-badge" style="color:#F5A623;">Docker</div>
+          </div>
+          <div class="card" style="margin-top:4px;">
+            <h3 style="margin-bottom: 8px;">Security Posture</h3>
+            <ul class="feat-list">
+              <li>Content Security Policy (Helmet.js)</li>
+              <li>Rate limiting: 100 req / 15 min per IP</li>
+              <li>Input validation with Zod (server + client)</li>
+              <li>HTTPS enforced on all endpoints</li>
+              <li>Stripe webhook signature verification</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── 8: CURRENT PARTNERS ─────────── -->
+  <section class="slide" id="s8">
+    <div class="slide-inner">
+      <div class="label">Integration Ecosystem</div>
+      <h2>Built on Best-in-Class<br>Infrastructure Partners</h2>
+      <div class="divider"></div>
+      <div class="grid-3" style="margin-top: 28px;">
+        <div class="partner-card">
+          <div class="partner-icon">💳</div>
+          <div style="font-weight:700; color:var(--gold);">Stripe</div>
+          <span class="pill pill-green" style="margin: 4px 0; display:inline-block;">Active Integration</span>
+          <p style="font-size:13px; margin-top:6px;">Stripe Connect for artist onboarding, Payment Intents for bookings, automatic application fee splits, and webhook event processing.</p>
+        </div>
+        <div class="partner-card">
+          <div class="partner-icon">🗄️</div>
+          <div style="font-weight:700; color:var(--gold);">Supabase</div>
+          <span class="pill pill-green" style="margin: 4px 0; display:inline-block;">Active Integration</span>
+          <p style="font-size:13px; margin-top:6px;">PostgreSQL database for all platform data. Auth service with email/password and OAuth-ready configuration. Row-level security policies.</p>
+        </div>
+        <div class="partner-card">
+          <div class="partner-icon">📅</div>
+          <div style="font-weight:700; color:var(--gold);">Google Calendar</div>
+          <span class="pill pill-blue" style="margin: 4px 0; display:inline-block;">Export Ready</span>
+          <p style="font-size:13px; margin-top:6px;">iCal (.ics) generation for booking exports. Direct Google Calendar import link construction. Ready for full OAuth calendar sync.</p>
+        </div>
+      </div>
+      <div style="margin-top: 24px;">
+        <div class="label" style="margin-bottom: 12px;">Partnership Opportunities We're Actively Exploring</div>
+        <div style="display:flex; flex-wrap:wrap; gap: 10px;">
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 16px; font-size:13px;">📧 Transactional Email (SendGrid / Resend)</div>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 16px; font-size:13px;">🔔 Push Notifications (OneSignal)</div>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 16px; font-size:13px;">🤝 CRM Integration (HubSpot / Salesforce)</div>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 16px; font-size:13px;">🧾 Tax Compliance (Trolley / Tipalti)</div>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 16px; font-size:13px;">🔐 Identity & KYC (Persona / Onfido)</div>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 16px; font-size:13px;">🎥 Video Hosting CDN (Mux / Cloudflare Stream)</div>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 16px; font-size:13px;">🛡️ E&O Insurance (for freelancers)</div>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 16px; font-size:13px;">⚡ Instant Payouts (fintech banking rails)</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── 9: TRACTION & ROADMAP ─────────── -->
+  <section class="slide" id="s9">
+    <div class="slide-inner">
+      <div class="label">Status & Roadmap</div>
+      <h2>In Beta — Core Platform<br>Fully Operational</h2>
+      <div class="divider"></div>
+      <div class="grid-2" style="margin-top: 24px; align-items: start;">
+        <div>
+          <h3 style="color:var(--text); margin-bottom: 16px;">What's Live Today</h3>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Artist discovery, filtering & profiles</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Booking creation & lifecycle management</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Real-time messaging (Socket.io)</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Stripe Connect artist onboarding</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Payment processing with platform fee</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> E-signature contracts</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Analytics & spend dashboards</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Responsive mobile UI</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Legal pages (Terms & Privacy)</div>
+          </div>
+        </div>
+        <div>
+          <h3 style="color:var(--text); margin-bottom: 16px;">Next 90 Days</h3>
+          <div class="timeline">
+            <div class="tl-row">
+              <div class="tl-line-col"><div class="tl-dot"></div><div class="tl-bar"></div></div>
+              <div class="tl-content">
+                <div class="tl-title">Artist Application & Approval Workflow</div>
+                <div class="tl-desc">Admin review queue, invite-only pipeline, quality scoring</div>
+              </div>
+            </div>
+            <div class="tl-row">
+              <div class="tl-line-col"><div class="tl-dot"></div><div class="tl-bar"></div></div>
+              <div class="tl-content">
+                <div class="tl-title">Escrow & Milestone Payments</div>
+                <div class="tl-desc">Funds held in escrow, released on milestone approval</div>
+              </div>
+            </div>
+            <div class="tl-row">
+              <div class="tl-line-col"><div class="tl-dot"></div><div class="tl-bar"></div></div>
+              <div class="tl-content">
+                <div class="tl-title">Dispute Resolution System</div>
+                <div class="tl-desc">Mediation workflow, evidence upload, admin arbitration</div>
+              </div>
+            </div>
+            <div class="tl-row">
+              <div class="tl-line-col"><div class="tl-dot"></div><div class="tl-bar" style="background:transparent;"></div></div>
+              <div class="tl-content">
+                <div class="tl-title">Video Portfolio CDN + Reviews</div>
+                <div class="tl-desc">Native video hosting, ratings submission, review responses</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── 10: CTA ─────────── -->
+  <section class="slide" id="s10">
+    <div class="slide-inner" style="text-align:center; display:flex; flex-direction:column; align-items:center;">
+      <div class="wordmark" style="margin-bottom: 20px; font-size: 0.9rem;">THE <span>CALLSHEET</span></div>
+      <div class="label">Let's Build Together</div>
+      <h2 style="font-size: clamp(2rem, 4vw, 3rem); max-width: 640px;">The world's premium AI creative marketplace is looking for the right partners</h2>
+      <div class="divider" style="margin: 24px auto;"></div>
+      <div class="grid-3" style="margin-top: 0; max-width: 700px; text-align:left;">
+        <div class="card" style="text-align:center;">
+          <div style="font-size:1.4rem; margin-bottom:8px;">🔗</div>
+          <div style="font-weight:700; font-size:14px;">Integration Partners</div>
+          <p style="font-size:12px; margin-top:6px;">Embed your tool into the The Callsheet workflow — payments, identity, video, comms.</p>
+        </div>
+        <div class="card" style="text-align:center;">
+          <div style="font-size:1.4rem; margin-bottom:8px;">🏢</div>
+          <div style="font-weight:700; font-size:14px;">Studio Partners</div>
+          <p style="font-size:12px; margin-top:6px;">Enterprise access, white-glove onboarding, and custom SLAs for high-volume hirers.</p>
+        </div>
+        <div class="card" style="text-align:center;">
+          <div style="font-size:1.4rem; margin-bottom:8px;">📣</div>
+          <div style="font-weight:700; font-size:14px;">Distribution Partners</div>
+          <p style="font-size:12px; margin-top:6px;">Reach the AI creative community through co-marketing, events, and joint campaigns.</p>
+        </div>
+      </div>
+      <div style="margin-top: 36px;">
+        <p style="font-size: 14px; color: var(--muted); margin-bottom: 6px;">Ready to connect?</p>
+        <div class="cta-email">jhs91689@gmail.com</div>
+        <div style="margin-top: 16px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+          <span class="pill pill-gold">B2B Marketplace</span>
+          <span class="pill pill-green">Beta Live</span>
+          <span class="pill pill-blue">Stripe + Supabase</span>
+          <span class="pill pill-purple">Global AI Talent</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ── NAV ── -->
+<div id="nav">
+  <button id="prev">← Prev</button>
+  <div class="pip-row" id="pips"></div>
+  <span id="slide-counter">1 / 11</span>
+  <button id="next">Next →</button>
+</div>
+
+<div id="hint">← → arrow keys to navigate</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const pipsEl = document.getElementById('pips');
+  const counter = document.getElementById('slide-counter');
+  let cur = 0;
+
+  // build pips
+  slides.forEach((_, i) => {
+    const p = document.createElement('div');
+    p.className = 'pip' + (i === 0 ? ' active' : '');
+    p.onclick = () => go(i);
+    pipsEl.appendChild(p);
+  });
+
+  function go(n) {
+    slides[cur].classList.remove('active');
+    document.querySelectorAll('.pip')[cur].classList.remove('active');
+    cur = (n + slides.length) % slides.length;
+    slides[cur].classList.add('active');
+    document.querySelectorAll('.pip')[cur].classList.add('active');
+    counter.textContent = `${cur + 1} / ${slides.length}`;
+  }
+
+  document.getElementById('prev').onclick = () => go(cur - 1);
+  document.getElementById('next').onclick = () => go(cur + 1);
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') go(cur + 1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   go(cur - 1);
+  });
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-// Mock data for Second Unit
+// Mock data for The Callsheet
 export const artists = [
   {
     id: 1, name: 'Maya Chen', role: 'AI Visual Artist', avatar: 'MC',

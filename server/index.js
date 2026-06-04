@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename)
 
 const app = express()
 const httpServer = createServer(app)
-const PORT = process.env.API_PORT || 3001
+const PORT = process.env.PORT || process.env.API_PORT || 3001
 let FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173'
 
 // Fix: Ensure FRONTEND_URL has a protocol (required by CORS policy)
@@ -329,10 +329,14 @@ app.get('/api/health', (req, res) => {
 const distPath = path.join(__dirname, '../dist')
 app.use(express.static(distPath))
 
-app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(distPath, 'index.html'))
+// Express 5 / path-to-regexp v8: bare '*' is invalid; use a named wildcard
+app.get('/{*splat}', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'Not found' })
   }
+  res.sendFile(path.join(distPath, 'index.html'), (err) => {
+    if (err) next(err)
+  })
 })
 
 httpServer.on('error', (err) => {
@@ -345,7 +349,7 @@ httpServer.on('error', (err) => {
 })
 
 httpServer.listen(PORT, () => {
-  console.log(`\n🚀 Second Unit API running on http://localhost:${PORT}`)
+  console.log(`\n🚀 The Callsheet API running on http://localhost:${PORT}`)
   console.log(`   Security: ✅ Helmet + Rate Limiting`)
   console.log(`   Persistence: ${supabase ? '✅ Supabase' : '⚠️  In-memory'}`)
   console.log()

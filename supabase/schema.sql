@@ -1,5 +1,5 @@
 -- =============================================
--- Second Unit — Database Schema
+-- The Callsheet — Database Schema
 -- Run this in your Supabase SQL Editor
 -- =============================================
 

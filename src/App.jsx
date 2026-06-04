@@ -174,7 +174,7 @@ function AppShell() {
             type="button"
             className="mobile-topbar-brand mobile-topbar-brand--home"
             onClick={() => goNav(homePath)}
-            aria-label="Second Unit — go to home"
+            aria-label="The Callsheet — go to home"
           >
             <BrandLogo variant="compact" />
           </button>
@@ -203,10 +203,10 @@ function AppShell() {
             type="button"
             className="logo logo--home"
             onClick={() => goNav(homePath)}
-            aria-label="Second Unit — AI artist platform, go to home"
+            aria-label="The Callsheet — AI artist platform, go to home"
           >
             <BrandLogo />
-            <span className="sr-only">Second Unit — AI artist platform</span>
+            <span className="sr-only">The Callsheet — AI artist platform</span>
           </button>
           <nav>
             <div className="nav-section">

@@ -452,7 +452,7 @@ export default function Bookings() {
 
             <div style={{ padding: '14px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <Shield size={14} style={{ color: 'var(--success)', marginTop: 1, flexShrink: 0 }} />
-              <span>You'll be taken to Stripe's secure checkout to enter your card details. Second Unit never handles card data directly.</span>
+              <span>You'll be taken to Stripe's secure checkout to enter your card details. The Callsheet never handles card data directly.</span>
             </div>
 
             <button type="button" className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }} onClick={handlePaymentSubmit} disabled={loading === showPay.id}>

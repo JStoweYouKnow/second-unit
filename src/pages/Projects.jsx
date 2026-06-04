@@ -17,7 +17,7 @@ The Artist agrees to provide the creative services described in this contract, i
   - 33% upon contract execution
   - 33% upon delivery of first draft/proof
   - 34% upon final approval and delivery
-• All payments processed through Second Unit's platform via Stripe.
+• All payments processed through The Callsheet's platform via Stripe.
 • Late payments are subject to a 1.5% monthly interest charge.
 
 3. INTELLECTUAL PROPERTY
@@ -259,7 +259,7 @@ export default function Projects() {
     const remainder = value - third * 2
     const content = `
 ═══════════════════════════════════════
-   SECOND UNIT — CONTRACT STATEMENT
+   THE CALLSHEET — CONTRACT STATEMENT
 ═══════════════════════════════════════
 
 Statement ref: CNT-${contract.id}
@@ -294,9 +294,9 @@ Client:  ${contract.signedByEmployer ? 'Signed' : 'Pending'}
 Artist:  ${contract.signedByArtist ? 'Signed' : 'Pending'}
 Contract status: ${contract.status}
 
-${contract.attachmentName ? `Attached agreement file: ${contract.attachmentName} (download from Second Unit contract record)\n` : ''}
+${contract.attachmentName ? `Attached agreement file: ${contract.attachmentName} (download from The Callsheet contract record)\n` : ''}
 ═══════════════════════════════════════
-https://secondunit.com
+https://thecallsheet.ai
 ═══════════════════════════════════════
 `
     const blob = new Blob([content], { type: 'text/plain' })
@@ -322,7 +322,7 @@ https://secondunit.com
   function generateContractText(contract) {
     const divider = '═'.repeat(60)
     return `${divider}
-    SECOND UNIT — CONTRACT AGREEMENT
+    THE CALLSHEET — CONTRACT AGREEMENT
 ${divider}
 
 Contract ID: ${contract.id}
@@ -345,7 +345,7 @@ TERMS AND CONDITIONS
 ${divider}
 
 ${contract.terms || STANDARD_TERMS}
-${contract.attachmentName ? `\n\n[Attached file: ${contract.attachmentName} — download from contract record in Second Unit]\n` : ''}
+${contract.attachmentName ? `\n\n[Attached file: ${contract.attachmentName} — download from contract record in The Callsheet]\n` : ''}
 
 ${divider}
 SIGNATURES
@@ -366,8 +366,8 @@ ${contract.artistSignature
   : '  ⏳ Awaiting signature'}
 
 ${divider}
-This contract was generated and managed through Second Unit.
-https://secondunit.com
+This contract was generated and managed through The Callsheet.
+https://thecallsheet.ai
 ${divider}
 `
   }

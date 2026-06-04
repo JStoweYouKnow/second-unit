@@ -200,6 +200,17 @@ export function Eye({ size = 24, color = 'currentColor', className = '', style }
   )
 }
 
+export function EyeOff({ size = 24, color = 'currentColor', className = '', style } = {}) {
+  return (
+    <Svg {...p(size, color, className, style)}>
+      <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+      <path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c7 0 10 7 10 7a18.2 18.2 0 0 1-2.16 3.19" />
+      <path d="M6.1 6.1A18.5 18.5 0 0 0 2 12s3 7 10 7a10.7 10.7 0 0 0 5.04-1.26" />
+      <line x1="2" y1="2" x2="22" y2="22" />
+    </Svg>
+  )
+}
+
 export function Search({ size = 24, color = 'currentColor', className = '', style } = {}) {
   return (
     <Svg {...p(size, color, className, style)}>

@@ -39,7 +39,7 @@ function SetupModal({ profile, onClose, onDone }) {
         {!done ? (
           <>
             <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 20 }}>
-              Confirm your details to enable milestone payments. Card details are collected by Stripe at checkout — Second Unit never stores them.
+              Confirm your details to enable milestone payments. Card details are collected by Stripe at checkout — The Callsheet never stores them.
             </p>
             <div className="form-group">
               <label className="form-label">Full name</label>
@@ -220,7 +220,7 @@ export default function Payments() {
   const handleDownloadReceipt = (payment) => {
     const content = `
 ═══════════════════════════════════════
-         SECOND UNIT — RECEIPT
+         THE CALLSHEET — RECEIPT
 ═══════════════════════════════════════
 
 Receipt #: ${payment.id}
@@ -243,8 +243,8 @@ Payment Method: Stripe${stripeStatus?.email ? ` · ${stripeStatus.email}` : ''}
 Processed by: Stripe
 
 ═══════════════════════════════════════
-Thank you for using Second Unit!
-https://secondunit.com
+Thank you for using The Callsheet!
+https://thecallsheet.ai
 ═══════════════════════════════════════
 `
     const blob = new Blob([content], { type: 'text/plain' })
@@ -261,11 +261,11 @@ https://secondunit.com
     const platformFee = Math.round(payment.amount * 0.1)
     const tot = payment.amount + platformFee
     const roleNote = isArtist
-      ? 'Artist copy — amounts shown reflect your payout / milestone record on Second Unit.'
-      : 'Client copy — amounts shown reflect your payment record on Second Unit.'
+      ? 'Artist copy — amounts shown reflect your payout / milestone record on The Callsheet.'
+      : 'Client copy — amounts shown reflect your payment record on The Callsheet.'
     const content = `
 ═══════════════════════════════════════
-         SECOND UNIT — INVOICE
+         THE CALLSHEET — INVOICE
 ═══════════════════════════════════════
 
 Invoice #: INV-${payment.id}
@@ -288,10 +288,10 @@ Service provider (artist): ${payment.artistName}
   Total (incl. platform fee)           $${tot.toLocaleString()}
 
 Payment reference: ${payment.id}
-Settlement: processed via Stripe on Second Unit
+Settlement: processed via Stripe on The Callsheet
 
 ═══════════════════════════════════════
-https://secondunit.com
+https://thecallsheet.ai
 ═══════════════════════════════════════
 `
     const blob = new Blob([content], { type: 'text/plain' })

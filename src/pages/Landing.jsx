@@ -53,7 +53,7 @@ export default function Landing() {
 
       {/* Feature Grid */}
       <section style={{ padding: '80px 24px', maxWidth: 1200, margin: '0 auto' }}>
-        <h2 style={{ textAlign: 'center', fontSize: 36, marginBottom: 64 }}>Why Top Studios Choose Second Unit</h2>
+        <h2 style={{ textAlign: 'center', fontSize: 36, marginBottom: 64 }}>Why Top Studios Choose The Callsheet</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 32 }}>
           
           <div className="card" style={{ padding: 40, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
@@ -94,11 +94,11 @@ export default function Landing() {
       
       {/* Simple Footer */}
       <footer style={{ padding: '40px 48px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
-        <div>&copy; 2026 Second Unit. All rights reserved.</div>
+        <div>&copy; 2026 The Callsheet. All rights reserved.</div>
         <div style={{ display: 'flex', gap: 24 }}>
           <Link to="/terms" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Terms</Link>
           <Link to="/privacy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Privacy</Link>
-          <a href="mailto:support@secondunit.com" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Contact</a>
+          <a href="mailto:support@thecallsheet.ai" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Contact</a>
         </div>
       </footer>
     </div>

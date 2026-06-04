@@ -6,6 +6,10 @@ import CalendarModal from '../components/CalendarModal'
 import { useAuth } from '../context/AuthContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
 import { useArtist } from '../hooks/useData'
+import { useArtistReviews } from '../hooks/useArtistReviews'
+import HirerReviewForm from '../components/HirerReviewForm'
+import ArtistReviewSettings from '../components/ArtistReviewSettings'
+import ReviewList from '../components/ReviewList'
 function VideoPlayer({ url }) {
   const getEmbedUrl = (url) => {
     if (!url) return null;
@@ -60,8 +64,10 @@ export default function ArtistProfile() {
   const [showCalendar, setShowCalendar] = useState(false)
   const [activeTab, setActiveTab] = useState('portfolio')
   const { artist, loading: artistLoading } = useArtist(id)
+  const reviewState = useArtistReviews(id, artist)
 
   const isOwnProfile = isArtistProfile(profile) && String(demoArtistPersona(profile)?.id) === String(id)
+  const isHirer = profile && !isArtistProfile(profile)
 
   const [portfolioItems, setPortfolioItems] = useState(() => {
     try {
@@ -98,7 +104,26 @@ export default function ArtistProfile() {
   if (artistLoading) return <div className="page-container" style={{ paddingTop: 80, textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
   if (!artist) return <div className="page-container"><p>Artist not found.</p></div>
 
+  const {
+    settings: reviewSettings,
+    allReviews,
+    publicReviews,
+    publicAverage,
+    updateShowOnProfile,
+    updateReviewVisibility,
+    submitReview,
+    getVisibility,
+    hirerExistingReview,
+  } = reviewState
+
   const isFav = favorites.includes(artist.id)
+  const hirerReview = isHirer ? hirerExistingReview(profile.id) : null
+  const reviewsForDisplay = isOwnProfile ? allReviews : publicReviews
+  const showRatingToHirer = isHirer && reviewSettings.showReviewsOnProfile && publicReviews.length > 0
+  const heroRating = showRatingToHirer || isOwnProfile
+    ? (publicAverage ?? artist.rating)
+    : null
+  const heroReviewCount = isOwnProfile ? publicReviews.length : publicReviews.length
 
   return (
     <div className="page-container">
@@ -120,6 +145,18 @@ export default function ArtistProfile() {
             </div>
             <div className="role">{artist.role}</div>
             <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+              {heroRating != null && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--gold)', fontSize: 14, fontWeight: 600 }}>
+                  <Star size={14} fill="var(--gold)" />
+                  {heroRating}
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
+                    ({heroReviewCount} public review{heroReviewCount === 1 ? '' : 's'})
+                  </span>
+                </span>
+              )}
+              {isHirer && !reviewSettings.showReviewsOnProfile && (
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Reviews not shown publicly</span>
+              )}
               <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{artist.projects} projects</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-secondary)', fontSize: 14 }}>
                 <MapPin size={14} /> {artist.location}
@@ -154,9 +191,16 @@ export default function ArtistProfile() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
         <div>
           <div className="tabs">
-            {['portfolio','about','reviews'].map(t => (
-              <button key={t} className={`tab ${activeTab === t ? 'active' : ''}`} onClick={() => setActiveTab(t)}>
-                {t.charAt(0).toUpperCase() + t.slice(1)}
+            {['portfolio', 'about', 'reviews'].map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={`tab ${activeTab === t ? 'active' : ''}`}
+                onClick={() => setActiveTab(t)}
+              >
+                {t === 'reviews'
+                  ? `Reviews${!isOwnProfile && publicReviews.length ? ` (${publicReviews.length})` : ''}`
+                  : t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
             ))}
           </div>
@@ -291,21 +335,41 @@ export default function ArtistProfile() {
           )}
 
           {activeTab === 'reviews' && (
-            <div className="slide-up" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {(artist.reviews || []).map((r, i) => (
-                <div key={i} className="card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <div>
-                      <span style={{ fontWeight: 600 }}>{r.name}</span>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 13, marginLeft: 8 }}>{r.company}</span>
-                    </div>
-                    <div style={{ color: 'var(--gold)', display: 'flex', gap: 2 }}>
-                      {Array.from({ length: r.rating }, (_, j) => <Star key={j} size={14} fill="var(--gold)" />)}
-                    </div>
-                  </div>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{r.text}</p>
-                </div>
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {isOwnProfile && (
+                <ArtistReviewSettings
+                  showReviewsOnProfile={reviewSettings.showReviewsOnProfile}
+                  onShowReviewsOnProfileChange={updateShowOnProfile}
+                  reviews={allReviews}
+                  getVisibility={getVisibility}
+                  onReviewVisibilityChange={updateReviewVisibility}
+                />
+              )}
+
+              {isHirer && (
+                <HirerReviewForm
+                  existingReview={hirerReview}
+                  hirerName={profile.full_name || 'Client'}
+                  onSubmit={(payload) =>
+                    submitReview({
+                      hirerId: profile.id,
+                      hirerName: profile.full_name || 'Client',
+                      ...payload,
+                    })
+                  }
+                />
+              )}
+
+              <ReviewList
+                reviews={reviewsForDisplay}
+                emptyMessage={
+                  isOwnProfile
+                    ? 'No reviews yet. When hirers leave feedback, you can choose what appears on your public profile.'
+                    : reviewSettings.showReviewsOnProfile
+                      ? 'No public reviews yet. Be the first to share feedback after working together.'
+                      : 'This artist has chosen not to display reviews on their public profile.'
+                }
+              />
             </div>
           )}
         </div>
@@ -329,6 +393,20 @@ export default function ArtistProfile() {
                 <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Projects</span>
                 <span style={{ fontWeight: 600 }}>{artist.projects}</span>
               </div>
+              {(showRatingToHirer || (isOwnProfile && publicReviews.length > 0)) && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Public rating</span>
+                  <span style={{ fontWeight: 600, color: 'var(--gold)' }}>
+                    {publicAverage ?? artist.rating} ★
+                  </span>
+                </div>
+              )}
+              {isOwnProfile && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Total feedback</span>
+                  <span style={{ fontWeight: 600 }}>{allReviews.length}</span>
+                </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                 <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Compensation</span>

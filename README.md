@@ -1,4 +1,4 @@
-# Second Unit — Premium AI Artist Marketplace
+# The Callsheet — Premium AI Artist Marketplace
 
 The world's leading marketplace for professional AI artists and creators. Hire top talent for visual arts, motion design, and more with secure payments and legally binding contracts.
 
@@ -28,8 +28,8 @@ The world's leading marketplace for professional AI artists and creators. Hire t
 ### 2. Installation
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/second-unit.git
-cd second-unit
+git clone https://github.com/your-username/the-callsheet.git
+cd the-callsheet
 
 # Install dependencies
 npm install
@@ -74,4 +74,4 @@ The project includes a `Dockerfile` for the API server.
 4. Set the internal port to `3001`.
 
 ---
-© 2026 Second Unit. All rights reserved.
+© 2026 The Callsheet. All rights reserved.

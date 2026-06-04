@@ -10,13 +10,13 @@ export function useAuth() {
 // Mock user for development without Supabase
 const MOCK_USER = {
   id: 'mock-user-001',
-  email: 'demo@secondunit.com',
+  email: 'demo@thecallsheet.ai',
   user_metadata: { full_name: 'Demo User', role: 'employer' },
 }
 
 const MOCK_PROFILE = {
   id: 'mock-user-001',
-  email: 'demo@secondunit.com',
+  email: 'demo@thecallsheet.ai',
   full_name: 'Demo User',
   role: 'employer',
   avatar_url: null,

@@ -7,8 +7,15 @@ const defaultAppContext = {
   allMessages: [],
   sendMessage: () => {},
   startConversation: () => undefined,
+  markConversationRead: () => {},
   localProjects: [],
-  setLocalProjects: () => {},
+  createContract: async () => null,
+  signContract: async () => null,
+  signContractAsArtist: async () => null,
+  payMilestone: async () => null,
+  approveMilestone: async () => null,
+  refetchContracts: () => {},
+  realtimeConnected: false,
 }
 
 export const AppContext = createContext(defaultAppContext)

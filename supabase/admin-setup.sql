@@ -30,9 +30,21 @@
 -- LinkedIn: enable "LinkedIn (OIDC)" — create LinkedIn app → Client ID + Secret
 --
 -- Authentication → URL configuration
---   Site URL:        production app origin, e.g. https://your-app.vercel.app
---   Redirect URLs:   same + http://localhost:5173/ for local Vite dev
+--   Site URL:        https://www.thecallsheet.ai
+--   Redirect URLs:   https://www.thecallsheet.ai/**
+--                    https://www.thecallsheet.ai/update-password
+--                    https://thecallsheet.ai/**          (apex redirects to www)
+--                    http://localhost:5173/**
+--                    http://localhost:5173/update-password
 --
--- App env: set VITE_SITE_URL to that production origin so OAuth redirect matches
--- the allow list (see .env.example).
+-- App env (Vercel): set VITE_PRODUCTION_URL = https://www.thecallsheet.ai on all environments
+-- (preview auth/OAuth callbacks redirect to production, not the Vercel preview URL)
+-- API check: curl https://www.thecallsheet.ai/api/health  (use www; apex returns 308 redirect)
+-- -----------------------------------------------------------------------------
+-- 4) Artist application workflow
+--
+-- Run: supabase/artist-applications.sql
+-- Promote a user to admin to review applications (see section 1 above).
+-- Share private invite links from /admin/invites (run supabase/artist-invites.sql first).
+-- Artists apply at /apply?invite=TOKEN — the public /apply URL alone will not work.
 -- -----------------------------------------------------------------------------

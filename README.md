@@ -9,7 +9,8 @@ The world's leading marketplace for professional AI artists and creators. Hire t
 - **E-Signatures** — Legally binding digital contracts with custom/standard terms.
 - **Real-time Messaging** — Instant chat with typing indicators and notifications.
 - **Analytics Dashboard** — Visual spend tracking, booking trends, and KPI cards.
-- **Calendar Sync** — Export bookings to Google Calendar or download .ics files.
+- **Calendar Sync** — Google Calendar OAuth (two-way: push bookings, import busy blocks) plus .ics export.
+- **Dispute Resolution** — Open disputes on bookings/contracts, upload evidence, admin mediation workflow.
 
 ## 🛠️ Tech Stack
 
@@ -46,10 +47,20 @@ FRONTEND_URL=http://localhost:5173
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
+# Email (optional — Resend for transactional alerts)
+RESEND_API_KEY=re_...
+EMAIL_FROM=The Callsheet <notifications@yourdomain.com>
+
 # Supabase (required for persistence)
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# Google Calendar OAuth (optional — two-way sync for artists)
+GOOGLE_CALENDAR_CLIENT_ID=...
+GOOGLE_CALENDAR_CLIENT_SECRET=...
+# Defaults to {FRONTEND_URL}/api/calendar/callback if unset
+GOOGLE_CALENDAR_REDIRECT_URI=http://localhost:3001/api/calendar/callback
 ```
 
 ### 4. Running Locally
@@ -60,18 +71,27 @@ npm run dev
 
 ## 🚢 Deployment
 
-### Frontend (Vercel)
-The project includes a `vercel.json` config.
-1. Connect your repo to Vercel.
-2. Set Environment Variables in Vercel dashboard.
-3. Deploy!
+### Vercel (recommended — frontend + serverless API)
+The project includes a `vercel.json` config. API routes live under `/api/*` as Vercel Functions.
 
-### Backend (Railway/Docker)
-The project includes a `Dockerfile` for the API server.
-1. Create a new service on Railway.
-2. Connect your repo (Railway detects the Dockerfile).
-3. Set Environment Variables.
-4. Set the internal port to `3001`.
+1. Connect your repo to Vercel.
+2. Set environment variables in the Vercel dashboard:
+   - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+   - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `FRONTEND_URL`
+   - `RESEND_API_KEY`, `EMAIL_FROM` (optional, for email alerts)
+   - `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_CALENDAR_REDIRECT_URI` (optional)
+3. Run SQL migrations in Supabase (see `supabase/*.sql`), including `disputes.sql` and `google-calendar-sync.sql`.
+4. Deploy.
+
+### Local full-stack (optional)
+```bash
+npm run dev   # Vite + Express/Socket.io on :3001
+```
+
+For confirmed bookings created before contract auto-linking:
+```bash
+npm run backfill:contracts
+```
 
 ---
 © 2026 The Callsheet. All rights reserved.

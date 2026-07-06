@@ -1,5 +1,6 @@
 import { stripe } from '../_lib/stripe.js'
 import { requireAuth } from '../_lib/auth.js'
+import { platformFeeAmountCents } from '../_lib/fees.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -17,7 +18,7 @@ export default async function handler(req, res) {
       metadata: { bookingId: bookingId || '', description: description || '' },
     }
     if (artistStripeAccountId) {
-      intentData.application_fee_amount = Math.round(amount * 10)
+      intentData.application_fee_amount = platformFeeAmountCents(Math.round(amount * 100))
       intentData.transfer_data = { destination: artistStripeAccountId }
     }
     const intent = await stripe.paymentIntents.create(intentData)

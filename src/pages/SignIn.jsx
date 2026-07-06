@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Mail, Lock, LogIn, ArrowRight } from '../components/icons'
 import { useAuth } from '../context/AuthContext'
+import { PENDING_APPLY_KEY } from '../hooks/useArtistApplication'
 import BrandLogo from '../components/BrandLogo'
+import ThemeToggle from '../components/ThemeToggle'
+import OAuthButtons from '../components/OAuthButtons'
 
 function readOAuthErrorFromUrl() {
   const q = new URLSearchParams(window.location.search)
@@ -40,12 +43,18 @@ export default function SignIn() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const { error } = await signIn({ email, password })
-    setLoading(false)
-    if (error) {
-      setError(error.message)
-    } else {
-      navigate('/home')
+    try {
+      const { error } = await signIn({ email, password })
+      if (error) {
+        setError(error.message)
+      } else {
+        const hasPendingApplication = sessionStorage.getItem(PENDING_APPLY_KEY)
+        navigate(hasPendingApplication ? '/application-status' : '/home')
+      }
+    } catch (err) {
+      setError(err.message || 'Sign in failed. Try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -53,22 +62,28 @@ export default function SignIn() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const { error } = await resetPassword(email)
-    setLoading(false)
-    if (error) {
-      setError(error.message)
-    } else {
-      setView('forgot-password-success')
+    try {
+      const { error } = await resetPassword(email)
+      if (error) {
+        setError(error.message)
+      } else {
+        setView('forgot-password-success')
+      }
+    } catch (err) {
+      setError(err.message || 'Could not send reset link. Try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
 
   return (
     <div className="auth-page">
+      <ThemeToggle variant="compact" className="auth-theme-toggle" />
       <div className="auth-container slide-up">
         <div className="auth-header">
           <div className="logo" style={{ justifyContent: 'center', borderBottom: 'none', paddingBottom: 0, marginBottom: 16 }}>
-            <BrandLogo />
+            <BrandLogo variant="auth" />
           </div>
           <h1>{view === 'sign-in' ? 'Welcome back' : view === 'forgot-password-success' ? 'Check your email' : 'Reset your password'}</h1>
           <p>{view === 'sign-in' ? 'Sign in to your account to continue' : view === 'forgot-password-success' ? 'A password reset link has been sent.' : 'Enter your email to receive a reset link'}</p>
@@ -137,6 +152,8 @@ export default function SignIn() {
             </button>
           </form>
         )}
+
+        {view === 'sign-in' && <OAuthButtons disabled={loading} />}
 
         <p className="auth-footer" style={{ marginTop: '24px' }}>
           {view === 'sign-in' ? (

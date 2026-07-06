@@ -1,10 +1,79 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { artists as mockArtists } from '../data/mockData'
+import { groupSlotsByDate } from '../lib/availability'
+
+const MOCK_ARTISTS = [
+  {
+    id: 'artist-001',
+    profileId: 'mock-user-001',
+    name: 'Emma Vance',
+    role: 'AI Motion Designer',
+    avatar: 'EV',
+    bio: 'Emma is a visual designer specializing in generative AI workflows. She has worked with global fashion houses to design futuristic seasonal campaigns.',
+    hourlyRate: 150,
+    location: 'New York, NY',
+    available: true,
+    rating: 4.9,
+    projects: 24,
+    skills: ['Midjourney', 'Stable Diffusion', 'ComfyUI', 'After Effects'],
+    brands: ['Gucci', 'Vogue', 'Apple'],
+    videoLinks: [
+      'https://vimeo.com/834816616',
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      'https://vimeo.com/657896435'
+    ],
+    socials: {
+      twitter: 'https://twitter.com',
+      instagram: 'https://instagram.com',
+      linkedin: 'https://linkedin.com',
+      website: 'https://example.com',
+    },
+    joined: '2026-01-15',
+    availabilitySlots: ['2026-06-15', '2026-06-16', '2026-06-18'],
+    portfolio: [
+      { id: 'p1', title: 'Neo-Tokyo Dreams', image: '', video: '', colorIdx: 0 },
+      { id: 'p2', title: 'Cybernetic Couture', image: '', video: '', colorIdx: 1 },
+      { id: 'p3', title: 'Digital Odyssey', image: '', video: '', colorIdx: 2 }
+    ]
+  },
+  {
+    id: 'artist-002',
+    profileId: 'mock-user-002',
+    name: 'Leo Thorne',
+    role: 'AI Cinematic Director',
+    avatar: 'LT',
+    bio: 'Leo directs AI-native cinematic shorts and high-fidelity video trailers, blending generative video tools with professional sound design.',
+    hourlyRate: 200,
+    location: 'London, UK',
+    available: true,
+    rating: 5.0,
+    projects: 18,
+    skills: ['Runway', 'Sora', 'Pika Labs', 'Premiere Pro'],
+    brands: ['Marvel', 'Netflix', 'Epic Games'],
+    videoLinks: [
+      'https://vimeo.com/347119253',
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      'https://vimeo.com/17207620',
+      'https://vimeo.com/83433604',
+      'https://www.youtube.com/watch?v=9bZkp7q19f0'
+    ],
+    socials: {
+      twitter: 'https://twitter.com',
+      instagram: 'https://instagram.com',
+      linkedin: 'https://linkedin.com',
+      website: 'https://example.com',
+    },
+    joined: '2026-02-10',
+    availabilitySlots: ['2026-06-15', '2026-06-17', '2026-06-19'],
+    portfolio: [
+      { id: 'p4', title: 'Chrono-Shift Trailer', image: '', video: '', colorIdx: 3 },
+      { id: 'p5', title: 'Lost Worlds NeRF', image: '', video: '', colorIdx: 4 }
+    ]
+  }
+]
 
 /**
- * Fetches all artists with their skills and brands.
- * Falls back to mock data when Supabase isn't configured.
+ * Fetches all artists with their skills and brands from Supabase.
  */
 export function useArtists({ search = '', roleFilter = 'all' } = {}) {
   const [artists, setArtists] = useState([])
@@ -16,19 +85,12 @@ export function useArtists({ search = '', roleFilter = 'all' } = {}) {
     setError(null)
 
     if (!isSupabaseConfigured) {
-      // Mock mode
-      let filtered = [...mockArtists]
-      if (roleFilter !== 'all') {
-        filtered = filtered.filter(a => a.role === roleFilter)
-      }
-      if (search) {
-        const q = search.toLowerCase()
-        filtered = filtered.filter(a =>
-          a.name.toLowerCase().includes(q) ||
-          a.role.toLowerCase().includes(q) ||
-          a.skills.some(s => s.toLowerCase().includes(q))
-        )
-      }
+      const q = search.toLowerCase()
+      const filtered = MOCK_ARTISTS.filter(a => {
+        if (roleFilter !== 'all' && a.role !== roleFilter) return false
+        if (q && !a.name.toLowerCase().includes(q) && !a.role.toLowerCase().includes(q) && !a.skills.some(s => s.toLowerCase().includes(q))) return false
+        return true
+      })
       setArtists(filtered)
       setLoading(false)
       return
@@ -41,7 +103,8 @@ export function useArtists({ search = '', roleFilter = 'all' } = {}) {
           *,
           profile:profiles!artists_profile_id_fkey(email, avatar_url),
           skills:artist_skills(skill:skills(name)),
-          brands:artist_brands(brand:brands(name))
+          brands:artist_brands(brand:brands(name)),
+          availability:availability_slots(*)
         `)
         .order('rating', { ascending: false })
 
@@ -56,22 +119,24 @@ export function useArtists({ search = '', roleFilter = 'all' } = {}) {
       const { data, error: fetchError } = await query
       if (fetchError) throw fetchError
 
-      // Flatten nested joins
-      const formatted = data.map(a => ({
+      const formatted = (data || []).map((a) => ({
         id: a.id,
         profileId: a.profile_id,
         name: a.display_name,
         role: a.role_title,
-        avatar: a.display_name.split(' ').map(n => n[0]).join(''),
+        avatar: a.display_name.split(' ').map((n) => n[0]).join(''),
         bio: a.bio,
         hourlyRate: a.hourly_rate,
+        dailyRate: a.day_rate ?? undefined,
+        projectFlatRate: a.project_flat_rate ?? undefined,
         location: a.location,
         available: a.available,
         rating: parseFloat(a.rating),
         projects: a.total_projects,
-        skills: a.skills?.map(s => s.skill.name) || [],
-        brands: a.brands?.map(b => b.brand.name) || [],
+        skills: a.skills?.map((s) => s.skill.name) || [],
+        brands: a.brands?.map((b) => b.brand.name) || [],
         videoLinks: a.video_links || [],
+        availabilitySlots: a.availability?.filter(slot => !slot.is_booked).map(slot => slot.date) || [],
         socials: {
           twitter: a.twitter || '#',
           instagram: a.instagram || '#',
@@ -84,14 +149,15 @@ export function useArtists({ search = '', roleFilter = 'all' } = {}) {
       setArtists(formatted)
     } catch (err) {
       setError(err.message)
-      // Fallback to mock on error
-      setArtists(mockArtists)
+      setArtists([])
     } finally {
       setLoading(false)
     }
   }, [search, roleFilter])
 
-  useEffect(() => { fetchArtists() }, [fetchArtists])
+  useEffect(() => {
+    fetchArtists()
+  }, [fetchArtists])
 
   return { artists, loading, error, refetch: fetchArtists }
 }
@@ -107,7 +173,7 @@ export function useArtist(id) {
     if (!id) return
 
     if (!isSupabaseConfigured) {
-      const found = mockArtists.find(a => a.id === parseInt(id) || a.id === id)
+      const found = MOCK_ARTISTS.find(a => a.id === id)
       setArtist(found || null)
       setLoading(false)
       return
@@ -132,15 +198,17 @@ export function useArtist(id) {
           profileId: data.profile_id,
           name: data.display_name,
           role: data.role_title,
-          avatar: data.display_name.split(' ').map(n => n[0]).join(''),
+          avatar: data.display_name.split(' ').map((n) => n[0]).join(''),
           bio: data.bio,
           hourlyRate: data.hourly_rate,
+          dailyRate: data.day_rate ?? undefined,
+          projectFlatRate: data.project_flat_rate ?? undefined,
           location: data.location,
           available: data.available,
           rating: parseFloat(data.rating),
           projects: data.total_projects,
-          skills: data.skills?.map(s => s.skill.name) || [],
-          brands: data.brands?.map(b => b.brand.name) || [],
+          skills: data.skills?.map((s) => s.skill.name) || [],
+          brands: data.brands?.map((b) => b.brand.name) || [],
           videoLinks: data.video_links || [],
           socials: {
             twitter: data.twitter || '#',
@@ -150,8 +218,10 @@ export function useArtist(id) {
           },
           joined: data.created_at,
           portfolio: data.portfolio || [],
-          availability: data.availability || [],
+          availability: groupSlotsByDate(data.availability || []),
         })
+      } else {
+        setArtist(null)
       }
       setLoading(false)
     }
@@ -166,7 +236,7 @@ export function useArtist(id) {
  * Manages favorites for the current user.
  */
 export function useFavorites(userId) {
-  const [favorites, setFavorites] = useState([1, 6]) // Default mock favorites
+  const [favorites, setFavorites] = useState([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -178,7 +248,7 @@ export function useFavorites(userId) {
         .from('favorites')
         .select('artist_id')
         .eq('employer_id', userId)
-      setFavorites(data?.map(f => f.artist_id) || [])
+      setFavorites(data?.map((f) => f.artist_id) || [])
       setLoading(false)
     }
 
@@ -188,9 +258,8 @@ export function useFavorites(userId) {
   const toggleFavorite = async (artistId) => {
     const isFav = favorites.includes(artistId)
 
-    // Optimistic update
-    setFavorites(prev =>
-      isFav ? prev.filter(id => id !== artistId) : [...prev, artistId]
+    setFavorites((prev) =>
+      isFav ? prev.filter((id) => id !== artistId) : [...prev, artistId]
     )
 
     if (!isSupabaseConfigured) return

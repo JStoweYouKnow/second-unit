@@ -1,31 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isToday, isSameDay, addMonths, subMonths } from 'date-fns'
-import { X, ChevronLeft, ChevronRight, ExternalLink, Download, Clock, MapPin } from './icons'
-
-// Generate demo availability for current and next month
-function generateAvailability() {
-  const slots = []
-  const now = new Date()
-  for (let m = 0; m < 2; m++) {
-    const month = addMonths(now, m)
-    const start = startOfMonth(month)
-    const end = endOfMonth(month)
-    let day = start
-    while (day <= end) {
-      const dow = day.getDay()
-      // Available on weekdays with some randomness
-      if (dow >= 1 && dow <= 5 && Math.random() > 0.3) {
-        const times = ['9:00 AM', '10:00 AM', '11:00 AM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM']
-        const available = times.filter(() => Math.random() > 0.4)
-        if (available.length > 0) {
-          slots.push({ date: format(day, 'yyyy-MM-dd'), slots: available })
-        }
-      }
-      day = addDays(day, 1)
-    }
-  }
-  return slots
-}
+import { X, ChevronLeft, ChevronRight, ExternalLink, Download, Clock } from './icons'
+import { isPastDate, normalizeArtistAvailability } from '../lib/availability'
 
 const CAL_COMP_NOTE = 'Compensation is agreed with the client for each engagement (not shown here).'
 
@@ -34,9 +10,11 @@ export default function CalendarModal({ artist, onClose, onBook }) {
   const [selectedDate, setSelectedDate] = useState(null)
   const [selectedSlot, setSelectedSlot] = useState(null)
 
-  // Use provided availability or generate demo data
-  const availability = artist.availability?.length > 0 ? artist.availability : generateAvailability()
-  const availableDates = availability.map(a => a.date)
+  const availability = useMemo(
+    () => normalizeArtistAvailability(artist.availability),
+    [artist.availability]
+  )
+  const availableDates = availability.map((a) => a.date)
 
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(monthStart)
@@ -52,7 +30,7 @@ export default function CalendarModal({ artist, onClose, onBook }) {
       const d = day
       const dateStr = format(d, 'yyyy-MM-dd')
       const hasSlots = availableDates.includes(dateStr)
-      const isPast = d < new Date(new Date().setHours(0,0,0,0))
+      const isPast = isPastDate(d)
       const isSelected = selectedDate && isSameDay(d, selectedDate)
       days.push(
         <div key={d.toString()}
@@ -167,6 +145,12 @@ END:VCALENDAR`
           ))}
         </div>
         {rows}
+
+        {availability.length === 0 && (
+          <p style={{ marginTop: 16, fontSize: 14, color: 'var(--text-muted)' }}>
+            No availability published yet. This artist hasn&apos;t opened booking slots on their calendar.
+          </p>
+        )}
 
         {/* Selected Date Slots */}
         {selectedDate && (

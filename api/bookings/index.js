@@ -2,9 +2,15 @@ import { z } from 'zod'
 import { db } from '../_lib/db.js'
 import { requireAuth } from '../_lib/auth.js'
 import { rateLimit, getClientIp } from '../_lib/ratelimit.js'
+import {
+  listBookingsForUser,
+  mapBookingToClient,
+  mapBookingToDb,
+  userCanAccessBooking,
+} from '../_lib/bookings.js'
 
 const BookingSchema = z.object({
-  artistId: z.union([z.string(), z.number()]),
+  artistId: z.string().uuid(),
   artistName: z.string(),
   date: z.string(),
   time: z.string().optional().default('09:00'),
@@ -22,26 +28,28 @@ export default async function handler(req, res) {
   const user = await requireAuth(req, res)
   if (!user) return
 
+  if (!db) {
+    return res.status(503).json({ error: 'Database not configured' })
+  }
+
   if (req.method === 'GET') {
-    const { data, error } = await db.from('bookings').select('*')
-    if (error) return res.status(500).json({ error: error.message })
-    return res.json(data)
+    try {
+      const bookings = await listBookingsForUser(db, user.id)
+      return res.json(bookings)
+    } catch (err) {
+      return res.status(500).json({ error: err.message })
+    }
   }
 
   if (req.method === 'POST') {
     try {
       const validated = BookingSchema.parse(req.body)
-      const booking = {
-        ...validated,
-        id: `bk_${Date.now()}`,
-        employerId: user.id,
-        status: 'pending',
-        totalAmount: validated.agreedTotal,
-        createdAt: new Date().toISOString(),
-      }
-      const { data, error } = await db.from('bookings').insert([booking]).select()
+      const row = mapBookingToDb(validated, user.id)
+
+      const { data, error } = await db.from('bookings').insert(row).select().single()
+
       if (error) return res.status(500).json({ error: error.message })
-      return res.status(201).json(data[0])
+      return res.status(201).json(mapBookingToClient(data))
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: err.errors })

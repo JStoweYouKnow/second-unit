@@ -16,27 +16,7 @@ function writeJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value))
 }
 
-function reviewIdForSeed(artistId, index) {
-  return `seed-${artistId}-${index}`
-}
-
-/** @typedef {{ id: string, artistId: string|number, hirerId?: string, name: string, company?: string, rating: number, text: string, createdAt: string, source: 'seed'|'hirer' }} StoredReview */
-
-/**
- * @param {import('../data/mockData').artists[0]['reviews'][0]} r
- */
-function normalizeSeedReview(r, artistId, index) {
-  return {
-    id: r.id || reviewIdForSeed(artistId, index),
-    artistId,
-    name: r.name,
-    company: r.company || '',
-    rating: Number(r.rating) || 5,
-    text: r.text || '',
-    createdAt: r.createdAt || new Date(2025, index % 12, 1).toISOString(),
-    source: 'seed',
-  }
-}
+/** @typedef {{ id: string, artistId: string|number, hirerId?: string, name: string, company?: string, rating: number, text: string, createdAt: string, source: 'hirer' }} StoredReview */
 
 export function getArtistReviewSettings(artistId) {
   const stored = readJson(`${SETTINGS_KEY_PREFIX}${artistId}`, null)
@@ -74,30 +54,20 @@ function saveHirerReviews(reviews) {
   writeJson(REVIEWS_KEY, reviews)
 }
 
-/**
- * @param {string|number} artistId
- * @param {{ reviews?: Array<{ name: string, company?: string, rating: number, text: string, id?: string, createdAt?: string }> } | null | undefined} mockArtist
- */
-export function getAllReviewsForArtist(artistId, mockArtist) {
+export function getAllReviewsForArtist(artistId) {
   const idKey = String(artistId)
-  const seed = (mockArtist?.reviews || []).map((r, i) => normalizeSeedReview(r, artistId, i))
-  const submitted = loadHirerReviews().filter((r) => String(r.artistId) === idKey)
-  const byId = new Map()
-  for (const r of [...seed, ...submitted]) {
-    byId.set(r.id, r)
-  }
-  return [...byId.values()].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  )
+  return loadHirerReviews()
+    .filter((r) => String(r.artistId) === idKey)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 }
 
 /**
  * Reviews hirers may see on the artist profile.
  */
-export function getPublicReviewsForArtist(artistId, mockArtist) {
+export function getPublicReviewsForArtist(artistId) {
   const settings = getArtistReviewSettings(artistId)
   if (!settings.showReviewsOnProfile) return []
-  return getAllReviewsForArtist(artistId, mockArtist).filter((r) =>
+  return getAllReviewsForArtist(artistId).filter((r) =>
     isReviewVisibleOnProfile(artistId, r.id)
   )
 }

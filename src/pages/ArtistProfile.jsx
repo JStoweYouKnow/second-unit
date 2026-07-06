@@ -1,10 +1,10 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Heart, Star, MapPin, Calendar, ExternalLink, Play, Globe, AtSign, Camera, Briefcase, Send, ChevronUp, ChevronDown } from '../components/icons'
+import { ArrowLeft, Heart, Star, MapPin, Calendar, Play, Globe, AtSign, Camera, Briefcase, Send, ChevronUp, ChevronDown } from '../components/icons'
 import { useApp } from '../context/AppContext'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import CalendarModal from '../components/CalendarModal'
 import { useAuth } from '../context/AuthContext'
-import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
+import { isArtistProfile } from '../lib/roleView'
 import { useArtist } from '../hooks/useData'
 import { useArtistReviews } from '../hooks/useArtistReviews'
 import HirerReviewForm from '../components/HirerReviewForm'
@@ -49,12 +49,6 @@ function VideoPlayer({ url }) {
   );
 }
 
-const DEFAULT_PORTFOLIO = [
-  { id: 1, title: 'Liquid Metal Campaign', image: '/demo/portfolio-1.png' },
-  { id: 2, title: 'Nature Motion Study', video: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4' },
-  { id: 3, title: 'Future Aesthetics', colorIdx: 3 },
-  { id: 4, title: 'AI Exploration', colorIdx: 4 },
-]
 
 export default function ArtistProfile() {
   const { id } = useParams()
@@ -64,22 +58,32 @@ export default function ArtistProfile() {
   const [showCalendar, setShowCalendar] = useState(false)
   const [activeTab, setActiveTab] = useState('portfolio')
   const { artist, loading: artistLoading } = useArtist(id)
-  const reviewState = useArtistReviews(id, artist)
+  const reviewState = useArtistReviews(id)
 
-  const isOwnProfile = isArtistProfile(profile) && String(demoArtistPersona(profile)?.id) === String(id)
+  const isOwnProfile = isArtistProfile(profile) && artist?.profileId === profile?.id
   const isHirer = profile && !isArtistProfile(profile)
 
-  const [portfolioItems, setPortfolioItems] = useState(() => {
-    try {
-      const saved = localStorage.getItem(`su_portfolio_order_${id}`)
-      if (saved) {
-        const order = JSON.parse(saved)
-        return [...DEFAULT_PORTFOLIO].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
-      }
-    } catch {}
-    return DEFAULT_PORTFOLIO
-  })
+  const [portfolioItems, setPortfolioItems] = useState([])
   const [videoLinks, setVideoLinks] = useState([])
+  const carouselRef = useRef(null)
+
+  const scrollCarousel = (direction) => {
+    if (carouselRef.current) {
+      const scrollAmount = 310 // updated card width + gap
+      carouselRef.current.scrollBy({
+        left: direction * scrollAmount,
+        behavior: 'smooth'
+      })
+    }
+  }
+
+  useEffect(() => {
+    if (artist?.portfolio?.length) {
+      setPortfolioItems(artist.portfolio)
+    } else {
+      setPortfolioItems([])
+    }
+  }, [artist?.portfolio])
 
   useEffect(() => {
     if (artist?.videoLinks) setVideoLinks(artist.videoLinks)
@@ -116,6 +120,22 @@ export default function ArtistProfile() {
     hirerExistingReview,
   } = reviewState
 
+  const getVideoThumb = (url) => {
+    if (!url) return null
+    if (url.includes('vimeo.com')) return `https://vumbnail.com/${url.split('/').pop()}.jpg`
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      const id = url.includes('v=')
+        ? new URL(url).searchParams.get('v')
+        : url.split('/').pop().split('?')[0]
+      return id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : null
+    }
+    return null
+  }
+
+  const heroVideo = portfolioItems[0]?.video || null
+  const heroImg = portfolioItems[0]?.image || getVideoThumb(videoLinks[0]) || null
+  const hasHeroVisual = !!(heroVideo || heroImg)
+
   const isFav = favorites.includes(artist.id)
   const hirerReview = isHirer ? hirerExistingReview(profile.id) : null
   const reviewsForDisplay = isOwnProfile ? allReviews : publicReviews
@@ -126,14 +146,26 @@ export default function ArtistProfile() {
   const heroReviewCount = isOwnProfile ? publicReviews.length : publicReviews.length
 
   return (
-    <div className="page-container">
-      <button className="btn btn-ghost" onClick={() => navigate(-1)} style={{ marginBottom: 16 }}>
-        <ArrowLeft size={16} /> Back
-      </button>
-
-      <div className="profile-hero slide-up">
+    <div>
+      <div
+        className={`profile-hero slide-up${hasHeroVisual ? ' profile-hero--visual' : ''}`}
+        style={heroImg && !heroVideo ? { backgroundImage: `url(${heroImg})` } : undefined}
+      >
+        <button
+          className={`btn btn-ghost${hasHeroVisual ? ' profile-hero__back' : ''}`}
+          onClick={() => navigate(-1)}
+          style={!hasHeroVisual ? { margin: '24px 0 16px 32px', display: 'block' } : undefined}
+        >
+          <ArrowLeft size={16} /> Back
+        </button>
+        {heroVideo && (
+          <video className="profile-hero__bg-video" autoPlay muted loop playsInline>
+            <source src={heroVideo} type="video/mp4" />
+          </video>
+        )}
+        {hasHeroVisual && <div className="profile-hero__gradient" />}
         <div className="profile-hero-content">
-          <div className="avatar avatar-lg">{artist.avatar}</div>
+          {!hasHeroVisual && <div className="avatar avatar-lg">{artist.avatar}</div>}
           <div className="profile-details">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <h1>{artist.name}</h1>
@@ -162,9 +194,11 @@ export default function ArtistProfile() {
                 <MapPin size={14} /> {artist.location}
               </span>
             </div>
-            <p style={{ marginTop: 10, marginBottom: 0, fontSize: 14, color: 'var(--text-muted)', maxWidth: '52ch', lineHeight: 1.5 }}>
-              Compensation is not listed publicly — scope and fees are negotiated with the client for each engagement.
-            </p>
+            {!hasHeroVisual && (
+              <p style={{ marginTop: 10, marginBottom: 0, fontSize: 14, color: 'var(--text-muted)', maxWidth: '52ch', lineHeight: 1.5 }}>
+                Compensation is not listed publicly — scope and fees are negotiated with the client for each engagement.
+              </p>
+            )}
             <div className="profile-socials">
               <a href={artist.socials.twitter} className="social-btn" title="Twitter"><AtSign size={16} /></a>
               <a href={artist.socials.instagram} className="social-btn" title="Instagram"><Camera size={16} /></a>
@@ -172,23 +206,25 @@ export default function ArtistProfile() {
               <a href={artist.socials.website} className="social-btn" title="Website"><Globe size={16} /></a>
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignSelf: 'flex-start' }}>
-            <button className="btn btn-primary btn-lg" onClick={() => startConversation(artist)}>
-              <Send size={16} /> Hire / Inquire
-            </button>
-            <button className="btn btn-secondary" onClick={() => setShowCalendar(true)}>
-              <Calendar size={16} /> View Calendar
-            </button>
-            <button className="btn btn-ghost" onClick={() => toggleFavorite(artist.id)}
-              style={isFav ? { color: 'var(--danger)' } : {}}>
-              <Heart size={16} fill={isFav ? 'var(--danger)' : 'none'} />
-              {isFav ? 'Favorited' : 'Add to Favorites'}
-            </button>
-          </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
+      <div className="page-container" style={{ paddingTop: 8 }}>
+      <div className="profile-actions-bar">
+        <button className="btn btn-primary btn-lg" onClick={() => startConversation(artist)}>
+          <Send size={16} /> Hire / Inquire
+        </button>
+        <button className="btn btn-secondary" onClick={() => setShowCalendar(true)}>
+          <Calendar size={16} /> View Calendar
+        </button>
+        <button className="btn btn-ghost" onClick={() => toggleFavorite(artist.id)}
+          style={isFav ? { color: 'var(--danger)' } : {}}>
+          <Heart size={16} fill={isFav ? 'var(--danger)' : 'none'} />
+          {isFav ? 'Favorited' : 'Add to Favorites'}
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 24 }}>
         <div>
           <div className="tabs">
             {['portfolio', 'about', 'reviews'].map((t) => (
@@ -218,10 +254,17 @@ export default function ArtistProfile() {
 
           {activeTab === 'portfolio' && (
             <div className="slide-up">
+              {portfolioItems.length === 0 && videoLinks.length === 0 ? (
+                <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
+                  {isOwnProfile ? 'Add portfolio work in your account settings.' : 'No portfolio items yet.'}
+                </div>
+              ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
                 {portfolioItems.map((item, i) => (
                   <div key={item.id} className="card" style={{
-                    height: 250, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    height: i === 0 ? 400 : 260,
+                    gridColumn: i === 0 ? '1 / -1' : undefined,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                     background: item.image ? `url(${item.image}) center/cover no-repeat` : (item.video ? 'black' : `linear-gradient(${135 + item.colorIdx * 30}deg, var(--accent-tint-12), rgba(56, 189, 248, 0.08))`),
                     fontSize: 14, color: (item.image || item.video) ? 'transparent' : 'var(--text-muted)',
                     position: 'relative',
@@ -292,43 +335,76 @@ export default function ArtistProfile() {
                   </div>
                 ))}
               </div>
+              )}
               {videoLinks.length > 0 && (
-                <div style={{ marginTop: 24 }}>
+                <div style={{ marginTop: 28, position: 'relative' }}>
                   <h3 style={{ marginBottom: 16 }}>Video Reels</h3>
-                  {videoLinks.map((v, i) => (
-                    <div key={i} style={{ marginBottom: 24, position: 'relative' }}>
-                      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                        <VideoPlayer url={v} />
-                        <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <Play size={16} style={{ color: 'var(--accent)' }} />
-                            <span style={{ fontWeight: 500, fontSize: 14 }}>Video Reel {i + 1}</span>
-                          </div>
-                          
-                          {isOwnProfile && (
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              <button 
-                                className="btn btn-ghost btn-sm" 
-                                style={{ padding: '4px 8px' }}
-                                onClick={() => moveItem(videoLinks, setVideoLinks, i, -1)}
-                                disabled={i === 0}
-                              >
-                                <ChevronUp size={16} />
-                              </button>
-                              <button 
-                                className="btn btn-ghost btn-sm" 
-                                style={{ padding: '4px 8px' }}
-                                onClick={() => moveItem(videoLinks, setVideoLinks, i, 1)}
-                                disabled={i === videoLinks.length - 1}
-                              >
-                                <ChevronDown size={16} />
-                              </button>
+                  <div className="video-carousel-wrapper">
+                    {videoLinks.length > 1 && (
+                      <button 
+                        type="button"
+                        onClick={() => scrollCarousel(-1)} 
+                        className="carousel-control-btn carousel-control-btn--left"
+                        aria-label="Scroll left"
+                      >
+                        ‹
+                      </button>
+                    )}
+                    
+                    <div 
+                      ref={carouselRef} 
+                      className="video-carousel"
+                    >
+                      {videoLinks.map((v, i) => (
+                        <div 
+                          key={i} 
+                          className="video-carousel-card"
+                        >
+                          <div className="card" style={{ padding: 0, overflow: 'hidden', height: '100%' }}>
+                            <VideoPlayer url={v} />
+                            <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <Play size={16} style={{ color: 'var(--accent)' }} />
+                                <span style={{ fontWeight: 500, fontSize: 14 }}>Video Reel {i + 1}</span>
+                              </div>
+                              
+                              {isOwnProfile && (
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                  <button 
+                                    className="btn btn-ghost btn-sm" 
+                                    style={{ padding: '4px 8px' }}
+                                    onClick={() => moveItem(videoLinks, setVideoLinks, i, -1)}
+                                    disabled={i === 0}
+                                  >
+                                    <ChevronUp size={16} />
+                                  </button>
+                                  <button 
+                                    className="btn btn-ghost btn-sm" 
+                                    style={{ padding: '4px 8px' }}
+                                    onClick={() => moveItem(videoLinks, setVideoLinks, i, 1)}
+                                    disabled={i === videoLinks.length - 1}
+                                  >
+                                    <ChevronDown size={16} />
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
+
+                    {videoLinks.length > 1 && (
+                      <button 
+                        type="button"
+                        onClick={() => scrollCarousel(1)} 
+                        className="carousel-control-btn carousel-control-btn--right"
+                        aria-label="Scroll right"
+                      >
+                        ›
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -421,6 +497,8 @@ export default function ArtistProfile() {
             </div>
           </div>
         </div>
+      </div>
+
       </div>
 
       {showCalendar && <CalendarModal artist={artist} onClose={() => setShowCalendar(false)} />}

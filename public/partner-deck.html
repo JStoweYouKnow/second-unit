@@ -208,7 +208,7 @@
             <li>Instant booking with availability calendars</li>
             <li>Real-time messaging with typing indicators</li>
             <li>E-signature contracts with milestone billing</li>
-            <li>Stripe Connect payouts with automatic 10% platform fee</li>
+            <li>Stripe Connect payouts with automatic 15% platform fee</li>
             <li>Analytics dashboards for studios & artists</li>
           </ul>
         </div>
@@ -328,7 +328,7 @@
           <h3>Payments & Payouts</h3>
           <ul class="feat-list">
             <li>Stripe Connect for artists</li>
-            <li>Automatic platform fee (10%)</li>
+            <li>Automatic platform fee (15%)</li>
             <li>Full payment history & receipts</li>
             <li>Multi-rate pricing models</li>
           </ul>
@@ -360,10 +360,10 @@
             <p style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">Every transaction (e.g. $1,000 booking)</p>
             <div class="fee-bar">
               <div class="fee-artist">Artist receives 90% · $900</div>
-              <div class="fee-platform">10%</div>
+              <div class="fee-platform">15%</div>
             </div>
           </div>
-          <p style="font-size: 13px; color: var(--muted); margin-top: 12px;">The 10% platform fee is deducted automatically via Stripe Connect <code>application_fee_amount</code>. Fully disclosed to both parties upfront.</p>
+          <p style="font-size: 13px; color: var(--muted); margin-top: 12px;">The 15% platform fee is retained at checkout; the artist receives 85% when the hirer marks the project complete. Fully disclosed to both parties upfront.</p>
           <div style="margin-top: 24px; padding: 16px; background: var(--gold-dim); border-radius: 8px; border: 1px solid var(--border);">
             <p style="font-size: 14px;"><strong style="color:var(--gold);">Revenue at scale:</strong><br>100 bookings/mo @ avg $2,500 = <strong>$25,000/mo GMV → $2,500/mo platform revenue</strong></p>
           </div>
@@ -372,7 +372,7 @@
           <div class="card">
             <h3>Current Model</h3>
             <ul class="feat-list" style="margin-top: 8px;">
-              <li>10% transaction fee on all bookings</li>
+              <li>15% transaction fee on completed bookings</li>
               <li>Stripe standard processing (~2.9% + 30¢) borne by hirer</li>
               <li>No listing fees or subscription required</li>
             </ul>
@@ -536,8 +536,8 @@
         <div class="partner-card">
           <div class="partner-icon">📅</div>
           <div style="font-weight:700; color:var(--gold);">Google Calendar</div>
-          <span class="pill pill-blue" style="margin: 4px 0; display:inline-block;">Export Ready</span>
-          <p style="font-size:13px; margin-top:6px;">iCal (.ics) generation for booking exports. Direct Google Calendar import link construction. Ready for full OAuth calendar sync.</p>
+          <span class="pill pill-green" style="margin: 4px 0; display:inline-block;">Active Integration</span>
+          <p style="font-size:13px; margin-top:6px;">OAuth connect from Account settings. Confirmed bookings push to Google Calendar; FreeBusy imports block artist availability slots.</p>
         </div>
       </div>
       <div style="margin-top: 24px;">
@@ -566,14 +566,18 @@
         <div>
           <h3 style="color:var(--text); margin-bottom: 16px;">What's Live Today</h3>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Artist discovery, filtering & profiles</div>
-            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Booking creation & lifecycle management</div>
-            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Real-time messaging (Socket.io)</div>
-            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Stripe Connect artist onboarding</div>
-            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Payment processing with platform fee</div>
-            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> E-signature contracts</div>
-            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Analytics & spend dashboards</div>
-            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Responsive mobile UI</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Invite-only artist onboarding & admin approval</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Artist discovery, filtering & multi-rate profiles</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Booking lifecycle + Stripe Checkout payments</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Supabase Realtime messaging + in-app notifications</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Contract attachments (Supabase Storage) + booking→contract linking</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Email alerts for bookings, signatures &amp; milestones (Resend)</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Stripe Connect onboarding & completion payouts</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> E-signature contracts (Supabase-backed)</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Contract milestone payments (33/33/34 + Stripe release)</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Shared reviews & analytics from live data</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Google Calendar OAuth sync (push bookings + import busy blocks)</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Dispute resolution (evidence upload, admin mediation)</div>
             <div style="display:flex; align-items:center; gap:10px; font-size:14px;"><span style="color:#34D399; font-size:16px;">✓</span> Legal pages (Terms & Privacy)</div>
           </div>
         </div>
@@ -583,29 +587,22 @@
             <div class="tl-row">
               <div class="tl-line-col"><div class="tl-dot"></div><div class="tl-bar"></div></div>
               <div class="tl-content">
-                <div class="tl-title">Artist Application & Approval Workflow</div>
-                <div class="tl-desc">Admin review queue, invite-only pipeline, quality scoring</div>
+                <div class="tl-title">Automated dispute payouts</div>
+                <div class="tl-desc">Stripe refund / release execution from admin resolution outcomes</div>
               </div>
             </div>
             <div class="tl-row">
               <div class="tl-line-col"><div class="tl-dot"></div><div class="tl-bar"></div></div>
               <div class="tl-content">
-                <div class="tl-title">Escrow & Milestone Payments</div>
-                <div class="tl-desc">Funds held in escrow, released on milestone approval</div>
-              </div>
-            </div>
-            <div class="tl-row">
-              <div class="tl-line-col"><div class="tl-dot"></div><div class="tl-bar"></div></div>
-              <div class="tl-content">
-                <div class="tl-title">Dispute Resolution System</div>
-                <div class="tl-desc">Mediation workflow, evidence upload, admin arbitration</div>
+                <div class="tl-title">Native video portfolio CDN</div>
+                <div class="tl-desc">Hosted reels, faster gallery loads, review responses</div>
               </div>
             </div>
             <div class="tl-row">
               <div class="tl-line-col"><div class="tl-dot"></div><div class="tl-bar" style="background:transparent;"></div></div>
               <div class="tl-content">
-                <div class="tl-title">Video Portfolio CDN + Reviews</div>
-                <div class="tl-desc">Native video hosting, ratings submission, review responses</div>
+                <div class="tl-title">Multi-calendar & employer sync</div>
+                <div class="tl-desc">Outlook/iCal feeds and employer-side calendar blocking</div>
               </div>
             </div>
           </div>

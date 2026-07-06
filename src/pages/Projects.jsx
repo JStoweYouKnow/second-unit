@@ -1,9 +1,15 @@
-import { useMemo, useState, useRef } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
+import { useSearchParams, Link } from 'react-router-dom'
 import { FileText, Plus, Download, Eye, CheckCircle, Clock, Archive, X, PenTool, Shield, Copy, Check, Upload, Receipt } from '../components/icons'
-import { artists } from '../data/mockData'
+import { ContractMilestonesPanel } from '../components/ContractMilestonesPanel'
+import { useArtists } from '../hooks/useData'
+import { useArtistProfile } from '../hooks/useArtistProfile'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
+import { contracts as contractsApi } from '../lib/api'
+import { isSupabaseConfigured } from '../lib/supabase'
+import { uploadContractAttachment, downloadContractAttachment } from '../lib/contractAttachments'
 
 const STANDARD_TERMS = `INDEPENDENT CONTRACTOR AGREEMENT
 
@@ -65,9 +71,13 @@ function isAllowedCustomAgreementFile(file) {
 
 export default function Projects() {
   const { profile } = useAuth()
-  const { localProjects, setLocalProjects, allMessages, sendMessage } = useApp()
+  const { allMessages, sendMessage, localProjects, createContract, signContract, signContractAsArtist, payMilestone, approveMilestone, refetchContracts } = useApp()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [milestoneBusy, setMilestoneBusy] = useState(null)
   const isArtist = isArtistProfile(profile)
-  const me = demoArtistPersona(profile)
+  const { artist: myArtistRecord } = useArtistProfile(profile?.id)
+  const me = demoArtistPersona(profile, myArtistRecord)
+  const { artists } = useArtists()
   const [showNew, setShowNew] = useState(false)
   const [showView, setShowView] = useState(null) // project to view
   const [showSign, setShowSign] = useState(null) // project to sign
@@ -82,6 +92,47 @@ export default function Projects() {
   const [signatureName, setSignatureName] = useState('')
   const [signatureAgreed, setSignatureAgreed] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [reuploadError, setReuploadError] = useState('')
+  const reuploadInputRef = useRef(null)
+
+  useEffect(() => {
+    const paid = searchParams.get('milestone_paid')
+    const contractId = searchParams.get('contract_id')
+    if (!contractId) return
+
+    refetchContracts().then((list) => {
+      const c = (list || localProjects).find((p) => String(p.id) === contractId)
+      if (c) setShowView(c)
+      if (paid) setSearchParams({}, { replace: true })
+    })
+  }, [searchParams])
+
+  const handlePayMilestone = async (contract, milestone) => {
+    setMilestoneBusy(milestone.id)
+    try {
+      const { url } = await payMilestone(contract.id, milestone.id)
+      if (url) window.location.href = url
+      else await refetchContracts()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setMilestoneBusy(null)
+    }
+  }
+
+  const handleApproveMilestone = async (contract, milestone) => {
+    setMilestoneBusy(milestone.id)
+    try {
+      await approveMilestone(contract.id, milestone.id)
+      const list = await refetchContracts()
+      const refreshed = list?.find((p) => p.id === contract.id)
+      if (refreshed) setShowView(refreshed)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setMilestoneBusy(null)
+    }
+  }
 
   const statusConfig = {
     active: { icon: <CheckCircle size={14} />, color: 'var(--success)', label: 'Active' },
@@ -122,6 +173,7 @@ export default function Projects() {
       if (prev?.objectUrl) URL.revokeObjectURL(prev.objectUrl)
       return {
         name: file.name,
+        file,
         size: file.size,
         mimeType: file.type || 'application/octet-stream',
         objectUrl: URL.createObjectURL(file),
@@ -129,7 +181,7 @@ export default function Projects() {
     })
   }
 
-  const handleCreateProject = (e) => {
+  const handleCreateProject = async (e) => {
     e.preventDefault()
     const hasCustomText = newProject.customTerms.trim().length > 0
     const hasCustomFile = !!customAgreementUpload
@@ -139,13 +191,14 @@ export default function Projects() {
     }
     setCustomUploadError('')
 
-    const artist = artists.find(a => a.id === parseInt(newProject.artistId))
+    const artist = artists.find((a) => String(a.id) === String(newProject.artistId))
     if (!artist) return
 
     let terms = STANDARD_TERMS
     let attachmentUrl = null
     let attachmentName = null
     let attachmentMime = null
+    const pendingFile = customAgreementUpload?.file ?? null
 
     if (projectType === 'custom') {
       const parts = []
@@ -155,43 +208,58 @@ export default function Projects() {
         parts.push(
           `[Uploaded agreement: ${customAgreementUpload.name} — ${kb} KB]\nUse “Download attachment” on this project to retrieve the PDF or Word file.`
         )
-        attachmentUrl = customAgreementUpload.objectUrl
+        if (!isSupabaseConfigured) {
+          attachmentUrl = customAgreementUpload.objectUrl
+        }
         attachmentName = customAgreementUpload.name
         attachmentMime = customAgreementUpload.mimeType
       }
       terms = parts.join('\n\n---\n\n')
     }
 
-    const project = {
-      id: `pj_${Date.now()}`,
+    const created = await createContract({
       title: newProject.title,
-      artistName: artist.name,
       artistId: artist.id,
+      artistName: artist.name,
       clientName: profile?.full_name || 'Client',
       type: projectType,
-      status: 'pending',
-      value: parseInt(newProject.value) || 0,
+      value: parseInt(newProject.value, 10) || 0,
       startDate: newProject.startDate,
       endDate: newProject.endDate,
       terms,
       attachmentUrl,
       attachmentName,
       attachmentMime,
-      signedByEmployer: false,
-      signedByArtist: false,
-      employerSignature: null,
-      artistSignature: null,
-      createdAt: new Date().toISOString(),
+    })
+
+    if (pendingFile && created?.id && isSupabaseConfigured) {
+      try {
+        const storagePath = await uploadContractAttachment(created.id, pendingFile)
+        await contractsApi.updateAttachment(created.id, {
+          attachmentStoragePath: storagePath,
+          attachmentName: customAgreementUpload.name,
+          attachmentMime: customAgreementUpload.mimeType,
+        })
+        await refetchContracts()
+      } catch (uploadErr) {
+        console.error('Attachment upload failed:', uploadErr)
+        setCustomUploadError('Project created but file upload failed. Try uploading again from the project view.')
+        return
+      }
     }
 
-    setLocalProjects(prev => [project, ...prev])
-    setShowNew(false)
-    setCustomAgreementUpload(null)
-    setNewProject({ title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: '' })
-    setProjectType('standard')
+    closeNewProjectModal()
   }
 
-  const handleDownloadAttachment = (contract) => {
+  const handleDownloadAttachment = async (contract) => {
+    if (contract?.attachmentStoragePath) {
+      try {
+        await downloadContractAttachment(contract.attachmentStoragePath, contract.attachmentName)
+      } catch (err) {
+        console.error(err)
+      }
+      return
+    }
     if (!contract?.attachmentUrl || !contract?.attachmentName) return
     const a = document.createElement('a')
     a.href = contract.attachmentUrl
@@ -200,37 +268,56 @@ export default function Projects() {
     a.click()
   }
 
-  const handleSign = () => {
+  const handleReuploadAttachment = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !showView?.id) return
+    setReuploadError('')
+    if (file.size > MAX_CUSTOM_FILE_BYTES) {
+      setReuploadError('File must be 15MB or smaller.')
+      return
+    }
+    if (!isAllowedCustomAgreementFile(file)) {
+      setReuploadError('Use a PDF (.pdf) or Word file (.doc, .docx).')
+      return
+    }
+    if (!isSupabaseConfigured) {
+      setReuploadError('Re-upload requires Supabase Storage.')
+      return
+    }
+    try {
+      const storagePath = await uploadContractAttachment(showView.id, file)
+      await contractsApi.updateAttachment(showView.id, {
+        attachmentStoragePath: storagePath,
+        attachmentName: file.name,
+        attachmentMime: file.type || 'application/octet-stream',
+      })
+      const list = await refetchContracts()
+      const refreshed = list?.find((p) => p.id === showView.id)
+      if (refreshed) setShowView(refreshed)
+    } catch (err) {
+      setReuploadError(err.message || 'Upload failed')
+    }
+  }
+
+  const handleSign = async () => {
     if (!signatureName.trim() || !signatureAgreed || !showSign) return
 
-    setLocalProjects(prev => prev.map(c => {
-      if (c.id !== showSign.id) return c
-      let updated = { ...c }
-      if (isArtist) {
-        updated = {
-          ...c,
-          signedByArtist: true,
-          artistSignature: { name: signatureName, date: new Date().toISOString(), ip: '127.0.0.1' },
-        }
-        if (updated.signedByEmployer) updated.status = 'active'
-      } else {
-        updated = {
-          ...c,
-          signedByEmployer: true,
-          employerSignature: { name: signatureName, date: new Date().toISOString(), ip: '127.0.0.1' },
-        }
-        if (updated.signedByArtist) updated.status = 'active'
-      }
+    const updated = isArtist
+      ? await signContractAsArtist(showSign.id, signatureName.trim())
+      : await signContract(showSign.id, signatureName.trim())
 
-      // Send automated message on signature
-      const conv = allMessages.find(m => m.artistId === updated.artistId)
+    if (updated) {
+      const conv = allMessages.find((m) => m.artistId === updated.artistId)
       if (conv) {
-        const sigNote = `✅ AGREEMENT SIGNED\nProject: ${updated.title}\nValue: $${updated.value?.toLocaleString()}\nStatus: ${updated.status.toUpperCase()}\n\nThis copy has been sent to both parties for their records.`
+        const sigNote = `✅ AGREEMENT SIGNED\nProject: ${updated.title}\nValue: $${updated.value?.toLocaleString()}\nStatus: ${(updated.status || 'pending').toUpperCase()}\n\nThis copy has been sent to both parties for their records.`
         sendMessage(conv.id, sigNote, isArtist ? 'artist' : 'user')
       }
-
-      return updated
-    }))
+      if (updated.status === 'active') {
+        await refetchContracts()
+        setShowView(updated)
+      }
+    }
 
     setShowSign(null)
     setSignatureName('')
@@ -416,6 +503,11 @@ ${divider}
                 <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-secondary)', alignItems: 'center' }}>
                   <span>{isArtist ? 'Your engagement with the client' : `Artist: ${c.artistName}`}</span>
                   <span>{c.startDate} → {c.endDate}</span>
+                  {(c.status === 'active' || c.status === 'completed') && c.milestones?.length > 0 && (
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                      {c.milestones.filter((m) => m.status === 'released').length}/{c.milestones.length} milestones released
+                    </span>
+                  )}
                   {/* Signature Status */}
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: c.signedByEmployer ? 'var(--success)' : 'var(--text-muted)' }}>
@@ -442,7 +534,7 @@ ${divider}
                 <button type="button" className="btn-icon" title="View" onClick={() => setShowView(c)}><Eye size={16} /></button>
                 <button type="button" className="btn-icon" title="Download contract (.txt)" onClick={() => handleDownloadPDF(c)}><Download size={16} /></button>
                 <button type="button" className="btn-icon" title="Download contract statement / invoice (.txt)" onClick={() => handleDownloadContractInvoice(c)}><Receipt size={16} /></button>
-                {c.attachmentUrl && c.attachmentName && (
+                {(c.hasAttachment || c.attachmentUrl) && c.attachmentName && (
                   <button
                     type="button"
                     className="btn-icon"
@@ -628,6 +720,14 @@ ${divider}
               </div>
             </div>
 
+            <ContractMilestonesPanel
+              contract={showView}
+              isArtist={isArtist}
+              busyId={milestoneBusy}
+              onPay={handlePayMilestone}
+              onApprove={handleApproveMilestone}
+            />
+
             {/* Terms */}
             <div style={{ marginBottom: 24 }}>
               <h3 style={{ fontSize: 14, marginBottom: 12, color: 'var(--text-secondary)' }}>Terms & Conditions</h3>
@@ -708,10 +808,26 @@ ${divider}
               )}
               <button type="button" className="btn btn-secondary" onClick={() => handleDownloadPDF(showView)}><Download size={16} /> Contract (.txt)</button>
               <button type="button" className="btn btn-secondary" onClick={() => handleDownloadContractInvoice(showView)}><Receipt size={16} /> Statement / invoice (.txt)</button>
-              {showView.attachmentUrl && showView.attachmentName && (
+              {(showView.hasAttachment || showView.attachmentUrl) && showView.attachmentName && (
                 <button type="button" className="btn btn-secondary" onClick={() => handleDownloadAttachment(showView)}>
                   <Download size={16} /> Original file
                 </button>
+              )}
+              {!isArtist && showView.type === 'custom' && isSupabaseConfigured && (
+                <>
+                  <input ref={reuploadInputRef} type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden onChange={handleReuploadAttachment} />
+                  <button type="button" className="btn btn-secondary" onClick={() => reuploadInputRef.current?.click()}>
+                    <Upload size={16} /> Replace attachment
+                  </button>
+                </>
+              )}
+              {reuploadError && (
+                <span style={{ fontSize: 12, color: 'var(--danger)', alignSelf: 'center' }}>{reuploadError}</span>
+              )}
+              {(showView.status === 'active' || showView.status === 'signed') && (
+                <Link to={`/disputes?contract=${showView.id}`} className="btn btn-ghost btn-sm">
+                  <Shield size={14} /> Open dispute
+                </Link>
               )}
               <button type="button" className="btn btn-secondary" onClick={() => setShowView(null)}>Close</button>
             </div>

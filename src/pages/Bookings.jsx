@@ -1,19 +1,24 @@
 import { useMemo, useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import { Calendar, Clock, Plus, CheckCircle, AlertCircle, X, Send, CreditCard, Loader2, Shield, ExternalLink } from '../components/icons'
-import { bookings as mockBookings, artists } from '../data/mockData'
+import { useArtists } from '../hooks/useData'
+import { useArtistProfile } from '../hooks/useArtistProfile'
+import { useBookings } from '../hooks/useBookings'
 import { bookings as bookingsApi, payments as paymentsApi } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
 import { bookingSubtotal, bookingScheduleCaption } from '../lib/pricing'
+import { PLATFORM_FEE_PERCENT, ARTIST_PAYOUT_RATE } from '../lib/fees'
 
 export default function Bookings() {
-  const { profile } = useAuth()
+  const { profile, isAuthenticated } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const isArtist = isArtistProfile(profile)
-  const myArtist = demoArtistPersona(profile)
+  const { artist: myArtistRecord } = useArtistProfile(profile?.id)
+  const myArtist = demoArtistPersona(profile, myArtistRecord)
+  const { artists } = useArtists()
+  const { bookings, loading: bookingsLoading, error: bookingsError, refetch } = useBookings(isAuthenticated)
   const [tab, setTab] = useState('upcoming')
-  const [localBookings, setLocalBookings] = useState(mockBookings)
   const [showNew, setShowNew] = useState(false)
   const [showPay, setShowPay] = useState(null)
   const [newBooking, setNewBooking] = useState({
@@ -26,36 +31,32 @@ export default function Bookings() {
     type: 'Consultation',
     notes: '',
   })
+  const [showComplete, setShowComplete] = useState(null)
   const [loading, setLoading] = useState(null)
   const [error, setError] = useState(null)
 
-  // Handle return from Stripe Checkout
+  // Handle return from Stripe Checkout (or mock payment)
   useEffect(() => {
     const success = searchParams.get('payment_success')
-    const bookingId = searchParams.get('booking_id')
     if (success) {
-      if (bookingId) {
-        setLocalBookings(prev =>
-          prev.map(b => b.id === bookingId ? { ...b, status: 'paid' } : b)
-        )
-      }
+      refetch()
       setSearchParams({}, { replace: true })
     }
-  }, [])
+  }, [searchParams, refetch, setSearchParams])
 
   const roleBookings = useMemo(() => {
-    if (!isArtist || !myArtist) return localBookings
-    return localBookings.filter((b) => b.artistId === myArtist.id)
-  }, [isArtist, myArtist, localBookings])
+    if (!isArtist || !myArtist) return bookings
+    return bookings.filter((b) => String(b.artistId) === String(myArtist.id))
+  }, [isArtist, myArtist, bookings])
 
   const filtered = tab === 'upcoming'
-    ? roleBookings.filter(b => b.status === 'confirmed' || b.status === 'pending')
+    ? roleBookings.filter(b => b.status === 'confirmed' || b.status === 'pending' || b.status === 'paid')
     : roleBookings
 
   const handleCreateBooking = async (e) => {
     e.preventDefault()
     setError(null)
-    const artist = artists.find(a => a.id === parseInt(newBooking.artistId, 10))
+    const artist = artists.find((a) => String(a.id) === String(newBooking.artistId))
     if (!artist) return
 
     const agreed = Math.round(Number(String(newBooking.agreedTotal).replace(/,/g, '')))
@@ -69,8 +70,7 @@ export default function Bookings() {
         ? 1
         : Number(newBooking.duration) || 1
 
-    const booking = {
-      id: `bk_${Date.now()}`,
+    const payload = {
       artistId: artist.id,
       artistName: artist.name,
       date: newBooking.date,
@@ -79,15 +79,13 @@ export default function Bookings() {
       durationUnit: newBooking.durationUnit,
       type: newBooking.type,
       agreedTotal: agreed,
-      status: 'pending',
       notes: newBooking.notes,
     }
 
     setLoading('new')
     try {
-      // employerId is set server-side from the authenticated JWT
-      await bookingsApi.create(booking)
-      setLocalBookings(prev => [booking, ...prev])
+      await bookingsApi.create(payload)
+      await refetch()
       setShowNew(false)
       setNewBooking({
         artistId: '',
@@ -100,7 +98,7 @@ export default function Bookings() {
         notes: '',
       })
     } catch (err) {
-      setError('Failed to create booking. Please try again.')
+      setError(err.message || 'Failed to create booking. Please try again.')
       console.error(err)
     } finally {
       setLoading(null)
@@ -112,9 +110,9 @@ export default function Bookings() {
     setLoading(id)
     try {
       await bookingsApi.respond(id, 'confirm')
-      setLocalBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'confirmed' } : b))
+      await refetch()
     } catch (err) {
-      setError('Failed to confirm booking.')
+      setError(err.message || 'Failed to confirm booking.')
       console.error(err)
     } finally {
       setLoading(null)
@@ -126,9 +124,9 @@ export default function Bookings() {
     setLoading(id)
     try {
       await bookingsApi.respond(id, 'decline')
-      setLocalBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' } : b))
+      await refetch()
     } catch (err) {
-      setError('Failed to decline booking.')
+      setError(err.message || 'Failed to decline booking.')
       console.error(err)
     } finally {
       setLoading(null)
@@ -137,6 +135,21 @@ export default function Bookings() {
 
   const handlePay = (booking) => {
     setShowPay(booking)
+  }
+
+  const handleComplete = async () => {
+    if (!showComplete) return
+    setError(null)
+    setLoading(showComplete.id)
+    try {
+      await bookingsApi.complete(showComplete.id)
+      await refetch()
+      setShowComplete(null)
+    } catch (err) {
+      setError(err.message || 'Failed to complete booking.')
+    } finally {
+      setLoading(null)
+    }
   }
 
   const handlePaymentSubmit = async () => {
@@ -155,6 +168,25 @@ export default function Bookings() {
       setError('Could not start checkout. Please try again.')
       setLoading(null)
     }
+  }
+
+  const hasLinkedContract = (booking) => Boolean(booking?.contractId || booking?.contract?.id)
+
+  const contractActionLabel = (booking, forArtist) => {
+    const c = booking.contract
+    if (!c) return forArtist ? 'View project' : 'Open project'
+    if (c.status === 'pending') {
+      const needsSign = forArtist ? !c.signedByArtist : !c.signedByEmployer
+      return needsSign ? 'Sign agreement' : 'View project'
+    }
+    if (c.status === 'active') return forArtist ? 'View milestones' : 'Pay milestones'
+    if (c.status === 'completed') return 'View project'
+    return 'Open project'
+  }
+
+  const contractHref = (booking) => {
+    const id = booking.contractId || booking.contract?.id
+    return id ? `/projects?contract_id=${id}` : '/projects'
   }
 
   const statusConfig = {
@@ -183,6 +215,15 @@ export default function Bookings() {
         </div>
       </div>
 
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '14px 16px', marginBottom: 20, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 13, color: 'var(--text-secondary)' }}>
+        <Shield size={16} style={{ flexShrink: 0, marginTop: 2, color: 'var(--accent)' }} />
+        <span>
+          {isArtist
+            ? `Confirmed bookings create a linked project contract. Payment runs through milestone escrow (${Math.round(ARTIST_PAYOUT_RATE * 100)}% released per approved milestone, ${PLATFORM_FEE_PERCENT}% platform fee).`
+            : `After the artist confirms, a project contract is created automatically. Pay through milestone escrow on Projects (${PLATFORM_FEE_PERCENT}% platform fee).`}
+        </span>
+      </div>
+
       {error && (
         <div className="alert alert-danger" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
           <AlertCircle size={18} />
@@ -191,12 +232,21 @@ export default function Bookings() {
         </div>
       )}
 
+      {bookingsError && !error && (
+        <div className="auth-error" style={{ marginBottom: 20 }}>{bookingsError}</div>
+      )}
+
       <div className="tabs">
         <button type="button" className={`tab ${tab === 'upcoming' ? 'active' : ''}`} onClick={() => setTab('upcoming')}>Upcoming</button>
         <button type="button" className={`tab ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>All Bookings</button>
       </div>
 
-      {filtered.length === 0 ? (
+      {bookingsLoading ? (
+        <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
+          <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+          <p>Loading bookings…</p>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
           <Calendar size={32} style={{ marginBottom: 8, opacity: 0.5 }} />
           <p>{isArtist ? 'No bookings on your calendar yet.' : 'No bookings yet.'}</p>
@@ -231,6 +281,11 @@ export default function Bookings() {
                     <span className="skill-tag">{b.type}</span>
                   </div>
                   {b.notes && <p style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>&ldquo;{b.notes}&rdquo;</p>}
+                  {hasLinkedContract(b) && b.contract?.title && (
+                    <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
+                      Linked project: {b.contract.title}
+                    </p>
+                  )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ textAlign: 'right', marginRight: 8 }}>
@@ -243,7 +298,7 @@ export default function Bookings() {
                       <Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent)' }} />
                     ) : (
                       <>
-                        {b.status === 'pending' && (
+                        {b.status === 'pending' && isArtist && (
                           <div style={{ display: 'flex', gap: 8 }}>
                             <button type="button" className="btn btn-success btn-sm" onClick={() => handleConfirm(b.id)}>
                               <CheckCircle size={14} /> Confirm
@@ -253,16 +308,56 @@ export default function Bookings() {
                             </button>
                           </div>
                         )}
+                        {b.status === 'pending' && !isArtist && (
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 140, textAlign: 'right' }}>
+                            Awaiting artist confirmation
+                          </span>
+                        )}
 
                         {b.status === 'confirmed' && !isArtist && (
-                          <button type="button" className="btn btn-primary btn-sm" onClick={() => handlePay(b)}>
-                            <CreditCard size={14} /> Pay Now
-                          </button>
+                          hasLinkedContract(b) ? (
+                            <Link to={contractHref(b)} className="btn btn-primary btn-sm">
+                              <ExternalLink size={14} /> {contractActionLabel(b, false)}
+                            </Link>
+                          ) : (
+                            <button type="button" className="btn btn-primary btn-sm" onClick={() => handlePay(b)}>
+                              <CreditCard size={14} /> Pay Now
+                            </button>
+                          )
                         )}
                         {b.status === 'confirmed' && isArtist && (
-                          <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 120, textAlign: 'right' }}>
-                            Awaiting client payment
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 140, textAlign: 'right' }}>
+                            {hasLinkedContract(b) ? 'Contract ready — awaiting signatures / payment' : 'Awaiting client payment'}
                           </span>
+                        )}
+
+                        {b.status === 'paid' && !isArtist && (
+                          hasLinkedContract(b) ? (
+                            <Link to={contractHref(b)} className="btn btn-secondary btn-sm">
+                              <ExternalLink size={14} /> {contractActionLabel(b, false)}
+                            </Link>
+                          ) : (
+                            <button type="button" className="btn btn-success btn-sm" onClick={() => setShowComplete(b)}>
+                              <CheckCircle size={14} /> Mark Complete
+                            </button>
+                          )
+                        )}
+                        {b.status === 'paid' && isArtist && (
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 140, textAlign: 'right' }}>
+                            {hasLinkedContract(b) ? (
+                              <Link to={contractHref(b)} style={{ color: 'var(--accent)' }}>
+                                {contractActionLabel(b, true)}
+                              </Link>
+                            ) : (
+                              'Awaiting project completion'
+                            )}
+                          </span>
+                        )}
+
+                        {['confirmed', 'paid', 'completed'].includes(b.status) && (
+                          <Link to={`/disputes?booking=${b.id}`} className="btn btn-ghost btn-sm" style={{ marginLeft: 8 }}>
+                            <Shield size={14} /> Dispute
+                          </Link>
                         )}
                       </>
                     )}
@@ -400,7 +495,7 @@ export default function Bookings() {
                     </span>
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    + 10% platform facilitation at payment. Final charge shown on the Pay step after confirmation.
+                    15% platform fee is deducted from the artist's payout when the project is marked complete. You pay the agreed fee only.
                   </div>
                 </div>
               )}
@@ -413,6 +508,56 @@ export default function Bookings() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showComplete && (
+        <div className="modal-overlay" role="presentation" onClick={() => setShowComplete(null)}>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="complete-booking-title" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 id="complete-booking-title">Mark Project Complete</h2>
+              <button type="button" className="btn-icon" onClick={() => setShowComplete(null)}><X size={18} /></button>
+            </div>
+
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 700, marginBottom: 4 }}>
+                ${Math.round(bookingSubtotal(showComplete) * 0.85).toLocaleString()}
+              </div>
+              <div style={{ color: 'var(--text-muted)' }}>released to {showComplete.artistName}</div>
+            </div>
+
+            <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Total paid</span>
+                <span>${bookingSubtotal(showComplete).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Platform fee (15%)</span>
+                <span>−${Math.round(bookingSubtotal(showComplete) * 0.15).toLocaleString()}</span>
+              </div>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                <span>Artist payout</span>
+                <span>${Math.round(bookingSubtotal(showComplete) * 0.85).toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div style={{ padding: '14px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <Shield size={14} style={{ color: 'var(--warning)', marginTop: 1, flexShrink: 0 }} />
+              <span>This will immediately transfer ${Math.round(bookingSubtotal(showComplete) * 0.85).toLocaleString()} to {showComplete.artistName} via Stripe. This action cannot be undone.</span>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-success btn-lg"
+              style={{ width: '100%', justifyContent: 'center' }}
+              onClick={handleComplete}
+              disabled={loading === showComplete.id}
+            >
+              {loading === showComplete.id
+                ? <Loader2 size={18} className="animate-spin" />
+                : <><CheckCircle size={18} /> Release Payment to Artist</>}
+            </button>
           </div>
         </div>
       )}
@@ -437,16 +582,15 @@ export default function Bookings() {
 
             <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Agreed fee</span>
-                <span>${bookingSubtotal(showPay).toLocaleString()}</span>
+                <span style={{ color: 'var(--text-muted)' }}>You pay</span>
+                <span style={{ fontWeight: 700 }}>${bookingSubtotal(showPay).toLocaleString()}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Platform fee (10%)</span>
-                <span>${Math.round(bookingSubtotal(showPay) * 0.1).toLocaleString()}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 0 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Platform fee (15%)</span>
+                <span style={{ color: 'var(--text-muted)' }}>deducted from artist payout</span>
               </div>
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                <span>Total</span>
-                <span>${(bookingSubtotal(showPay) + Math.round(bookingSubtotal(showPay) * 0.1)).toLocaleString()}</span>
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                Artist receives ${Math.round(bookingSubtotal(showPay) * 0.85).toLocaleString()} when you mark the project complete.
               </div>
             </div>
 

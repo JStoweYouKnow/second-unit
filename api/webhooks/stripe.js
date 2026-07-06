@@ -1,10 +1,20 @@
 import Stripe from 'stripe'
 import { db } from '../_lib/db.js'
+import { completeBookingPayment } from '../_lib/completeBookingPayment.js'
+import { completeMilestonePayment } from '../_lib/milestones.js'
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null
 
-// Vercel: disable body parsing so we can verify the raw Stripe signature
 export const config = { api: { bodyParser: false } }
+
+function readMetadata(obj) {
+  const meta = obj?.metadata || {}
+  const piMeta =
+    typeof obj?.payment_intent === 'object' && obj?.payment_intent?.metadata
+      ? obj.payment_intent.metadata
+      : {}
+  return { ...piMeta, ...meta }
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -23,15 +33,25 @@ export default async function handler(req, res) {
     return res.status(400).send(`Webhook Error: ${err.message}`)
   }
 
-  const bookingId =
-    event.data.object?.metadata?.bookingId ||
-    event.data.object?.payment_intent?.metadata?.bookingId
+  const obj = event.data.object
+  const meta = readMetadata(obj)
+  const bookingId = meta.bookingId
+  const milestoneId = meta.milestoneId
+
+  const paymentIntentId =
+    event.type === 'checkout.session.completed'
+      ? (typeof obj.payment_intent === 'string' ? obj.payment_intent : obj.payment_intent?.id)
+      : obj.id
 
   if (
-    bookingId &&
+    db &&
     (event.type === 'payment_intent.succeeded' || event.type === 'checkout.session.completed')
   ) {
-    await db.from('bookings').update({ status: 'paid' }).eq('id', bookingId)
+    if (milestoneId) {
+      await completeMilestonePayment(db, milestoneId, { paymentIntentId })
+    } else if (bookingId) {
+      await completeBookingPayment(db, bookingId, { paymentIntentId })
+    }
   }
 
   res.json({ received: true })

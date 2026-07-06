@@ -1,106 +1,164 @@
+import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { ArrowRight, Star, Play, CheckCircle } from '../components/icons'
-import BrandLogo from '../components/BrandLogo'
+import ThemeToggle from '../components/ThemeToggle'
 import { useAuth } from '../context/AuthContext'
 
 export default function Landing() {
   const { isAuthenticated } = useAuth()
+  const [activeTab, setActiveTab] = useState('overview')
 
-  if (isAuthenticated) {
+  const isGuestMode = new URLSearchParams(window.location.search).get('guest') === 'true'
+
+  if (isAuthenticated && !isGuestMode) {
     return <Navigate to="/home" replace />
   }
 
   return (
-    <div className="landing-page" style={{ background: 'var(--bg-app)', minHeight: '100vh', color: 'var(--text-primary)' }}>
-      {/* Navbar */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 48px', borderBottom: '1px solid var(--border)', background: 'rgba(5, 5, 5, 0.8)', backdropFilter: 'blur(12px)', position: 'sticky', top: 0, zIndex: 100 }}>
-        <BrandLogo />
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <Link to="/signin" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontWeight: 500, transition: 'var(--transition)' }} onMouseEnter={e => e.target.style.color = 'var(--text-primary)'} onMouseLeave={e => e.target.style.color = 'var(--text-secondary)'}>
-            Sign In
-          </Link>
-          <Link to="/signup" className="btn btn-primary" style={{ padding: '8px 24px', borderRadius: 24 }}>
-            Join Beta
-          </Link>
+    <div className="landing-page">
+      <header className="landing-header">
+        <div className="logo-home">
+          <img
+            src="/brand/the-callsheet-transparent-logo.png"
+            alt="The Callsheet"
+            className="brand-logo brand-logo--landing brand-logo--on-dark"
+            decoding="async"
+          />
+        </div>
+        <nav className="landing-nav" aria-label="Main Navigation">
+          <button
+            type="button"
+            className={`landing-nav-link ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => setActiveTab('overview')}
+          >
+            Overview
+          </button>
+          <button
+            type="button"
+            className={`landing-nav-link ${activeTab === 'features' ? 'active' : ''}`}
+            onClick={() => setActiveTab('features')}
+          >
+            Features
+          </button>
+          <button
+            type="button"
+            className={`landing-nav-link ${activeTab === 'beta' ? 'active' : ''}`}
+            onClick={() => setActiveTab('beta')}
+          >
+            Private Beta
+          </button>
+        </nav>
+        <div className="landing-header__actions">
+          <ThemeToggle variant="compact" />
+          <Link to="/signin" className="landing-header__link">Sign In</Link>
+          <Link to="/signup" className="btn btn-primary btn-sm">Join Beta</Link>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section style={{ padding: '120px 24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-        {/* Cinematic glow effect */}
-        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '800px', height: '800px', background: 'radial-gradient(circle, rgba(245, 197, 66, 0.08) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
-        
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: 900, margin: '0 auto' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 16px', background: 'rgba(245, 197, 66, 0.1)', border: '1px solid rgba(245, 197, 66, 0.2)', borderRadius: 30, color: 'var(--gold)', fontSize: 14, fontWeight: 600, marginBottom: 32 }}>
-            <Star size={14} fill="var(--gold)" /> Now in Private Beta
-          </div>
-          <h1 style={{ fontSize: 'clamp(48px, 6vw, 72px)', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.02em', marginBottom: 24 }}>
-            The Premier Marketplace for <span style={{ color: 'var(--gold)' }}>AI Native Creatives</span>
-          </h1>
-          <p style={{ fontSize: 'clamp(18px, 2vw, 22px)', color: 'var(--text-secondary)', maxWidth: 700, margin: '0 auto 48px auto', lineHeight: 1.6 }}>
-            Connect with elite AI visual artists, motion designers, and virtual production specialists for your next studio campaign.
-          </p>
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link to="/signup" className="btn btn-primary btn-lg" style={{ padding: '16px 32px', fontSize: 16, borderRadius: 30 }}>
-              Hire Talent <ArrowRight size={18} />
-            </Link>
-            <Link to="/signup" className="btn btn-secondary btn-lg" style={{ padding: '16px 32px', fontSize: 16, borderRadius: 30, background: 'transparent', borderColor: 'var(--border)' }}>
-              Apply as Artist
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Feature Grid */}
-      <section style={{ padding: '80px 24px', maxWidth: 1200, margin: '0 auto' }}>
-        <h2 style={{ textAlign: 'center', fontSize: 36, marginBottom: 64 }}>Why Top Studios Choose The Callsheet</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 32 }}>
-          
-          <div className="card" style={{ padding: 40, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(245, 197, 66, 0.1)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-              <Star size={24} />
+      <main className="landing-content">
+        {activeTab === 'overview' && (
+          <section className="landing-hero landing-tab-content" key="overview">
+            <video
+              className="landing-hero__video"
+              autoPlay
+              muted
+              loop
+              playsInline
+              aria-hidden="true"
+            >
+              <source src="/videos/hero-bg.mp4" type="video/mp4" />
+            </video>
+            <div className="landing-hero__video-overlay" />
+            <div className="landing-hero__inner">
+              <div className="landing-eyebrow hero-animate hero-animate--1">
+                <Star size={14} /> Now in Private Beta
+              </div>
+              <h1 className="landing-hero__title hero-animate hero-animate--2">
+                The premier marketplace for{' '}
+                <span className="landing-hero__emphasis">AI native creatives</span>
+              </h1>
+              <p className="landing-hero__lede hero-animate hero-animate--3">
+                Connect with elite AI visual artists, motion designers, and virtual production
+                specialists for your next studio campaign.
+              </p>
+              <div className="landing-hero__cta hero-animate hero-animate--4">
+                <Link to="/signup" className="btn btn-primary btn-lg">
+                  Hire Talent <ArrowRight size={18} />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('features')}
+                  className="btn btn-secondary btn-lg"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                >
+                  Learn More <ArrowRight size={18} />
+                </button>
+              </div>
             </div>
-            <h3 style={{ fontSize: 20, marginBottom: 12 }}>Vetted Elite Talent</h3>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>We rigorously screen every artist. Only the top 1% of AI creative professionals make it onto our invite-only platform.</p>
-          </div>
+          </section>
+        )}
 
-          <div className="card" style={{ padding: 40, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(245, 197, 66, 0.1)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-              <Play size={24} />
+        {activeTab === 'features' && (
+          <section className="landing-features landing-tab-content" key="features">
+            <h2 className="landing-section-title reveal-stagger reveal-stagger--1">Why top studios choose The Callsheet</h2>
+            <div className="landing-features__grid">
+              <article className="card landing-feature-card reveal-stagger reveal-stagger--1">
+                <div className="landing-feature-card__icon"><Star size={22} /></div>
+                <h3>Vetted elite talent</h3>
+                <p>
+                  We rigorously screen every artist. Only the top 1% of AI creative professionals
+                  make it onto our invite-only platform.
+                </p>
+              </article>
+              <article className="card landing-feature-card reveal-stagger reveal-stagger--2">
+                <div className="landing-feature-card__icon"><Play size={22} /></div>
+                <h3>Cinematic showcases</h3>
+                <p>
+                  Review portfolios via high-fidelity, instant-playback native HTML5 video showcases
+                  before initiating a contract.
+                </p>
+              </article>
+              <article className="card landing-feature-card reveal-stagger reveal-stagger--3">
+                <div className="landing-feature-card__icon"><CheckCircle size={22} /></div>
+                <h3>Secure contracts &amp; escrow</h3>
+                <p>
+                  Seamlessly handle legal agreements, milestone tracking, and secure payments via
+                  Stripe — all in one thread.
+                </p>
+              </article>
             </div>
-            <h3 style={{ fontSize: 20, marginBottom: 12 }}>Cinematic Showcases</h3>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>Review portfolios via high-fidelity, instant-playback native HTML5 video showcases before initiating a contract.</p>
-          </div>
-
-          <div className="card" style={{ padding: 40, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(245, 197, 66, 0.1)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-              <CheckCircle size={24} />
+            <div className="reveal-stagger reveal-stagger--3" style={{ display: 'flex', justifyContent: 'center', marginTop: 32 }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab('beta')}
+                className="btn btn-primary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+              >
+                Join Private Beta <ArrowRight size={18} />
+              </button>
             </div>
-            <h3 style={{ fontSize: 20, marginBottom: 12 }}>Secure Contracts & Escrow</h3>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>Seamlessly handle legal agreements, milestone tracking, and secure payments via Stripe all in one thread.</p>
+          </section>
+        )}
+
+        {activeTab === 'beta' && (
+          <div className="landing-cta-container landing-tab-content" key="beta">
+            <section className="landing-cta-band">
+              <h2>Ready to redefine production?</h2>
+              <p>Join the private beta today and access the future of creative talent.</p>
+              <Link to="/signup" className="btn btn-inverse btn-lg">Get Started</Link>
+            </section>
+
+            <footer className="landing-footer">
+              <div>&copy; 2026 The Callsheet. All rights reserved.</div>
+              <div className="landing-footer__links">
+                <Link to="/terms">Terms</Link>
+                <Link to="/privacy">Privacy</Link>
+                <a href="mailto:support@thecallsheet.ai">Contact</a>
+              </div>
+            </footer>
           </div>
-
-        </div>
-      </section>
-
-      {/* Footer CTA */}
-      <section style={{ padding: '100px 24px', textAlign: 'center', background: 'var(--bg-card)', borderTop: '1px solid var(--border)' }}>
-        <h2 style={{ fontSize: 40, marginBottom: 24 }}>Ready to redefine production?</h2>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: 40 }}>Join the private beta today and access the future of creative talent.</p>
-        <Link to="/signup" className="btn btn-primary btn-lg" style={{ padding: '16px 40px', fontSize: 18, borderRadius: 30 }}>
-          Get Started
-        </Link>
-      </section>
-      
-      {/* Simple Footer */}
-      <footer style={{ padding: '40px 48px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
-        <div>&copy; 2026 The Callsheet. All rights reserved.</div>
-        <div style={{ display: 'flex', gap: 24 }}>
-          <Link to="/terms" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Terms</Link>
-          <Link to="/privacy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Privacy</Link>
-          <a href="mailto:support@thecallsheet.ai" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Contact</a>
-        </div>
-      </footer>
+        )}
+      </main>
     </div>
   )
 }

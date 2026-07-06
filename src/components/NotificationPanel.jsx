@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
-import { Bell, MessageSquare, Calendar, CreditCard, Check, CheckCheck, X } from './icons'
+import { Bell, MessageSquare, Calendar, CreditCard, Check, CheckCheck, X, FileText } from './icons'
 import { useNavigate } from 'react-router-dom'
 import { useNotifications } from '../context/NotificationContext'
 
 const typeIcons = {
   message: MessageSquare,
   booking: Calendar,
+  contract: FileText,
   payment: CreditCard,
+  system: Bell,
 }
 
 const typeColors = {

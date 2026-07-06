@@ -1,6 +1,8 @@
 import { stripe, FRONTEND_URL } from '../_lib/stripe.js'
 import { requireAuth } from '../_lib/auth.js'
 import { rateLimit, getClientIp } from '../_lib/ratelimit.js'
+import { db } from '../_lib/db.js'
+import { completeBookingPayment } from '../_lib/completeBookingPayment.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -11,23 +13,33 @@ export default async function handler(req, res) {
   const user = await requireAuth(req, res)
   if (!user) return
 
-  const { amount, artistName, description, bookingId, artistStripeAccountId } = req.body
+  const { amount, artistName, description, bookingId } = req.body
 
-  // Mock mode: skip Stripe, return a success redirect
+  if (bookingId && db) {
+    const { data: booking } = await db
+      .from('bookings')
+      .select('employer_id, status')
+      .eq('id', bookingId)
+      .maybeSingle()
+
+    if (booking && booking.employer_id !== user.id) {
+      return res.status(403).json({ error: 'Not authorized to pay for this booking' })
+    }
+  }
+
   if (!stripe) {
+    if (bookingId && db) {
+      await completeBookingPayment(db, bookingId, { paymentIntentId: null })
+    }
     return res.json({
       url: `${FRONTEND_URL}/bookings?payment_success=1&booking_id=${bookingId || ''}`,
     })
   }
 
   try {
-    const platformFee = Math.round(amount * 10)
-    const paymentIntentData = { metadata: { bookingId: bookingId || '' } }
-    if (artistStripeAccountId) {
-      paymentIntentData.application_fee_amount = platformFee
-      paymentIntentData.transfer_data = { destination: artistStripeAccountId }
-    }
-
+    // Separate charges model: full payment lands on the platform account.
+    // The platform keeps its 15% immediately; the artist's 85% is released
+    // explicitly when the project is marked complete via POST /bookings/:id/complete.
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       line_items: [{
@@ -38,7 +50,9 @@ export default async function handler(req, res) {
         },
         quantity: 1,
       }],
-      payment_intent_data: paymentIntentData,
+      payment_intent_data: {
+        metadata: { bookingId: bookingId || '' },
+      },
       metadata: { bookingId: bookingId || '' },
       success_url: `${FRONTEND_URL}/bookings?payment_success=1&booking_id=${bookingId || ''}`,
       cancel_url: `${FRONTEND_URL}/bookings?payment_cancelled=1`,

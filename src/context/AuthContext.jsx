@@ -1,5 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { supabase, isSupabaseConfigured, clearPersistedAuthSession } from '../lib/supabase'
+import { getAuthRedirectBaseUrl } from '../lib/siteUrl'
+import { getPasswordResetRedirectUrl } from '../lib/authRecovery'
+import { flushPendingArtistApplication } from '../hooks/useArtistApplication'
 
 const AuthContext = createContext()
 
@@ -22,10 +25,29 @@ const MOCK_PROFILE = {
   avatar_url: null,
 }
 
+const AUTH_REQUEST_TIMEOUT_MS = 15000
+const PROFILE_FETCH_TIMEOUT_MS = 10000
+
+function withTimeout(promise, ms, message) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms)
+    Promise.resolve(promise)
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((err) => {
+        clearTimeout(timer)
+        reject(err)
+      })
+  })
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [adminViewAs, setAdminViewAsState] = useState(null) // null | 'employer' | 'artist'
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -50,7 +72,9 @@ export function AuthProvider({ children }) {
       .getSession()
       .then(({ data: { session } }) => {
         setUser(session?.user ?? null)
-        if (session?.user) fetchProfile(session.user.id)
+        if (session?.user) {
+          scheduleProfileFetch(session.user.id, session.user)
+        }
       })
       .catch((err) => {
         console.error('Supabase getSession failed', err)
@@ -61,18 +85,16 @@ export function AuthProvider({ children }) {
         setLoading(false)
       })
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setUser(session?.user ?? null)
-        if (session?.user) {
-          await fetchProfile(session.user.id, session.user)
-        } else {
-          setProfile(null)
-        }
-        setLoading(false)
+    // Never await Supabase DB calls inside onAuthStateChange — it can deadlock sign-in.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      if (session?.user) {
+        scheduleProfileFetch(session.user.id, session.user)
+      } else {
+        setProfile(null)
       }
-    )
+      setLoading(false)
+    })
 
     return () => {
       clearTimeout(timeoutId)
@@ -80,30 +102,68 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  function scheduleProfileFetch(userId, sessionUser = null) {
+    setTimeout(() => {
+      void fetchProfile(userId, sessionUser)
+    }, 0)
+  }
+
   async function fetchProfile(userId, sessionUser = null) {
+    if (!isSupabaseConfigured) {
+      const savedRole = localStorage.getItem('mock_user_role') || 'employer'
+      const savedName = localStorage.getItem('mock_user_name') || MOCK_USER.user_metadata.full_name
+      const savedEmail = localStorage.getItem('mock_user_email') || MOCK_USER.email
+      setProfile({ ...MOCK_PROFILE, id: userId || MOCK_USER.id, email: savedEmail, full_name: savedName, role: savedRole })
+      return
+    }
+
     try {
-      let { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-        
-      // Self-heal: If the DB trigger used an old default of 'employer', but they signed up as 'artist'
+      const { data, error } = await withTimeout(
+        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+        PROFILE_FETCH_TIMEOUT_MS,
+        'Loading profile timed out'
+      )
+
+      if (error) {
+        console.error('fetchProfile error:', error.message, error.code)
+        setProfile(null)
+        return
+      }
+
+      if (!data) {
+        setProfile(null)
+        return
+      }
+
+      let profileData = data
+
+      // Self-heal: metadata says artist but profile still employer (never override admin).
       const targetUser = sessionUser || user
-      if (data?.role === 'employer' && targetUser?.user_metadata?.role === 'artist') {
-        const { data: updatedProfile, error: updateError } = await supabase
-          .from('profiles')
-          .update({ role: 'artist' })
-          .eq('id', userId)
-          .select()
-          .single()
-          
+      if (
+        profileData?.role === 'employer' &&
+        targetUser?.user_metadata?.role === 'artist'
+      ) {
+        const { data: updatedProfile, error: updateError } = await withTimeout(
+          supabase.from('profiles').update({ role: 'artist' }).eq('id', userId).select().maybeSingle(),
+          PROFILE_FETCH_TIMEOUT_MS,
+          'Profile update timed out'
+        )
+
         if (!updateError && updatedProfile) {
-          data = updatedProfile
+          profileData = updatedProfile
         }
       }
-      
-      setProfile(data)
+
+      setProfile(profileData)
+
+      void flushPendingArtistApplication({
+        profileId: profileData.id,
+        email: targetUser?.email || profileData.email,
+      }).then(({ error: flushError }) => {
+        if (flushError) {
+          console.warn('[auth] Pending artist application could not be submitted:', flushError.message)
+        }
+      })
     } catch (err) {
       console.error('fetchProfile failed', err)
       setProfile(null)
@@ -130,6 +190,7 @@ export function AuthProvider({ children }) {
         password,
         options: {
           data: { full_name: fullName, role },
+          emailRedirectTo: getAuthRedirectUrl(),
         },
       })
       if (error?.message?.toLowerCase().includes('database error')) {
@@ -156,10 +217,14 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        AUTH_REQUEST_TIMEOUT_MS,
+        'Sign in timed out. Check your connection and try again.'
+      )
+      if (!error && data?.user) {
+        scheduleProfileFetch(data.user.id, data.user)
+      }
       return { data, error }
     } catch (err) {
       console.error('[auth] signIn error:', err)
@@ -168,25 +233,37 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
+    // Clear React state immediately so the UI responds even if the network call is slow.
+    setUser(null)
+    setProfile(null)
+
     if (!isSupabaseConfigured) {
-      setUser(null)
-      setProfile(null)
-      return
+      return { error: null }
     }
+
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) console.error('[auth] signOut', error)
+      const localSignOut = supabase.auth.signOut({ scope: 'local' })
+      await Promise.race([
+        localSignOut,
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('signOut timed out')), 4000)
+        }),
+      ])
     } catch (err) {
-      console.error('[auth] signOut', err)
-    } finally {
-      setUser(null)
-      setProfile(null)
+      console.error('[auth] signOut local failed — clearing persisted session', err)
+      clearPersistedAuthSession()
     }
+
+    // Revoke refresh token server-side; don't block the UI on this.
+    void supabase.auth.signOut({ scope: 'global' }).catch((err) => {
+      console.warn('[auth] signOut global (non-blocking)', err)
+    })
+
+    return { error: null }
   }
 
   function getAuthRedirectUrl() {
-    const base = (import.meta.env.VITE_SITE_URL || window.location.origin).replace(/\/$/, '')
-    return `${base}/`
+    return `${getAuthRedirectBaseUrl()}/`
   }
 
   /**
@@ -208,15 +285,30 @@ export function AuthProvider({ children }) {
   }
 
   async function resetPassword(email) {
-    if (!isSupabaseConfigured) return { error: null }
-    return await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/update-password`,
+    if (!isSupabaseConfigured) {
+      return { error: { message: 'Password reset is unavailable in demo mode.' } }
+    }
+    return await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: getPasswordResetRedirectUrl(),
     })
   }
 
   async function updatePassword(newPassword) {
     if (!isSupabaseConfigured) return { error: null }
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      return { error: { message: 'Your reset session expired. Request a new password reset link.' } }
+    }
+
     return await supabase.auth.updateUser({ password: newPassword })
+  }
+
+  const isAdmin = profile?.role === 'admin'
+  const effectiveRole = isAdmin && adminViewAs ? adminViewAs : profile?.role
+
+  function setAdminViewAs(role) {
+    if (isAdmin) setAdminViewAsState(role)
   }
 
   const value = {
@@ -224,8 +316,11 @@ export function AuthProvider({ children }) {
     profile,
     loading,
     isAuthenticated: !!user,
-    isAdmin: profile?.role === 'admin',
+    isAdmin,
     isMockMode: !isSupabaseConfigured,
+    adminViewAs,
+    setAdminViewAs,
+    effectiveRole,
     signUp,
     signIn,
     signOut,

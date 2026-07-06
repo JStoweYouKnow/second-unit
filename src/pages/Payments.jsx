@@ -4,10 +4,16 @@ import {
   Download, X, Search, ArrowDownRight, Receipt, Shield, FileText,
   Mail, Lock, ChevronRight, UserPlus, ExternalLink, Loader2,
 } from '../components/icons'
-import { payments as mockPayments } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
+import { useArtistProfile } from '../hooks/useArtistProfile'
+import { usePayments } from '../hooks/usePayments'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
 import { stripeConnect, payments as paymentsApi } from '../lib/api'
+import {
+  PLATFORM_FEE_PERCENT,
+  platformFeeAmount,
+  artistPayoutAmount,
+} from '../lib/fees'
 
 function loadLS(key) {
   try { return JSON.parse(localStorage.getItem(key) || 'null') } catch { return null }
@@ -53,7 +59,7 @@ function SetupModal({ profile, onClose, onDone }) {
             </div>
             <div style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <Shield size={14} style={{ color: 'var(--success)', marginTop: 1, flexShrink: 0 }} />
-              <span>Payments are processed via Stripe Checkout. A 10% platform fee applies per transaction.</span>
+              <span>Payments are processed via Stripe Checkout. A {PLATFORM_FEE_PERCENT}% platform fee is deducted from the artist payout on completion.</span>
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
@@ -84,17 +90,21 @@ function SetupModal({ profile, onClose, onDone }) {
 
 // ─── Artist Connect Modal ────────────────────────────────────────────────────
 
-function ConnectModal({ userEmail, onClose, onDone }) {
+function ConnectModal({ userEmail, artistId, onClose, onDone }) {
   const [form, setForm] = useState({ firstName: '', lastName: '', dob: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
-  const canSubmit = form.firstName.trim() && form.lastName.trim()
+  const canSubmit = form.firstName.trim() && form.lastName.trim() && artistId
 
   async function handleConnect() {
+    if (!artistId) {
+      setError('Artist profile not found. Complete your profile before connecting payouts.')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
-      const { accountId } = await stripeConnect.createAccount(userEmail)
+      const { accountId } = await stripeConnect.createAccount(userEmail, artistId)
       const { url } = await stripeConnect.getOnboardingLink(accountId)
       // Store partial status so the return URL can complete it
       saveLS('su_connect_pending_v1', { accountId, firstName: form.firstName, lastName: form.lastName })
@@ -144,7 +154,7 @@ function ConnectModal({ userEmail, onClose, onDone }) {
         {error && <p style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 12 }}>{error}</p>}
         <div style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 8 }}>
           <Lock size={14} style={{ color: 'var(--accent)', marginTop: 1, flexShrink: 0 }} />
-          <span>Stripe handles identity verification. A 10% platform fee is deducted from each payout.</span>
+          <span>Stripe handles identity verification. The {PLATFORM_FEE_PERCENT}% platform fee is deducted from your payout when the hirer marks the project complete.</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
           <button type="button" className="btn btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
@@ -164,17 +174,23 @@ function ConnectModal({ userEmail, onClose, onDone }) {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function Payments() {
-  const { profile, user } = useAuth()
+  const { profile, user, isAuthenticated } = useAuth()
   const isArtist = isArtistProfile(profile)
-  const me = demoArtistPersona(profile)
-  const paymentPool = useMemo(() => {
-    if (!isArtist || !me) return mockPayments
-    return mockPayments.filter((p) => p.artistName === me.name)
-  }, [isArtist, me])
+  const { artist: myArtistRecord } = useArtistProfile(profile?.id)
+  const me = demoArtistPersona(profile, myArtistRecord)
+  const { payments: paymentPool, loading: paymentsLoading, error: paymentsError, refetch: refetchPayments } = usePayments(isAuthenticated)
 
   const [stripeStatus, setStripeStatus] = useState(() => loadLS('su_stripe_v1'))
   const [connectStatus, setConnectStatus] = useState(() => loadLS('su_connect_v1'))
   const [confirmBusy, setConfirmBusy] = useState(false)
+
+  const stripeConnected = useMemo(() => {
+    if (connectStatus) return connectStatus
+    if (myArtistRecord?.stripeAccountId) {
+      return { accountId: myArtistRecord.stripeAccountId, bankLast4: '····' }
+    }
+    return null
+  }, [connectStatus, myArtistRecord?.stripeAccountId])
 
   const [showSetup, setShowSetup] = useState(false)
   const [showConnect, setShowConnect] = useState(false)
@@ -195,9 +211,10 @@ export default function Payments() {
         saveLS('su_connect_v1', status)
         saveLS('su_connect_pending_v1', null)
       }
+      refetchPayments()
       window.history.replaceState({}, '', window.location.pathname)
     }
-  }, [])
+  }, [refetchPayments])
 
   const filteredPayments = paymentPool.filter(p => {
     if (filter !== 'all' && p.status !== filter) return false
@@ -207,8 +224,11 @@ export default function Payments() {
 
   const total = paymentPool.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
   const pending = paymentPool.filter(p => p.status === 'pending' || p.status === 'upcoming').reduce((s, p) => s + p.amount, 0)
-  const thisMonth = paymentPool.filter(p => p.status === 'paid').slice(0, 2).reduce((s, p) => s + p.amount, 0)
-  const platformFees = Math.round(total * 0.1)
+  const monthPrefix = new Date().toISOString().slice(0, 7)
+  const thisMonth = paymentPool
+    .filter(p => p.status === 'paid' && p.date?.startsWith(monthPrefix))
+    .reduce((s, p) => s + p.amount, 0)
+  const platformFees = platformFeeAmount(total)
 
   const statusStyles = {
     paid: { bg: 'var(--success-muted-bg)', color: 'var(--success)', icon: <CheckCircle size={14} />, label: 'Paid' },
@@ -235,9 +255,10 @@ Description: ${payment.description}
 Artist: ${payment.artistName}
 
 Subtotal:      $${payment.amount.toLocaleString()}
-Platform Fee:  $${Math.round(payment.amount * 0.1).toLocaleString()} (10%)
+Platform Fee:  $${platformFeeAmount(payment.amount).toLocaleString()} (${PLATFORM_FEE_PERCENT}% — from artist payout)
+Artist Payout: $${artistPayoutAmount(payment.amount).toLocaleString()}
 ───────────────────────────────────────
-Total Charged: $${(payment.amount + Math.round(payment.amount * 0.1)).toLocaleString()}
+Total Charged: $${payment.amount.toLocaleString()}
 
 Payment Method: Stripe${stripeStatus?.email ? ` · ${stripeStatus.email}` : ''}
 Processed by: Stripe
@@ -258,8 +279,9 @@ https://thecallsheet.ai
 
   const handleDownloadInvoice = (payment) => {
     const viewer = profile?.full_name || (isArtist ? 'Artist' : 'Client')
-    const platformFee = Math.round(payment.amount * 0.1)
-    const tot = payment.amount + platformFee
+    const platformFee = platformFeeAmount(payment.amount)
+    const artistShare = artistPayoutAmount(payment.amount)
+    const tot = payment.amount
     const roleNote = isArtist
       ? 'Artist copy — amounts shown reflect your payout / milestone record on The Callsheet.'
       : 'Client copy — amounts shown reflect your payment record on The Callsheet.'
@@ -283,9 +305,10 @@ ${payment.description}
 Service provider (artist): ${payment.artistName}
 
   Line subtotal                         $${payment.amount.toLocaleString()}
-  Platform facilitation fee (10%)      $${platformFee.toLocaleString()}
+  Platform fee (${PLATFORM_FEE_PERCENT}%, artist payout)  $${platformFee.toLocaleString()}
+  Artist net payout                     $${artistShare.toLocaleString()}
 ───────────────────────────────────────
-  Total (incl. platform fee)           $${tot.toLocaleString()}
+  Total paid by client                  $${tot.toLocaleString()}
 
 Payment reference: ${payment.id}
 Settlement: processed via Stripe on The Callsheet
@@ -316,7 +339,7 @@ https://thecallsheet.ai
               <CreditCard size={16} /> Set up payments
             </button>
           )}
-          {isArtist && !connectStatus && (
+          {isArtist && !stripeConnected && (
             <button type="button" className="btn btn-primary" onClick={() => setShowConnect(true)}>
               <UserPlus size={16} /> Connect payout account
             </button>
@@ -343,7 +366,7 @@ https://thecallsheet.ai
         <div className="stat-card">
           <span className="stat-label"><Receipt size={14} /> {isArtist ? 'Fees withheld' : 'Platform fees'}</span>
           <span className="stat-value" style={{ color: 'var(--accent)' }}>${platformFees.toLocaleString()}</span>
-          <span className="stat-change">10% per transaction</span>
+          <span className="stat-change">{PLATFORM_FEE_PERCENT}% facilitation fee</span>
         </div>
       </div>
 
@@ -374,7 +397,7 @@ https://thecallsheet.ai
             <div>
               <div style={{ fontWeight: 600, fontSize: 15 }}>Stripe payments active</div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                {stripeStatus.email} · card details collected at checkout · 10% platform fee
+                {stripeStatus.email} · card details collected at checkout · {PLATFORM_FEE_PERCENT}% platform fee
               </div>
             </div>
           </div>
@@ -384,7 +407,7 @@ https://thecallsheet.ai
         </div>
       )}
 
-      {isArtist && !connectStatus && (
+      {isArtist && !stripeConnected && (
         <div style={{ marginBottom: 24, padding: '20px 24px', background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
             <div style={{ padding: 10, borderRadius: 'var(--radius-sm)', background: 'var(--accent-tint-10)' }}>
@@ -401,7 +424,7 @@ https://thecallsheet.ai
         </div>
       )}
 
-      {isArtist && connectStatus && (
+      {isArtist && stripeConnected && (
         <div style={{ marginBottom: 24, padding: '16px 20px', background: 'linear-gradient(135deg, var(--success-muted-bg), var(--accent-tint-05))', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ padding: 8, borderRadius: 'var(--radius-sm)', background: 'var(--success-muted-bg)' }}>
@@ -410,7 +433,7 @@ https://thecallsheet.ai
             <div>
               <div style={{ fontWeight: 600, fontSize: 15 }}>Stripe Connect active</div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                Bank account ···· {connectStatus.bankLast4} · Payouts arrive 2–3 business days after approval · ID: {connectStatus.accountId}
+                Bank account ···· {stripeConnected.bankLast4} · Payouts arrive 2–3 business days after approval · ID: {stripeConnected.accountId}
               </div>
             </div>
           </div>
@@ -418,6 +441,10 @@ https://thecallsheet.ai
             <ArrowUpRight size={14} /> Stripe dashboard
           </a>
         </div>
+      )}
+
+      {paymentsError && (
+        <div className="auth-error" style={{ marginBottom: 20 }}>{paymentsError}</div>
       )}
 
       {/* Filters */}
@@ -453,9 +480,14 @@ https://thecallsheet.ai
           <span style={{ textAlign: 'center' }}>Receipt · Invoice</span>
         </div>
 
-        {filteredPayments.length === 0 ? (
+        {paymentsLoading ? (
           <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
-            No payments match your filters.
+            <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+            <p>Loading payments…</p>
+          </div>
+        ) : filteredPayments.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
+            {paymentPool.length === 0 ? 'No payments yet. Complete a booking checkout to see records here.' : 'No payments match your filters.'}
           </div>
         ) : (
           filteredPayments.map(p => {
@@ -528,7 +560,7 @@ https://thecallsheet.ai
                 { label: isArtist ? 'Payee' : 'Artist', value: isArtist ? (me?.name ?? showReceipt.artistName) : showReceipt.artistName },
                 { label: 'Date', value: showReceipt.date },
                 { label: 'Payment ID', value: showReceipt.id },
-                { label: 'Method', value: stripeStatus ? `Stripe · ${stripeStatus.email}` : (connectStatus ? `Stripe Connect · ···· ${connectStatus.bankLast4}` : '—') },
+                { label: 'Method', value: stripeStatus ? `Stripe · ${stripeStatus.email}` : (stripeConnected ? `Stripe Connect · ···· ${stripeConnected.bankLast4}` : '—') },
               ].map(item => (
                 <div key={item.label} style={{ padding: 12, background: 'var(--surface)', borderRadius: 'var(--radius-sm)' }}>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{item.label}</div>
@@ -543,12 +575,12 @@ https://thecallsheet.ai
                 <span>${showReceipt.amount.toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Platform fee (10%)</span>
-                <span>${Math.round(showReceipt.amount * 0.1).toLocaleString()}</span>
+                <span style={{ color: 'var(--text-muted)' }}>Platform fee ({PLATFORM_FEE_PERCENT}%)</span>
+                <span>${platformFeeAmount(showReceipt.amount).toLocaleString()}</span>
               </div>
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                <span>Total</span>
-                <span>${(showReceipt.amount + Math.round(showReceipt.amount * 0.1)).toLocaleString()}</span>
+                <span>Total charged</span>
+                <span>${showReceipt.amount.toLocaleString()}</span>
               </div>
             </div>
 
@@ -602,11 +634,11 @@ https://thecallsheet.ai
                 <span>Milestone amount</span><span>${selectedPayment.amount.toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, color: 'var(--text-muted)' }}>
-                <span>Platform fee (10%)</span><span>${Math.round(selectedPayment.amount * 0.1).toLocaleString()}</span>
+                <span>Platform fee ({PLATFORM_FEE_PERCENT}%, from artist payout)</span><span>${platformFeeAmount(selectedPayment.amount).toLocaleString()}</span>
               </div>
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14 }}>
                 <span>Total charge</span>
-                <span>${(selectedPayment.amount + Math.round(selectedPayment.amount * 0.1)).toLocaleString()}</span>
+                <span>${selectedPayment.amount.toLocaleString()}</span>
               </div>
             </div>
             <button type="button" className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }}
@@ -618,7 +650,7 @@ https://thecallsheet.ai
                     amount: selectedPayment.amount,
                     artistName: selectedPayment.artistName,
                     description: selectedPayment.description,
-                    bookingId: selectedPayment.id,
+                    bookingId: selectedPayment.bookingId || selectedPayment.id,
                   })
                   window.location.href = url
                 } catch {
@@ -649,6 +681,7 @@ https://thecallsheet.ai
       {showConnect && (
         <ConnectModal
           userEmail={user?.email || profile?.email || ''}
+          artistId={myArtistRecord?.id}
           onClose={() => setShowConnect(false)}
           onDone={(status) => { setConnectStatus(status); saveLS('su_connect_v1', status) }}
         />

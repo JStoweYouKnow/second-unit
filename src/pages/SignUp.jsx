@@ -1,19 +1,28 @@
-import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { Mail, Lock, User, ArrowLeft, UserPlus, Palette, Briefcase } from '../components/icons'
 import { useAuth } from '../context/AuthContext'
 import BrandLogo from '../components/BrandLogo'
+import ThemeToggle from '../components/ThemeToggle'
+import OAuthButtons from '../components/OAuthButtons'
 
 export default function SignUp() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { signUp, signInWithOAuth, isMockMode } = useAuth()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState('employer')
+  const [role, setRole] = useState(searchParams.get('role') === 'artist' ? 'artist' : 'employer')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get('role') === 'artist') {
+      navigate('/apply', { replace: true })
+    }
+  }, [searchParams, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -36,6 +45,7 @@ export default function SignUp() {
   if (success) {
     return (
       <div className="auth-page">
+        <ThemeToggle variant="compact" className="auth-theme-toggle" />
         <div className="auth-container slide-up" style={{ textAlign: 'center' }}>
           <Mail size={48} style={{ marginBottom: 16, color: 'var(--accent)', opacity: 0.8 }} />
           <h1>Check your email</h1>
@@ -51,10 +61,11 @@ export default function SignUp() {
 
   return (
     <div className="auth-page">
+      <ThemeToggle variant="compact" className="auth-theme-toggle" />
       <div className="auth-container slide-up">
         <div className="auth-header">
           <div className="logo" style={{ justifyContent: 'center', borderBottom: 'none', paddingBottom: 0, marginBottom: 16 }}>
-            <BrandLogo />
+            <BrandLogo variant="auth" />
           </div>
           <h1>Create your account</h1>
           <p>Join the premier AI artist marketplace</p>
@@ -74,10 +85,10 @@ export default function SignUp() {
             <span>I'm hiring</span>
             <small>Find and book AI artists</small>
           </button>
-          <button type="button" className={`auth-role-option ${role === 'artist' ? 'active' : ''}`} onClick={() => setRole('artist')}>
+          <button type="button" className={`auth-role-option ${role === 'artist' ? 'active' : ''}`} onClick={() => navigate('/apply')}>
             <Palette size={20} />
             <span>I'm an artist</span>
-            <small>Showcase work & get hired</small>
+            <small>Apply to join the marketplace</small>
           </button>
         </div>
 
@@ -139,6 +150,8 @@ export default function SignUp() {
             {loading ? 'Creating account...' : <><UserPlus size={18} aria-hidden /> Create Account</>}
           </button>
         </form>
+
+        <OAuthButtons disabled={loading} />
 
         <p className="auth-footer" style={{ marginTop: '24px' }}>
           Already have an account? <Link to="/signin"><ArrowLeft size={14} /> Sign In</Link>

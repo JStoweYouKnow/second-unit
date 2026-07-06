@@ -1,21 +1,243 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { profileApi, billing, calendar } from '../lib/api'
 import { User, Mail, Shield, Bell, CreditCard, Camera } from '../components/icons'
+import { ArtistFormFields } from '../components/ArtistFormFields'
+import ThemeToggle from '../components/ThemeToggle'
+import { useArtistProfile, saveArtistProfile } from '../hooks/useArtistProfile'
+import { useMyApplication, isPendingApplicant } from '../hooks/useArtistApplication'
+import { artistRecordToForm, emptyArtistForm } from '../lib/artistProfile'
 
 export default function Account() {
-  const { profile, user, isMockMode } = useAuth()
+  const { profile, user, isMockMode, fetchProfile } = useAuth()
+  const { artist, loading: artistLoading, refetch: refetchArtist } = useArtistProfile(profile?.id)
+  const { application, loading: appLoading } = useMyApplication(profile?.id)
+
   const [activeTab, setActiveTab] = useState('profile')
+  const [searchParams, setSearchParams] = useSearchParams()
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [artistForm, setArtistForm] = useState(emptyArtistForm())
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordMsg, setPasswordMsg] = useState('')
+  const [notifPrefs, setNotifPrefs] = useState({
+    messages: true,
+    projects: true,
+    billing: true,
+    marketing: false,
+  })
+  const [paymentMethods, setPaymentMethods] = useState([])
+  const [billingLoading, setBillingLoading] = useState(false)
+  const [calendarStatus, setCalendarStatus] = useState({ connected: false })
+  const [calendarBusy, setCalendarBusy] = useState(false)
 
-  const handleSave = () => {
+  const isApprovedArtist = profile?.role === 'artist' && !!artist
+  const isPending = isPendingApplicant(application)
+
+  useEffect(() => {
+    if (profile?.full_name) setFullName(profile.full_name)
+  }, [profile?.full_name])
+
+  useEffect(() => {
+    if (artist) {
+      setArtistForm(artistRecordToForm(artist))
+      setFullName(artist.displayName || profile?.full_name || '')
+    }
+  }, [artist, profile?.full_name])
+
+  useEffect(() => {
+    if (searchParams.get('billing') === 'success') {
+      setActiveTab('billing')
+      setSearchParams({}, { replace: true })
+    }
+    if (searchParams.get('calendar') === 'connected') {
+      setActiveTab('profile')
+      calendar.getStatus().then(setCalendarStatus).catch(() => {})
+      setSearchParams({}, { replace: true })
+    }
+    if (searchParams.get('calendar') === 'error') {
+      setError('Google Calendar connection failed. Check OAuth credentials and try again.')
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !profile?.id) return
+    calendar.getStatus().then(setCalendarStatus).catch(() => {})
+  }, [profile?.id])
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !profile?.id) return
+    profileApi.getNotificationPrefs().then(setNotifPrefs).catch(() => {})
+  }, [profile?.id])
+
+  const loadPaymentMethods = useCallback(async () => {
+    if (!isSupabaseConfigured) return
+    setBillingLoading(true)
+    try {
+      const data = await billing.listPaymentMethods()
+      setPaymentMethods(data.paymentMethods || [])
+    } catch {
+      setPaymentMethods([])
+    } finally {
+      setBillingLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'billing') loadPaymentMethods()
+  }, [activeTab, loadPaymentMethods])
+
+  const handleUpdatePassword = async () => {
+    setPasswordMsg('')
+    setError('')
+    if (!newPassword || newPassword.length < 8) {
+      setPasswordMsg('New password must be at least 8 characters.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg('Passwords do not match.')
+      return
+    }
+    if (!isSupabaseConfigured || !supabase) {
+      setPasswordMsg('Password change requires Supabase auth.')
+      return
+    }
+    if (currentPassword && user?.email) {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      })
+      if (signInError) {
+        setPasswordMsg('Current password is incorrect.')
+        return
+      }
+    }
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
+    if (updateError) {
+      setPasswordMsg(updateError.message)
+      return
+    }
+    setCurrentPassword('')
+    setNewPassword('')
+    setConfirmPassword('')
+    setPasswordMsg('Password updated successfully.')
+  }
+
+  const handleSaveNotificationPrefs = async () => {
     setIsSaving(true)
-    setSaved(false)
-    setTimeout(() => {
-      setIsSaving(false)
+    setError('')
+    try {
+      if (isSupabaseConfigured) {
+        const savedPrefs = await profileApi.updateNotificationPrefs(notifPrefs)
+        setNotifPrefs(savedPrefs)
+      }
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
-    }, 800)
+    } catch (err) {
+      setError(err.message || 'Failed to save preferences')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleAddPaymentMethod = async () => {
+    setBillingLoading(true)
+    setError('')
+    try {
+      const { url } = await billing.createSetupSession()
+      if (url) window.location.href = url
+    } catch (err) {
+      setError(err.message || 'Could not open Stripe billing portal')
+      setBillingLoading(false)
+    }
+  }
+
+  const handleConnectCalendar = async () => {
+    setCalendarBusy(true)
+    setError('')
+    try {
+      const { url } = await calendar.connect()
+      if (url) window.location.href = url
+    } catch (err) {
+      setError(err.message || 'Could not start Google Calendar OAuth')
+      setCalendarBusy(false)
+    }
+  }
+
+  const handleDisconnectCalendar = async () => {
+    setCalendarBusy(true)
+    try {
+      await calendar.disconnect()
+      setCalendarStatus({ connected: false })
+    } catch (err) {
+      setError(err.message || 'Could not disconnect calendar')
+    } finally {
+      setCalendarBusy(false)
+    }
+  }
+
+  const handleSyncCalendar = async () => {
+    setCalendarBusy(true)
+    try {
+      await calendar.sync()
+      const status = await calendar.getStatus()
+      setCalendarStatus(status)
+    } catch (err) {
+      setError(err.message || 'Calendar sync failed')
+    } finally {
+      setCalendarBusy(false)
+    }
+  }
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    setSaved(false)
+    setError('')
+
+    if (isApprovedArtist) {
+      const { error: saveError } = await saveArtistProfile({
+        profileId: profile.id,
+        fullName,
+        form: artistForm,
+        existingArtist: artist,
+      })
+
+      if (saveError) {
+        setError(saveError.message || 'Failed to save profile')
+        setIsSaving(false)
+        return
+      }
+
+      await refetchArtist()
+      await fetchProfile?.(profile.id)
+    } else if (profile?.id) {
+      if (isSupabaseConfigured) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ full_name: fullName.trim(), updated_at: new Date().toISOString() })
+          .eq('id', profile.id)
+
+        if (profileError) {
+          setError(profileError.message)
+          setIsSaving(false)
+          return
+        }
+      } else {
+        localStorage.setItem('mock_user_name', fullName)
+      }
+      await fetchProfile?.(profile.id)
+    }
+
+    setIsSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 3000)
   }
 
   return (
@@ -31,25 +253,29 @@ export default function Account() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 40, marginTop: 32 }}>
         <aside style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <button 
+          <button
+            type="button"
             className={`nav-link ${activeTab === 'profile' ? 'active' : ''}`}
             onClick={() => setActiveTab('profile')}
           >
             <User size={18} /> Profile Info
           </button>
-          <button 
+          <button
+            type="button"
             className={`nav-link ${activeTab === 'security' ? 'active' : ''}`}
             onClick={() => setActiveTab('security')}
           >
             <Shield size={18} /> Security
           </button>
-          <button 
+          <button
+            type="button"
             className={`nav-link ${activeTab === 'notifications' ? 'active' : ''}`}
             onClick={() => setActiveTab('notifications')}
           >
             <Bell size={18} /> Notifications
           </button>
-          <button 
+          <button
+            type="button"
             className={`nav-link ${activeTab === 'billing' ? 'active' : ''}`}
             onClick={() => setActiveTab('billing')}
           >
@@ -62,113 +288,73 @@ export default function Account() {
             <div className="slide-up">
               <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: 32 }}>
                 <div className="avatar" style={{ width: 80, height: 80, fontSize: 32, position: 'relative' }}>
-                  {(profile?.full_name || 'U').split(' ').map(n => n[0]).join('').slice(0, 2)}
-                  <button className="btn-icon" style={{ position: 'absolute', bottom: -4, right: -4, width: 32, height: 32, background: 'var(--accent)', color: 'white', borderColor: 'transparent' }}>
+                  {(fullName || 'U').split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  <button type="button" className="btn-icon" style={{ position: 'absolute', bottom: -4, right: -4, width: 32, height: 32, background: 'var(--accent)', color: 'white', borderColor: 'transparent' }}>
                     <Camera size={16} />
                   </button>
                 </div>
                 <div>
-                  <h3 style={{ margin: 0 }}>{profile?.full_name || 'User'}</h3>
+                  <h3 style={{ margin: 0 }}>{fullName || 'User'}</h3>
                   <p style={{ color: 'var(--text-muted)', margin: '4px 0 0 0' }}>{user?.email}</p>
                 </div>
               </div>
 
+              {isPending && (
+                <div style={{ padding: 16, marginBottom: 24, borderRadius: 'var(--radius-md)', border: '1px solid rgba(245, 197, 66, 0.3)', background: 'rgba(245, 197, 66, 0.08)', fontSize: 14 }}>
+                  Your artist application is under review.{' '}
+                  <Link to="/application-status" style={{ color: 'var(--gold)' }}>View status</Link>
+                  {' · '}
+                  <Link to="/apply" style={{ color: 'var(--gold)' }}>Edit application</Link>
+                </div>
+              )}
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                 <div className="form-group">
                   <label className="form-label">Full Name</label>
-                  <input className="filter-select" style={{ width: '100%' }} defaultValue={profile?.full_name} />
+                  <input className="filter-select" style={{ width: '100%' }} value={fullName} onChange={(e) => setFullName(e.target.value)} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Display Name</label>
-                  <input className="filter-select" style={{ width: '100%' }} defaultValue={profile?.full_name?.split(' ')[0]} />
+                  <label className="form-label">Account Role</label>
+                  <input className="filter-select" style={{ width: '100%' }} value={profile?.role || 'employer'} disabled />
                 </div>
                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
                   <label className="form-label">Email Address</label>
                   <div style={{ position: 'relative' }}>
-                    <input className="filter-select" style={{ width: '100%', paddingLeft: 40 }} defaultValue={user?.email} disabled />
+                    <input className="filter-select" style={{ width: '100%', paddingLeft: 40 }} value={user?.email || ''} disabled />
                     <Mail size={16} style={{ position: 'absolute', left: 14, top: 11, color: 'var(--text-muted)' }} />
                   </div>
                 </div>
               </div>
 
-
-              {profile?.role === 'artist' && (
+              {isApprovedArtist && (
                 <>
                   <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
                   <h3 style={{ marginBottom: 24 }}>Artist Profile Details</h3>
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20 }}>
-                    <div className="form-group">
-                      <label className="form-label">Professional Bio</label>
-                      <textarea 
-                        className="filter-select" 
-                        style={{ width: '100%', minHeight: '100px', padding: '12px', resize: 'vertical' }} 
-                        placeholder="Award-winning AI visual artist specializing in..."
-                      />
-                    </div>
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                      <div className="form-group">
-                        <label className="form-label">Core Skills (comma separated)</label>
-                        <input className="filter-select" style={{ width: '100%' }} placeholder="Midjourney, Stable Diffusion, Runway" />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Location</label>
-                        <input className="filter-select" style={{ width: '100%' }} placeholder="Los Angeles, CA" />
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                      <div className="form-group">
-                        <label className="form-label">Past Brands & Clients (comma separated)</label>
-                        <input className="filter-select" style={{ width: '100%' }} placeholder="Nike, Apple, Spotify" />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          Typical Project Rate (USD)
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, background: 'var(--surface)', padding: '2px 6px', borderRadius: 10 }}>Private</span>
-                        </label>
-                        <input className="filter-select" style={{ width: '100%' }} type="number" placeholder="e.g. 5000" />
-                        <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>We use this to filter out job inquiries with inadequate budgets.</span>
-                      </div>
-                    </div>
-
-                    <h4 style={{ marginTop: 16, marginBottom: 8 }}>Social & Portfolio Links</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                      <div className="form-group">
-                        <label className="form-label">Website Portfolio</label>
-                        <input className="filter-select" style={{ width: '100%' }} placeholder="https://yourwebsite.com" />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Instagram</label>
-                        <input className="filter-select" style={{ width: '100%' }} placeholder="https://instagram.com/username" />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Twitter / X</label>
-                        <input className="filter-select" style={{ width: '100%' }} placeholder="https://twitter.com/username" />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">LinkedIn</label>
-                        <input className="filter-select" style={{ width: '100%' }} placeholder="https://linkedin.com/in/username" />
-                      </div>
-                    </div>
-
-                    <div className="form-group" style={{ marginTop: 8 }}>
-                      <label className="form-label">Video Reels (YouTube/Vimeo URLs, comma separated)</label>
-                      <input className="filter-select" style={{ width: '100%' }} placeholder="https://youtube.com/..., https://vimeo.com/..." />
-                    </div>
-                  </div>
+                  {artistLoading ? (
+                    <p style={{ color: 'var(--text-muted)' }}>Loading artist profile…</p>
+                  ) : (
+                    <ArtistFormFields form={artistForm} onChange={setArtistForm} />
+                  )}
                 </>
+              )}
+
+              {!isApprovedArtist && application && !isPending && application.status === 'rejected' && (
+                <div style={{ marginTop: 24, padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface)' }}>
+                  <p style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--text-secondary)' }}>
+                    Your previous application was not approved. Request a new invite link to apply again.
+                  </p>
+                  <Link to="/apply" className="btn btn-primary btn-sm">Resubmit application</Link>
+                </div>
               )}
 
               <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
               <h3 style={{ marginBottom: 12 }}>Backend Connection Status</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20 }}>Verify where your data is being stored and processed.</p>
-              
-              <div style={{ 
-                padding: '16px 20px', 
-                borderRadius: 'var(--radius-md)', 
-                border: '1px solid var(--border)', 
+
+              <div style={{
+                padding: '16px 20px',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border)',
                 background: 'var(--surface)',
                 display: 'flex',
                 alignItems: 'center',
@@ -176,12 +362,12 @@ export default function Account() {
               }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: isMockMode ? 'var(--warning)' : 'var(--success)' }}></div>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: isMockMode ? 'var(--warning)' : 'var(--success)' }} />
                     <span style={{ fontWeight: 600, fontSize: 14 }}>{isMockMode ? 'Mock Mode (Local Storage)' : 'Supabase (Production Database)'}</span>
                   </div>
                   <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: 0 }}>
-                    {isMockMode 
-                      ? 'The app is running without a backend connection. All changes are temporary and saved only in your browser.' 
+                    {isMockMode
+                      ? 'The app is running without a backend connection. All changes are temporary and saved only in your browser.'
                       : 'Successfully connected to the live Supabase database. All data is persistent and synced across devices.'}
                   </p>
                 </div>
@@ -189,12 +375,38 @@ export default function Account() {
                 {isMockMode && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--warning)', textTransform: 'uppercase' }}>No Backend</span>}
               </div>
 
+              {error && <div className="auth-error" style={{ marginTop: 20 }}>{error}</div>}
+
+              <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
+
+              <h4 style={{ margin: '0 0 12px 0', fontFamily: 'var(--font-display)', letterSpacing: 'var(--tracking-tight)' }}>Appearance</h4>
+              <ThemeToggle variant="row" />
+
+              <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
+
+              <h4 style={{ margin: '0 0 8px 0', fontFamily: 'var(--font-display)' }}>Google Calendar</h4>
+              <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 16 }}>
+                Two-way sync: confirmed bookings push to your calendar; busy times import into your availability (artists).
+              </p>
+              {calendarStatus.connected ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 13, color: 'var(--success)' }}>Connected {calendarStatus.lastSyncedAt ? `· last sync ${new Date(calendarStatus.lastSyncedAt).toLocaleString()}` : ''}</span>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleSyncCalendar} disabled={calendarBusy}>Sync now</button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={handleDisconnectCalendar} disabled={calendarBusy}>Disconnect</button>
+                </div>
+              ) : (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={handleConnectCalendar} disabled={calendarBusy || !isSupabaseConfigured}>
+                  Connect Google Calendar
+                </button>
+              )}
+
               <div style={{ marginTop: 32, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16 }}>
                 {saved && <span style={{ color: 'var(--success)', fontSize: 14, fontWeight: 500 }}>Profile updated successfully!</span>}
-                <button 
-                  className="btn btn-primary" 
-                  onClick={handleSave} 
-                  disabled={isSaving}
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSave}
+                  disabled={isSaving || (isApprovedArtist && artistLoading) || appLoading}
                 >
                   {isSaving ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -205,33 +417,45 @@ export default function Account() {
           {activeTab === 'security' && (
             <div className="slide-up">
               <h3 style={{ marginBottom: 24 }}>Security Settings</h3>
-              
+
               <div style={{ display: 'grid', gap: 20, maxWidth: 500 }}>
                 <div className="form-group">
                   <label className="form-label">Current Password</label>
-                  <input className="filter-select" type="password" style={{ width: '100%' }} placeholder="••••••••" />
+                  <input className="filter-select" type="password" style={{ width: '100%' }} placeholder="••••••••"
+                    value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">New Password</label>
-                  <input className="filter-select" type="password" style={{ width: '100%' }} placeholder="••••••••" />
+                  <input className="filter-select" type="password" style={{ width: '100%' }} placeholder="••••••••"
+                    value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Confirm New Password</label>
-                  <input className="filter-select" type="password" style={{ width: '100%' }} placeholder="••••••••" />
+                  <input className="filter-select" type="password" style={{ width: '100%' }} placeholder="••••••••"
+                    value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
                 </div>
                 <div>
-                  <button className="btn btn-secondary" style={{ marginTop: 8 }}>Update Password</button>
+                  {passwordMsg && (
+                    <p style={{ fontSize: 13, color: passwordMsg.includes('success') ? 'var(--success)' : 'var(--danger)', marginBottom: 8 }}>
+                      {passwordMsg}
+                    </p>
+                  )}
+                  <button type="button" className="btn btn-secondary" style={{ marginTop: 8 }} onClick={handleUpdatePassword}>
+                    Update Password
+                  </button>
                 </div>
               </div>
 
               <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
-              
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h4 style={{ margin: '0 0 4px 0' }}>Two-Factor Authentication</h4>
                   <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 14 }}>Add an extra layer of security to your account.</p>
                 </div>
-                <button className="btn btn-primary btn-sm">Enable 2FA</button>
+                <button type="button" className="btn btn-primary btn-sm" disabled title="Enable TOTP in Supabase Auth dashboard first">
+                  Enable 2FA
+                </button>
               </div>
             </div>
           )}
@@ -239,16 +463,21 @@ export default function Account() {
           {activeTab === 'notifications' && (
             <div className="slide-up">
               <h3 style={{ marginBottom: 24 }}>Notification Preferences</h3>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 600 }}>
                 {[
-                  { id: 'n1', label: 'New Messages', desc: 'When a client or artist sends you a direct message.' },
-                  { id: 'n2', label: 'Project Updates', desc: 'Milestone approvals, contract changes, and status updates.' },
-                  { id: 'n3', label: 'Billing Alerts', desc: 'Invoices, payment receipts, and escrow releases.' },
-                  { id: 'n4', label: 'Marketing & News', desc: 'Product updates, beta features, and community highlights.' }
-                ].map(n => (
-                  <label key={n.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: 16, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', background: 'var(--surface)' }}>
-                    <input type="checkbox" defaultChecked={n.id !== 'n4'} style={{ marginTop: 4 }} />
+                  { key: 'messages', label: 'New Messages', desc: 'When a client or artist sends you a direct message.' },
+                  { key: 'projects', label: 'Project Updates', desc: 'Milestone approvals, contract changes, and status updates.' },
+                  { key: 'billing', label: 'Billing Alerts', desc: 'Invoices, payment receipts, and escrow releases.' },
+                  { key: 'marketing', label: 'Marketing & News', desc: 'Product updates, beta features, and community highlights.' },
+                ].map((n) => (
+                  <label key={n.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: 16, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', background: 'var(--surface)' }}>
+                    <input
+                      type="checkbox"
+                      checked={!!notifPrefs[n.key]}
+                      onChange={(e) => setNotifPrefs((p) => ({ ...p, [n.key]: e.target.checked }))}
+                      style={{ marginTop: 4 }}
+                    />
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{n.label}</div>
                       <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{n.desc}</div>
@@ -256,9 +485,12 @@ export default function Account() {
                   </label>
                 ))}
               </div>
-              
-              <div style={{ marginTop: 32 }}>
-                <button className="btn btn-primary">Save Preferences</button>
+
+              <div style={{ marginTop: 32, display: 'flex', alignItems: 'center', gap: 16 }}>
+                {saved && <span style={{ color: 'var(--success)', fontSize: 14 }}>Preferences saved.</span>}
+                <button type="button" className="btn btn-primary" onClick={handleSaveNotificationPrefs} disabled={isSaving}>
+                  {isSaving ? 'Saving…' : 'Save Preferences'}
+                </button>
               </div>
             </div>
           )}
@@ -266,28 +498,47 @@ export default function Account() {
           {activeTab === 'billing' && (
             <div className="slide-up">
               <h3 style={{ marginBottom: 24 }}>Billing & Payments</h3>
-              
+
               <div className="card" style={{ padding: 24, background: 'rgba(245, 197, 66, 0.05)', borderColor: 'var(--gold)', marginBottom: 24 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <h4 style={{ margin: '0 0 4px 0', color: 'var(--gold)' }}>Private Beta Plan</h4>
-                    <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 14 }}>You are currently enjoying fee-free early access.</p>
+                    <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 14 }}>
+                      No monthly subscription during beta. A 15% platform fee applies to completed bookings (deducted from the artist payout).
+                    </p>
                   </div>
                   <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>$0<span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-muted)' }}>/mo</span></div>
                 </div>
               </div>
 
               <h4 style={{ marginBottom: 16 }}>Payment Methods</h4>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', marginBottom: 32 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ background: 'var(--bg-app)', padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)', fontSize: 12, fontWeight: 700 }}>VISA</div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>Visa ending in 4242</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Expires 12/2028</div>
-                  </div>
+              {billingLoading ? (
+                <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading payment methods…</p>
+              ) : paymentMethods.length === 0 ? (
+                <div style={{ padding: 16, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', marginBottom: 16 }}>
+                  <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: '0 0 12px' }}>No saved cards yet. Add one for faster checkout.</p>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={handleAddPaymentMethod}>Add payment method</button>
                 </div>
-                <button className="btn-link" style={{ color: 'var(--text-muted)' }}>Edit</button>
-              </div>
+              ) : (
+                paymentMethods.map((pm) => (
+                  <div key={pm.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ background: 'var(--bg-app)', padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>
+                        {pm.brand}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>{pm.brand} ending in {pm.last4}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Expires {pm.expMonth}/{pm.expYear}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+              {paymentMethods.length > 0 && (
+                <button type="button" className="btn btn-secondary btn-sm" style={{ marginBottom: 32 }} onClick={handleAddPaymentMethod} disabled={billingLoading}>
+                  Add another card
+                </button>
+              )}
 
               <h4 style={{ marginBottom: 16 }}>Billing History</h4>
               <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>

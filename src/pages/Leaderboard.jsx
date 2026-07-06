@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Calendar, Heart, Play, Star, MedalGold, MedalSilver, MedalBronze, Filter, DollarSign, MapPin, Globe, AtSign, ExternalLink } from '../components/icons'
+import { Search, Calendar, Heart, Play, Star, MedalGold, MedalSilver, MedalBronze, Filter, DollarSign, MapPin, Globe, AtSign, ExternalLink, X } from '../components/icons'
 import { availableProjects } from '../data/mockData'
 import { useArtists } from '../hooks/useData'
 import { useApp } from '../context/AppContext'
@@ -62,6 +62,14 @@ export default function Leaderboard() {
   const [search, setSearch] = useState('')
   const [calendarArtist, setCalendarArtist] = useState(null)
   const [hoveredId, setHoveredId] = useState(null)
+  const [showHero, setShowHero] = useState(() => {
+    return localStorage.getItem('spotlight_hero_dismissed') !== 'true'
+  })
+
+  const dismissHero = () => {
+    localStorage.setItem('spotlight_hero_dismissed', 'true')
+    setShowHero(false)
+  }
 
   const { artists, loading: artistsLoading } = useArtists()
 
@@ -70,6 +78,7 @@ export default function Leaderboard() {
   const [selectedLocations, setSelectedLocations] = useState(() => new Set())
   const [skillMatchMode, setSkillMatchMode] = useState('any')
   const [availableOnly, setAvailableOnly] = useState(false)
+  const [availableDate, setAvailableDate] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const roleOptions = useMemo(
     () => [...new Set(artists.map(a => a.role))].sort(),
@@ -102,6 +111,11 @@ export default function Leaderboard() {
       if (selectedLocations.size > 0 && !selectedLocations.has(a.location)) return false
       if (availableOnly && !a.available) return false
 
+      if (availableDate) {
+        const slots = a.availabilitySlots || []
+        if (!slots.includes(availableDate)) return false
+      }
+
       if (q) {
         const hay = [
           a.name,
@@ -117,13 +131,14 @@ export default function Leaderboard() {
       return true
     })
     return filteredArray.sort((a, b) => b.projects - a.projects)
-  }, [artists, search, selectedRoles, selectedSkills, selectedLocations, skillMatchMode, availableOnly])
+  }, [artists, search, selectedRoles, selectedSkills, selectedLocations, skillMatchMode, availableOnly, availableDate])
 
   const activeFilterCount = useMemo(() => {
     let n = selectedRoles.size + selectedSkills.size + selectedLocations.size
     if (availableOnly) n += 1
+    if (availableDate) n += 1
     return n
-  }, [selectedRoles, selectedSkills, selectedLocations, availableOnly])
+  }, [selectedRoles, selectedSkills, selectedLocations, availableOnly, availableDate])
 
   const clearFilters = useCallback(() => {
     setSelectedRoles(new Set())
@@ -131,21 +146,32 @@ export default function Leaderboard() {
     setSelectedLocations(new Set())
     setSkillMatchMode('any')
     setAvailableOnly(false)
+    setAvailableDate('')
   }, [])
 
   return (
     <div className="page-container">
-      <div className="spotlight-hero">
-        <h2 className="spotlight-hero__title">Hire exceptional AI-native creative talent</h2>
-        <p className="spotlight-hero__lede">
-          Browse verified talent, review open projects with transparent client budgets, and agree fees directly with the client before you book.
-        </p>
-        <div className="spotlight-hero__trust">
-          <span><strong>Stripe</strong> — secure checkout</span>
-          <span><strong>Contracts</strong> — e-sign ready</span>
-          <span><strong>Messages</strong> — keep context in one thread</span>
+      {showHero && (
+        <div className="spotlight-hero">
+          <button
+            type="button"
+            className="spotlight-hero__close"
+            onClick={dismissHero}
+            aria-label="Dismiss banner"
+          >
+            <X size={16} aria-hidden />
+          </button>
+          <h2 className="spotlight-hero__title">Hire exceptional AI-native creative talent</h2>
+          <p className="spotlight-hero__lede">
+            Browse verified talent, review open projects with transparent client budgets, and agree fees directly with the client before you book.
+          </p>
+          <div className="spotlight-hero__trust">
+            <span><strong>Stripe</strong> — secure checkout</span>
+            <span><strong>Contracts</strong> — e-sign ready</span>
+            <span><strong>Messages</strong> — keep context in one thread</span>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="page-header">
         <div className="page-header-row">
@@ -261,6 +287,19 @@ export default function Leaderboard() {
                 />
                 Available for new work only
               </label>
+              <div className="filter-row" style={{ marginTop: 12 }}>
+                <label htmlFor="available-date-filter" className="form-label" style={{ marginBottom: 4, display: 'block', fontSize: 12 }}>
+                  Available on date
+                </label>
+                <input
+                  id="available-date-filter"
+                  type="date"
+                  className="form-input filter-select"
+                  style={{ width: '100%', padding: '6px 10px', height: 'auto', minHeight: 34 }}
+                  value={availableDate}
+                  onChange={(e) => setAvailableDate(e.target.value)}
+                />
+              </div>
             </fieldset>
           </div>
           )}

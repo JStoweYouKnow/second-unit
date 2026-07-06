@@ -1,11 +1,17 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heart, Star, Calendar, TrendingUp, Users, DollarSign, FileText, ArrowUpRight, BarChart3, PieChart, Activity, User, MapPin } from '../components/icons'
-import { artists, bookings, payments, availableProjects } from '../data/mockData'
-import { useApp } from '../context/AppContext'
+import { useArtists } from '../hooks/useData'
+import { buildOpenBriefCards } from '../lib/openBriefs'
+import { useArtistProfile } from '../hooks/useArtistProfile'
+import { useBookings } from '../hooks/useBookings'
+import { usePayments } from '../hooks/usePayments'
 import { useAuth } from '../context/AuthContext'
-import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
-import { bookingSubtotal, formatBudgetRange } from '../lib/pricing'
+import { useApp } from '../context/AppContext'
+import { demoArtistPersona } from '../lib/roleView'
+import { buildMonthlySeries, buildMonthlyCounts, parseRowDate } from '../lib/analytics'
+import { artistPayoutAmount } from '../lib/fees'
+import ArtistAvailabilityEditor from '../components/ArtistAvailabilityEditor'
 
 // Simple bar chart component (pure CSS)
 function BarChart({ data, height = 160 }) {
@@ -79,67 +85,79 @@ function Sparkline({ data, color = 'var(--accent)', height = 40 }) {
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { profile } = useAuth()
+  const { profile, effectiveRole, isAuthenticated } = useAuth()
   const { favorites, localProjects } = useApp()
-  const isArtist = isArtistProfile(profile)
-  const me = demoArtistPersona(profile)
-  const favArtists = artists.filter(a => favorites.includes(a.id))
+  const { artists } = useArtists()
+  const { artist: myArtistRecord } = useArtistProfile(profile?.id)
+  const { bookings: allBookings } = useBookings(isAuthenticated)
+  const { payments: allPayments } = usePayments(isAuthenticated)
+  const isArtist = effectiveRole === 'artist'
+  const me = demoArtistPersona(profile, myArtistRecord)
+  const favArtists = artists.filter((a) => favorites.includes(a.id))
   const [timeRange, setTimeRange] = useState('6m')
 
-  const myBookings = useMemo(() => (me ? bookings.filter((b) => b.artistId === me.id) : []), [me])
+  const myBookings = useMemo(() => {
+    if (!me) return []
+    return allBookings.filter(
+      (b) => String(b.artistId) === String(me.id) && (b.status === 'confirmed' || b.status === 'pending')
+    )
+  }, [me, allBookings])
+
+  const employerBookings = useMemo(
+    () => allBookings.filter((b) => b.status === 'confirmed' || b.status === 'pending'),
+    [allBookings]
+  )
+
   const myProjects = useMemo(() => (me ? localProjects.filter((p) => p.artistId === me.id) : []), [me, localProjects])
-  const myPayments = useMemo(() => (me ? payments.filter((p) => p.artistName === me.name) : []), [me])
+  const myPayments = useMemo(() => allPayments, [allPayments])
 
   const rangeMap = { '1m': 1, '3m': 3, '6m': 6, '1y': 12 }
   const rangeMonths = rangeMap[timeRange] || 6
 
-  // Mock analytics data
+  // Analytics from real booking/payment data
   const artistIncomeData = useMemo(() => {
-    const raw = [
-      { label: 'May', value: 1500 }, { label: 'Jun', value: 2900 }, { label: 'Jul', value: 3100 },
-      { label: 'Aug', value: 2400 }, { label: 'Sep', value: 3800 }, { label: 'Oct', value: 2100 },
-      { label: 'Nov', value: 3400 }, { label: 'Dec', value: 1800 }, { label: 'Jan', value: 4100 },
-      { label: 'Feb', value: 2800 }, { label: 'Mar', value: 4900 }, { label: 'Apr', value: 3700 },
-    ]
-    return raw.slice(-rangeMonths)
-  }, [rangeMonths])
+    const paid = myPayments.filter((p) => p.status === 'paid')
+    return buildMonthlySeries(
+      paid,
+      rangeMonths,
+      (p) => artistPayoutAmount(p.amount),
+      parseRowDate
+    )
+  }, [myPayments, rangeMonths])
 
   const monthlySpendData = useMemo(() => {
-    const raw = [
-      { label: 'May', value: 3200 }, { label: 'Jun', value: 5100 }, { label: 'Jul', value: 4400 },
-      { label: 'Aug', value: 6200 }, { label: 'Sep', value: 5800 }, { label: 'Oct', value: 4200 },
-      { label: 'Nov', value: 6800 }, { label: 'Dec', value: 3500 }, { label: 'Jan', value: 8200 },
-      { label: 'Feb', value: 5600 }, { label: 'Mar', value: 9800 }, { label: 'Apr', value: 7400 },
-    ]
-    return raw.slice(-rangeMonths)
-  }, [rangeMonths])
+    const paid = allPayments.filter((p) => p.status === 'paid')
+    return buildMonthlySeries(paid, rangeMonths, (p) => p.amount, parseRowDate)
+  }, [allPayments, rangeMonths])
 
-  const bookingTrend = [3, 5, 4, 7, 6, 8, 5, 9, 7, 11, 8, 10]
-  const totalPaidOut = payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
-  const scheduledSpend = payments.filter(p => p.status === 'pending' || p.status === 'upcoming').reduce((s, p) => s + p.amount, 0)
+  const bookingTrend = useMemo(
+    () => buildMonthlyCounts(employerBookings, rangeMonths, parseRowDate),
+    [employerBookings, rangeMonths]
+  )
+  const totalPaidOut = allPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+  const scheduledSpend = allPayments.filter(p => p.status === 'pending' || p.status === 'upcoming').reduce((s, p) => s + p.amount, 0)
 
-  const roleDistribution = [
-    { label: 'Visual Artist', value: 3, color: 'var(--accent)' },
-    { label: 'Motion Designer', value: 2, color: 'var(--accent-secondary)' },
-    { label: 'Music Producer', value: 2, color: '#f5c542' },
-    { label: '3D Artist', value: 1, color: '#ff4d6a' },
-    { label: 'Other', value: 2, color: '#64748b' },
-  ]
+  const roleDistribution = useMemo(() => {
+    const counts = {}
+    for (const a of artists) {
+      const role = a.role || 'Other'
+      counts[role] = (counts[role] || 0) + 1
+    }
+    const colors = ['var(--accent)', 'var(--accent-secondary)', '#f5c542', '#ff4d6a', '#64748b']
+    const entries = Object.entries(counts)
+    if (entries.length === 0) {
+      return [{ label: 'No artists yet', value: 1, color: 'var(--text-muted)' }]
+    }
+    return entries.map(([label, value], i) => ({
+      label,
+      value,
+      color: colors[i % colors.length],
+    }))
+  }, [artists])
 
-  const recentActivity = [
-    { type: 'booking', text: 'Booking confirmed with Maya Chen', time: '2h ago', color: 'var(--success)' },
-    { type: 'payment', text: 'You sent $5,000 to an artist (milestone)', time: '5h ago', color: 'var(--accent)' },
-    { type: 'contract', text: 'Contract signed by Theo Park', time: '1d ago', color: 'var(--warning)' },
-    { type: 'message', text: 'New message from Dex Okafor', time: '1d ago', color: 'var(--accent-secondary)' },
-    { type: 'booking', text: 'Booking request sent to Aria Nakamura', time: '2d ago', color: 'var(--success)' },
-  ]
+  const recentActivity = []
 
-  const artistRecentActivity = [
-    { type: 'booking', text: 'New booking request for a consultation', time: '2h ago', color: 'var(--success)' },
-    { type: 'payment', text: 'Milestone marked paid by client', time: '5h ago', color: 'var(--accent)' },
-    { type: 'message', text: 'Client asked about timeline', time: '1d ago', color: 'var(--accent-secondary)' },
-    { type: 'contract', text: 'Contract ready for your signature', time: '1d ago', color: 'var(--warning)' },
-  ]
+  const artistRecentActivity = []
 
 
 
@@ -187,8 +205,29 @@ export default function Dashboard() {
       }))
   }, [me, localProjects])
 
+  const openBriefs = useMemo(
+    () =>
+      buildOpenBriefCards({
+        bookings: isArtist ? myBookings : employerBookings,
+        contracts: localProjects,
+        isArtist,
+        artistId: me?.id,
+      }),
+    [isArtist, myBookings, employerBookings, localProjects, me?.id]
+  )
+
   if (isArtist) {
-    const artistPersona = me || artists[0]
+    if (!me) {
+      return (
+        <div className="page-container">
+          <div className="page-header">
+            <h1>Studio</h1>
+            <p>Complete your artist profile to get started.</p>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="page-container">
         <div className="page-header">
@@ -224,7 +263,7 @@ export default function Dashboard() {
           </div>
           <div className="stat-card">
             <span className="stat-label"><Star size={14} /> Rating</span>
-            <span className="stat-value">{me.rating}</span>
+            <span className="stat-value">{me.rating ?? '—'}</span>
             <span className="stat-change">{me.role}</span>
           </div>
         </div>
@@ -236,7 +275,7 @@ export default function Dashboard() {
                 <h3 style={{ fontSize: 16, fontFamily: 'var(--font-display)', marginBottom: 4 }}>
                   <BarChart3 size={16} style={{ marginRight: 6, color: 'var(--accent)' }} /> Earnings trend
                 </h3>
-                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Illustrative monthly payouts (mock data)</span>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Monthly payouts from your engagements</span>
               </div>
             </div>
             <BarChart data={artistIncomeData} height={180} />
@@ -273,7 +312,10 @@ export default function Dashboard() {
               <TrendingUp size={16} style={{ marginRight: 6, color: 'var(--accent)' }} /> Recent activity
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {artistRecentActivity.map((a, i) => (
+              {artistRecentActivity.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>No recent activity yet.</p>
+              ) : (
+                artistRecentActivity.map((a, i) => (
                 <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: a.color, marginTop: 6, flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
@@ -281,10 +323,13 @@ export default function Dashboard() {
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.time}</div>
                   </div>
                 </div>
-              ))}
+              ))
+              )}
             </div>
           </div>
         </div>
+
+        <ArtistAvailabilityEditor artistId={me.id} artistName={me.name} />
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, margin: 0 }}>Your public profile</h2>
@@ -346,7 +391,12 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="spotlight-projects__grid">
-            {[...contractOffers, ...availableProjects].map((proj) => (
+            {[...contractOffers, ...openBriefs].length === 0 ? (
+              <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
+                No open projects yet — contract offers and booking requests will appear here.
+              </div>
+            ) : (
+            [...contractOffers, ...openBriefs].map((proj) => (
               <article key={proj.id} className="spotlight-project-card card slide-up" style={proj.isOffer ? { borderColor: 'var(--accent)', borderWidth: 1, borderStyle: 'solid' } : undefined}>
                 {proj.isOffer && (
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
@@ -378,7 +428,8 @@ export default function Dashboard() {
                   </div>
                 )}
               </article>
-            ))}
+            ))
+            )}
           </div>
         </section>
       </div>
@@ -411,12 +462,12 @@ export default function Dashboard() {
         </div>
         <div className="stat-card">
           <span className="stat-label"><Calendar size={14} /> Bookings</span>
-          <span className="stat-value">{bookings.length}</span>
-          <span className="stat-change"><ArrowUpRight size={12} /> 3 this month</span>
+          <span className="stat-value">{employerBookings.length}</span>
+          <span className="stat-change"><ArrowUpRight size={12} /> {employerBookings.length} upcoming</span>
         </div>
         <div className="stat-card">
           <span className="stat-label"><Users size={14} /> Active Artists</span>
-          <span className="stat-value">{artists.filter(a => a.available).length}</span>
+          <span className="stat-value">{artists.filter((a) => a.available).length}</span>
           <span className="stat-change">{favorites.length} favorited</span>
         </div>
         <div className="stat-card">
@@ -475,7 +526,10 @@ export default function Dashboard() {
             <TrendingUp size={16} style={{ marginRight: 6, color: 'var(--accent)' }} /> Recent Activity
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {recentActivity.map((a, i) => (
+            {recentActivity.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>No recent activity yet.</p>
+            ) : (
+              recentActivity.map((a, i) => (
               <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: a.color, marginTop: 6, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
@@ -483,7 +537,8 @@ export default function Dashboard() {
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.time}</div>
                 </div>
               </div>
-            ))}
+            ))
+            )}
           </div>
         </div>
       </div>
@@ -498,13 +553,17 @@ export default function Dashboard() {
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} /> Open Briefs
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {availableProjects.slice(0, 2).map(p => (
+            {openBriefs.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No open briefs — pending bookings and contracts appear here.</p>
+            ) : (
+            openBriefs.slice(0, 2).map(p => (
               <div key={p.id} className="project-phase-card">
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{p.title}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.posted} · {p.location}</div>
               </div>
-            ))}
-            <button className="btn btn-ghost btn-sm" style={{ width: '100%', marginTop: 8 }}>View all open briefs</button>
+            ))
+            )}
+            <button type="button" className="btn btn-ghost btn-sm" style={{ width: '100%', marginTop: 8 }} onClick={() => navigate('/bookings')}>View bookings</button>
           </div>
         </div>
 
@@ -585,7 +644,12 @@ export default function Dashboard() {
       {/* Upcoming Bookings */}
       <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 16 }}>Upcoming Bookings</h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 40 }}>
-        {bookings.map(b => (
+        {employerBookings.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+            No upcoming bookings.
+          </div>
+        ) : (
+          employerBookings.map((b) => (
           <div key={b.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px' }}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <Calendar size={18} style={{ color: 'var(--accent)' }} />
@@ -605,7 +669,8 @@ export default function Dashboard() {
               </span>
             </div>
           </div>
-        ))}
+        ))
+        )}
       </div>
     </div>
   )

@@ -1,15 +1,21 @@
 import { useState, useCallback, lazy, Suspense, useMemo, useEffect } from 'react'
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom'
-import { LayoutDashboard, Trophy, MessageSquare, Calendar, FileText, CreditCard, LogOut, Loader2, User, Menu, X } from './components/icons'
-import { isArtistProfile, demoArtistPersona } from './lib/roleView'
+import { LayoutDashboard, Trophy, MessageSquare, Calendar, FileText, CreditCard, LogOut, Loader2, User, Menu, X, UserPlus, Shield } from './components/icons'
+import { demoArtistPersona, isArtistProfile } from './lib/roleView'
+import { useArtistProfile } from './hooks/useArtistProfile'
+import { useMyApplication, isPendingApplicant, useAdminApplications } from './hooks/useArtistApplication'
+import { useAdminInvites } from './hooks/useArtistInvites'
 import { AppContext } from './context/AppContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
 import { useFavorites } from './hooks/useData'
-import { messages as mockMessages, contracts as mockContracts } from './data/mockData'
+import { useConversations } from './hooks/useConversations'
+import { useMessageRealtime } from './hooks/useMessageRealtime'
+import { useContracts } from './hooks/useContracts'
 import NotificationPanel from './components/NotificationPanel'
 import ErrorBoundary from './components/ErrorBoundary'
 import BrandLogo from './components/BrandLogo'
+import ThemeToggle from './components/ThemeToggle'
 
 // Lazy loaded pages (Item 6)
 const Leaderboard = lazy(() => import('./pages/Leaderboard'))
@@ -27,6 +33,12 @@ const NotFound = lazy(() => import('./pages/NotFound'))
 const Landing = lazy(() => import('./pages/Landing'))
 const Terms = lazy(() => import('./pages/Terms'))
 const Privacy = lazy(() => import('./pages/Privacy'))
+const ArtistApply = lazy(() => import('./pages/ArtistApply'))
+const ApplicationStatus = lazy(() => import('./pages/ApplicationStatus'))
+const AdminApplications = lazy(() => import('./pages/AdminApplications'))
+const AdminInvites = lazy(() => import('./pages/AdminInvites'))
+const Disputes = lazy(() => import('./pages/Disputes'))
+const AdminDisputes = lazy(() => import('./pages/AdminDisputes'))
 
 function LoadingScreen() {
   return (
@@ -53,8 +65,8 @@ function ProtectedRoute({ children }) {
 }
 
 function HomeGate() {
-  const { profile } = useAuth()
-  if (isArtistProfile(profile)) return <Navigate to="/dashboard" replace />
+  const { effectiveRole } = useAuth()
+  if (effectiveRole === 'artist') return <Navigate to="/dashboard" replace />
   return <Leaderboard />
 }
 
@@ -64,54 +76,115 @@ function formatAccountRole(role) {
   return map[role] || role.charAt(0).toUpperCase() + role.slice(1)
 }
 
+const APPLICANT_GATE_TIMEOUT_MS = 12000
+
+function ApplicantGate({ children }) {
+  const { profile, user, isAdmin } = useAuth()
+  const location = useLocation()
+  const { application, loading: appLoading } = useMyApplication(profile?.id || user?.id)
+  const { artist, loading: artistLoading } = useArtistProfile(profile?.id || user?.id)
+  const [gateTimedOut, setGateTimedOut] = useState(false)
+
+  const allowedPaths = ['/application-status', '/account', '/apply']
+  const isAllowed = allowedPaths.some((p) => location.pathname === p || location.pathname.startsWith(`${p}/`))
+
+  useEffect(() => {
+    if (!appLoading && !artistLoading) {
+      setGateTimedOut(false)
+      return
+    }
+    const timer = setTimeout(() => setGateTimedOut(true), APPLICANT_GATE_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [appLoading, artistLoading])
+
+  if (isAdmin || artist) return children
+  if ((appLoading || artistLoading) && !gateTimedOut) return <LoadingScreen />
+  if (isPendingApplicant(application) && !isAllowed) {
+    return <Navigate to="/application-status" replace />
+  }
+
+  return children
+}
+
 function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, profile, signOut, isMockMode } = useAuth()
+  const { user, profile, signOut, isMockMode, isAdmin, fetchProfile, adminViewAs, setAdminViewAs, effectiveRole, isAuthenticated } = useAuth()
+  const { artist } = useArtistProfile(profile?.id || user?.id)
+  const { applications: adminApplications } = useAdminApplications(isAdmin)
+  const { invites: adminInvites } = useAdminInvites(isAdmin)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const { favorites, toggleFavorite } = useFavorites(user?.id)
-  const [allMessages, setAllMessages] = useState(mockMessages)
-  const [localProjects, setLocalProjects] = useState(mockContracts)
+  const {
+    conversations: allMessages,
+    sendMessage,
+    startConversation: startConversationApi,
+    markRead: markConversationRead,
+    applyRemoteMessage,
+    applyRemoteConversationUpdate,
+    refetch: refetchConversations,
+  } = useConversations(isAuthenticated)
+  const isArtistUser = isArtistProfile(profile)
+  const { realtimeConnected } = useMessageRealtime({
+    enabled: isAuthenticated,
+    profileId: profile?.id,
+    isArtist: isArtistUser,
+    applyRemoteMessage,
+    applyRemoteConversationUpdate,
+    refetch: refetchConversations,
+  })
+  const {
+    contracts: localProjects,
+    createContract,
+    signContract,
+    signContractAsArtist,
+    refetch: refetchContracts,
+    payMilestone,
+    approveMilestone,
+  } = useContracts(isAuthenticated)
 
-  const sendMessage = useCallback((conversationId, text, senderOverride) => {
-    setAllMessages(prev => prev.map(m => {
-      if (m.id === conversationId) {
-        return {
-          ...m, lastMessage: text, time: 'Just now', unread: senderOverride === 'artist',
-          thread: [...m.thread, { id: Date.now(), sender: senderOverride || 'user', text, time: 'Just now' }]
-        }
-      }
-      return m
-    }))
-  }, [])
-
-  const startConversation = (artist) => {
-    const existing = allMessages.find(m => m.artistId === artist.id)
-    if (existing) { navigate('/messages'); return existing.id }
-    const newConv = {
-      id: Date.now(), artistId: artist.id, artistName: artist.name, avatar: artist.avatar,
-      unread: false, lastMessage: '', time: 'Now', thread: []
-    }
-    setAllMessages(prev => [newConv, ...prev])
+  const startConversation = async (artist) => {
+    const conv = await startConversationApi(artist)
     navigate('/messages')
-    return newConv.id
+    return conv?.id
   }
 
   const unreadCount = allMessages.filter(m => m.unread).length
-  const demoPersona = demoArtistPersona(profile)
+  const demoPersona = demoArtistPersona(profile, artist)
+  const pendingApplicationCount = adminApplications.filter((a) => a.status === 'pending').length
+  const activeInviteCount = adminInvites.filter((i) => !i.usedAt && (!i.expiresAt || new Date(i.expiresAt) > new Date())).length
 
   const navItems = useMemo(() => {
-    if (isArtistProfile(profile)) {
-      const pid = demoPersona?.id ?? 1
-      const profilePath = `/artist/${pid}`
+    if (isAdmin && !adminViewAs) {
       return [
+        { path: '/admin/applications', icon: FileText, label: 'Applications', badge: pendingApplicationCount || null },
+        { path: '/admin/disputes', icon: Shield, label: 'Disputes' },
+        { path: '/admin/invites', icon: UserPlus, label: 'Invites', badge: activeInviteCount || null },
+        { path: '/home', icon: Trophy, label: 'Artist Spotlight' },
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-        { path: profilePath, icon: User, label: 'My profile', matchPrefix: profilePath },
         { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
         { path: '/bookings', icon: Calendar, label: 'Bookings' },
+        { path: '/disputes', icon: Shield, label: 'Disputes' },
+        { path: '/projects', icon: FileText, label: 'Projects' },
+        { path: '/payments', icon: CreditCard, label: 'Payments' },
+      ]
+    }
+    if (effectiveRole === 'artist') {
+      const pid = demoPersona?.id ?? artist?.id
+      const items = [
+        { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+        { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
+        { path: '/bookings', icon: Calendar, label: 'Bookings' },
+        { path: '/disputes', icon: Shield, label: 'Disputes' },
         { path: '/projects', icon: FileText, label: 'Projects' },
         { path: '/payments', icon: CreditCard, label: 'Earnings' },
       ]
+      if (pid) {
+        const profilePath = `/artist/${pid}`
+        items.splice(1, 0, { path: profilePath, icon: User, label: 'My profile', matchPrefix: profilePath })
+      }
+      return items
     }
     return [
       { path: '/', icon: Trophy, label: 'Artist Spotlight' },
@@ -121,7 +194,7 @@ function AppShell() {
       { path: '/projects', icon: FileText, label: 'Projects' },
       { path: '/payments', icon: CreditCard, label: 'Payments' },
     ]
-  }, [profile?.role, profile?.full_name, unreadCount, demoPersona?.id])
+  }, [effectiveRole, adminViewAs, unreadCount, demoPersona?.id, artist?.id, isAdmin, pendingApplicationCount, activeInviteCount])
 
   const ctx = {
     favorites,
@@ -129,22 +202,37 @@ function AppShell() {
     allMessages,
     sendMessage,
     startConversation,
+    markConversationRead,
     localProjects,
-    setLocalProjects,
+    createContract,
+    signContract,
+    signContractAsArtist,
+    payMilestone,
+    approveMilestone,
+    refetchContracts,
+    realtimeConnected,
   }
 
   const handleSignOut = async () => {
+    if (signingOut) return
+    setSigningOut(true)
+    setMobileNavOpen(false)
+
     try {
-      if (signOut) {
-        await signOut()
-      }
+      await signOut()
     } catch (e) {
       console.error('[App] signOut error:', e)
     } finally {
-      setMobileNavOpen(false)
-      navigate('/signin', { replace: true })
+      // Full page navigation guarantees session/UI reset on production (avoids stale router state).
+      window.location.assign('/signin')
     }
   }
+
+  useEffect(() => {
+    if (user?.id && fetchProfile) {
+      fetchProfile(user.id, user)
+    }
+  }, [user?.id])
 
   useEffect(() => {
     setMobileNavOpen(false)
@@ -161,7 +249,7 @@ function AppShell() {
     setMobileNavOpen(false)
   }
 
-  const homePath = isArtistProfile(profile) ? '/dashboard' : '/home'
+  const homePath = effectiveRole === 'artist' ? '/dashboard' : '/home'
 
   return (
     <AppContext.Provider value={ctx}>
@@ -178,16 +266,19 @@ function AppShell() {
           >
             <BrandLogo variant="compact" />
           </button>
-          <button
-            type="button"
-            className="mobile-menu-btn"
-            aria-expanded={mobileNavOpen}
-            aria-controls="app-sidebar"
-            onClick={() => setMobileNavOpen((o) => !o)}
-          >
-            {mobileNavOpen ? <X size={22} aria-hidden /> : <Menu size={22} aria-hidden />}
-            <span className="sr-only">{mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}</span>
-          </button>
+          <div className="mobile-topbar-actions">
+            <ThemeToggle variant="compact" />
+            <button
+              type="button"
+              className="mobile-menu-btn"
+              aria-expanded={mobileNavOpen}
+              aria-controls="app-sidebar"
+              onClick={() => setMobileNavOpen((o) => !o)}
+            >
+              {mobileNavOpen ? <X size={22} aria-hidden /> : <Menu size={22} aria-hidden />}
+              <span className="sr-only">{mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}</span>
+            </button>
+          </div>
         </header>
 
         <button
@@ -230,7 +321,34 @@ function AppShell() {
                 )
               })}
             </div>
-            <div className="nav-section" style={{ marginTop: 'auto' }}>
+            {isAdmin && (
+              <div className="nav-section" style={{ marginTop: 'auto' }}>
+                <div className="nav-label">View as</div>
+                <div style={{ display: 'flex', gap: 4, padding: '4px 0' }}>
+                  {[null, 'employer', 'artist'].map((mode) => {
+                    const label = mode === null ? 'Admin' : mode === 'employer' ? 'Hirer' : 'Artist'
+                    const active = adminViewAs === mode
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setAdminViewAs(mode)}
+                        style={{
+                          flex: 1, padding: '5px 0', fontSize: 12, fontWeight: 600,
+                          borderRadius: 0, border: '1px solid var(--border-strong)',
+                          background: active ? 'var(--ink)' : 'transparent',
+                          color: active ? 'var(--paper)' : 'var(--text-secondary)',
+                          cursor: 'pointer', transition: 'var(--transition)',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+            <div className="nav-section" style={{ marginTop: isAdmin ? 0 : 'auto' }}>
               <div className="nav-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 Account
                 <NotificationPanel />
@@ -259,18 +377,72 @@ function AppShell() {
                     {profile?.full_name || 'User'}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    {formatAccountRole(profile?.role)}{isMockMode ? ' · demo' : ''}
+                    {formatAccountRole(profile?.role)}{adminViewAs ? ` · viewing as ${adminViewAs}` : ''}{isMockMode ? ' · demo' : ''}
                   </div>
                 </div>
               </div>
+              <ThemeToggle showLabel />
               <button 
                 type="button" 
                 className="nav-link sign-out-btn" 
                 onClick={handleSignOut}
+                disabled={signingOut}
+                aria-busy={signingOut}
                 style={{ marginTop: 4 }}
               >
-                <LogOut size={18} aria-hidden /> Sign Out
+                <LogOut size={18} aria-hidden /> {signingOut ? 'Signing out…' : 'Sign Out'}
               </button>
+              {isMockMode && (
+                <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Mock Personas</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm mock-switch-hirer-btn"
+                      style={{ fontSize: 11, padding: '4px 8px', width: '100%', justifyContent: 'flex-start', border: '1px dashed var(--border-strong)' }}
+                      onClick={() => {
+                        localStorage.setItem('mock_user_role', 'employer');
+                        localStorage.setItem('mock_user_name', 'Test Hirer');
+                        localStorage.setItem('mock_user_email', 'hirer@test.com');
+                        window.location.reload();
+                      }}
+                    >
+                      Hirer (Test Hirer)
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm mock-switch-artist-btn"
+                      style={{ fontSize: 11, padding: '4px 8px', width: '100%', justifyContent: 'flex-start', border: '1px dashed var(--border-strong)' }}
+                      onClick={() => {
+                        localStorage.setItem('mock_user_role', 'artist');
+                        localStorage.setItem('mock_user_name', 'Leo Thorne');
+                        localStorage.setItem('mock_user_email', 'leo@thorne.com');
+                        localStorage.setItem('mock_artist_profile', JSON.stringify({
+                          id: 'artist-002',
+                          profileId: 'mock-user-001',
+                          displayName: 'Leo Thorne',
+                          roleTitle: 'AI Cinematic Director',
+                          bio: 'Leo directs AI-native cinematic shorts and high-fidelity video trailers, blending generative video tools with professional sound design.',
+                          hourlyRate: 200,
+                          location: 'London, UK',
+                          available: true,
+                          rating: 5.0,
+                          projects: 18,
+                          skills: ['Runway', 'Sora', 'Pika Labs', 'Premiere Pro'],
+                          brands: ['Marvel', 'Netflix', 'Epic Games'],
+                          videoLinks: [
+                            'https://vimeo.com/347119253',
+                            'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+                          ]
+                        }));
+                        window.location.reload();
+                      }}
+                    >
+                      Artist (Leo Thorne)
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </nav>
         </aside>
@@ -278,14 +450,18 @@ function AppShell() {
           <ErrorBoundary>
             <Suspense fallback={<LoadingScreen />}>
               <Routes>
-                <Route path="/home" element={<ProtectedRoute><HomeGate /></ProtectedRoute>} />
-                <Route path="/artist/:id" element={<ProtectedRoute><ArtistProfile /></ProtectedRoute>} />
-                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-                <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
-                <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
-                 <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+                <Route path="/home" element={<ProtectedRoute><ApplicantGate><HomeGate /></ApplicantGate></ProtectedRoute>} />
+                <Route path="/artist/:id" element={<ProtectedRoute><ApplicantGate><ArtistProfile /></ApplicantGate></ProtectedRoute>} />
+                <Route path="/dashboard" element={<ProtectedRoute><ApplicantGate><Dashboard /></ApplicantGate></ProtectedRoute>} />
+                <Route path="/messages" element={<ProtectedRoute><ApplicantGate><Messages /></ApplicantGate></ProtectedRoute>} />
+                <Route path="/bookings" element={<ProtectedRoute><ApplicantGate><Bookings /></ApplicantGate></ProtectedRoute>} />
+                <Route path="/projects" element={<ProtectedRoute><ApplicantGate><Projects /></ApplicantGate></ProtectedRoute>} />
+                <Route path="/payments" element={<ProtectedRoute><ApplicantGate><Payments /></ApplicantGate></ProtectedRoute>} />
                 <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
+                <Route path="/disputes" element={<ProtectedRoute><ApplicantGate><Disputes /></ApplicantGate></ProtectedRoute>} />
+                <Route path="/admin/applications" element={<ProtectedRoute><AdminApplications /></ProtectedRoute>} />
+                <Route path="/admin/disputes" element={<ProtectedRoute><AdminDisputes /></ProtectedRoute>} />
+                <Route path="/admin/invites" element={<ProtectedRoute><AdminInvites /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
@@ -304,6 +480,8 @@ function App() {
           <Suspense fallback={<LoadingScreen />}>
             <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/apply" element={<ArtistApply />} />
+              <Route path="/application-status" element={<ProtectedRoute><ApplicationStatus /></ProtectedRoute>} />
               <Route path="/signin" element={<SignIn />} />
               <Route path="/signup" element={<SignUp />} />
               <Route path="/update-password" element={<UpdatePassword />} />

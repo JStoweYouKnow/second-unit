@@ -9,7 +9,7 @@ import { useApp } from '../context/AppContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
 import { contracts as contractsApi } from '../lib/api'
 import { isSupabaseConfigured } from '../lib/supabase'
-import { uploadContractAttachment, downloadContractAttachment } from '../lib/contractAttachments'
+import { splitMilestoneAmounts, DEFAULT_MILESTONE_TITLES } from '../lib/milestones'
 
 const STANDARD_TERMS = `INDEPENDENT CONTRACTOR AGREEMENT
 
@@ -83,8 +83,10 @@ export default function Projects() {
   const [showSign, setShowSign] = useState(null) // project to sign
   const [projectType, setProjectType] = useState('standard')
   const [newProject, setNewProject] = useState({
-    title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: ''
+    title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: '',
+    milestone1: '', milestone2: '', milestone3: '',
   })
+  const [useCustomMilestones, setUseCustomMilestones] = useState(false)
   /** Pending upload in the modal only (blob URL revoked on discard). On create, URL is kept on the contract row. */
   const [customAgreementUpload, setCustomAgreementUpload] = useState(null)
   const [customUploadError, setCustomUploadError] = useState('')
@@ -217,19 +219,35 @@ export default function Projects() {
       terms = parts.join('\n\n---\n\n')
     }
 
+    const totalValue = parseInt(newProject.value, 10) || 0
+    const defaultSplits = splitMilestoneAmounts(totalValue)
+    const milestoneAmounts = useCustomMilestones
+      ? [
+          parseInt(newProject.milestone1, 10) || 0,
+          parseInt(newProject.milestone2, 10) || 0,
+          parseInt(newProject.milestone3, 10) || 0,
+        ]
+      : defaultSplits
+
+    if (useCustomMilestones && milestoneAmounts.reduce((a, b) => a + b, 0) !== totalValue) {
+      setCustomUploadError('Milestone amounts must sum to the contract value.')
+      return
+    }
+
     const created = await createContract({
       title: newProject.title,
       artistId: artist.id,
       artistName: artist.name,
       clientName: profile?.full_name || 'Client',
       type: projectType,
-      value: parseInt(newProject.value, 10) || 0,
+      value: totalValue,
       startDate: newProject.startDate,
       endDate: newProject.endDate,
       terms,
       attachmentUrl,
       attachmentName,
       attachmentMime,
+      milestoneAmounts,
     })
 
     if (pendingFile && created?.id && isSupabaseConfigured) {
@@ -607,8 +625,41 @@ ${divider}
                 <div className="form-group">
                   <label className="form-label">Total Value ($)</label>
                   <input className="form-input" type="number" placeholder="10000" value={newProject.value}
-                    onChange={e => setNewProject(p => ({ ...p, value: e.target.value }))} required />
+                    onChange={e => {
+                      const value = e.target.value
+                      const splits = splitMilestoneAmounts(parseInt(value, 10) || 0)
+                      setNewProject(p => ({
+                        ...p,
+                        value,
+                        milestone1: String(splits[0]),
+                        milestone2: String(splits[1]),
+                        milestone3: String(splits[2]),
+                      }))
+                    }} required />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={useCustomMilestones} onChange={(e) => setUseCustomMilestones(e.target.checked)} />
+                  Custom milestone payment split (default 33/33/34)
+                </label>
+                {useCustomMilestones && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 10 }}>
+                    {DEFAULT_MILESTONE_TITLES.map((m, i) => (
+                      <div key={m.title}>
+                        <label className="form-label" style={{ fontSize: 11 }}>{m.title} ($)</label>
+                        <input
+                          className="form-input"
+                          type="number"
+                          min="0"
+                          value={newProject[`milestone${i + 1}`]}
+                          onChange={(e) => setNewProject((p) => ({ ...p, [`milestone${i + 1}`]: e.target.value }))}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {projectType === 'custom' && (

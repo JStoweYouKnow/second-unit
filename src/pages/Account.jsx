@@ -6,6 +6,7 @@ import { profileApi, billing, calendar } from '../lib/api'
 import { User, Mail, Shield, Bell, CreditCard, Camera } from '../components/icons'
 import { ArtistFormFields } from '../components/ArtistFormFields'
 import ThemeToggle from '../components/ThemeToggle'
+import { MfaSettings } from '../components/MfaSettings'
 import { useArtistProfile, saveArtistProfile } from '../hooks/useArtistProfile'
 import { useMyApplication, isPendingApplicant } from '../hooks/useArtistApplication'
 import { artistRecordToForm, emptyArtistForm } from '../lib/artistProfile'
@@ -34,7 +35,7 @@ export default function Account() {
   })
   const [paymentMethods, setPaymentMethods] = useState([])
   const [billingLoading, setBillingLoading] = useState(false)
-  const [calendarStatus, setCalendarStatus] = useState({ connected: false })
+  const [calendarStatus, setCalendarStatus] = useState({ connected: false, feedUrl: null })
   const [calendarBusy, setCalendarBusy] = useState(false)
 
   const isApprovedArtist = profile?.role === 'artist' && !!artist
@@ -448,14 +449,33 @@ export default function Account() {
 
               <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h4 style={{ margin: '0 0 4px 0' }}>Two-Factor Authentication</h4>
-                  <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 14 }}>Add an extra layer of security to your account.</p>
-                </div>
-                <button type="button" className="btn btn-primary btn-sm" disabled title="Enable TOTP in Supabase Auth dashboard first">
-                  Enable 2FA
-                </button>
+              <MfaSettings />
+
+              <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
+
+              <div>
+                <h4 style={{ margin: '0 0 8px 0' }}>iCal subscription feed</h4>
+                <p style={{ color: 'var(--text-muted)', margin: '0 0 12px 0', fontSize: 14 }}>
+                  Subscribe in Apple Calendar, Outlook, or any iCal app — works without Google OAuth.
+                </p>
+                {calendarStatus.feedUrl ? (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <code style={{ fontSize: 12, padding: '8px 10px', background: 'var(--surface)', borderRadius: 6, wordBreak: 'break-all' }}>
+                      {calendarStatus.feedUrl}
+                    </code>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => navigator.clipboard?.writeText(calendarStatus.feedUrl)}
+                    >
+                      Copy URL
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => calendar.getFeedToken().then((r) => setCalendarStatus((s) => ({ ...s, feedUrl: r.feedUrl }))).catch(() => setError('Could not generate feed URL'))}>
+                    Generate feed URL
+                  </button>
+                )}
               </div>
             </div>
           )}

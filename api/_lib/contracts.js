@@ -37,6 +37,7 @@ export function mapContractToClient(row) {
     artistSignature: row.artist_signature ?? null,
     bookingId: row.booking_id ?? null,
     milestones: row.milestones ?? [],
+    milestoneAmounts: row.milestone_amounts ?? null,
     createdAt: row.created_at,
   }
 }
@@ -58,6 +59,9 @@ export function mapContractToDb(payload, employerId) {
     attachment_mime: payload.attachmentMime || null,
     signed_by_employer: false,
     signed_by_artist: false,
+    milestone_amounts: Array.isArray(payload.milestoneAmounts) && payload.milestoneAmounts.length === 3
+      ? payload.milestoneAmounts.map((n) => Math.round(Number(n) || 0))
+      : null,
   }
 }
 

@@ -5,6 +5,7 @@ import { demoArtistPersona, isArtistProfile } from './lib/roleView'
 import { useArtistProfile } from './hooks/useArtistProfile'
 import { useMyApplication, isPendingApplicant, useAdminApplications } from './hooks/useArtistApplication'
 import { useAdminInvites } from './hooks/useArtistInvites'
+import { useDisputes } from './hooks/useDisputes'
 import { AppContext } from './context/AppContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
@@ -113,6 +114,7 @@ function AppShell() {
   const { artist } = useArtistProfile(profile?.id || user?.id)
   const { applications: adminApplications } = useAdminApplications(isAdmin)
   const { invites: adminInvites } = useAdminInvites(isAdmin)
+  const { disputes: adminDisputes } = useDisputes(isAdmin && !adminViewAs)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const { favorites, toggleFavorite } = useFavorites(user?.id)
@@ -154,12 +156,13 @@ function AppShell() {
   const demoPersona = demoArtistPersona(profile, artist)
   const pendingApplicationCount = adminApplications.filter((a) => a.status === 'pending').length
   const activeInviteCount = adminInvites.filter((i) => !i.usedAt && (!i.expiresAt || new Date(i.expiresAt) > new Date())).length
+  const openDisputeCount = adminDisputes.filter((d) => d.status !== 'resolved' && d.status !== 'closed').length
 
   const navItems = useMemo(() => {
     if (isAdmin && !adminViewAs) {
       return [
         { path: '/admin/applications', icon: FileText, label: 'Applications', badge: pendingApplicationCount || null },
-        { path: '/admin/disputes', icon: Shield, label: 'Disputes' },
+        { path: '/admin/disputes', icon: Shield, label: 'Disputes', badge: openDisputeCount || null },
         { path: '/admin/invites', icon: UserPlus, label: 'Invites', badge: activeInviteCount || null },
         { path: '/home', icon: Trophy, label: 'Artist Spotlight' },
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -194,7 +197,7 @@ function AppShell() {
       { path: '/projects', icon: FileText, label: 'Projects' },
       { path: '/payments', icon: CreditCard, label: 'Payments' },
     ]
-  }, [effectiveRole, adminViewAs, unreadCount, demoPersona?.id, artist?.id, isAdmin, pendingApplicationCount, activeInviteCount])
+  }, [effectiveRole, adminViewAs, unreadCount, demoPersona?.id, artist?.id, isAdmin, pendingApplicationCount, activeInviteCount, openDisputeCount])
 
   const ctx = {
     favorites,

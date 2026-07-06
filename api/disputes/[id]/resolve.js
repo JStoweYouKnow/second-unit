@@ -8,6 +8,8 @@ import { createNotification } from '../../_lib/notifications.js'
 const ResolveSchema = z.object({
   outcome: z.enum(['refund_employer', 'release_artist', 'split', 'no_action']),
   resolutionNotes: z.string().min(1).max(5000),
+  splitEmployerCents: z.number().int().min(0).optional().nullable(),
+  splitArtistCents: z.number().int().min(0).optional().nullable(),
 })
 
 export default async function handler(req, res) {

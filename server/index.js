@@ -65,6 +65,7 @@ import {
   getCalendarConnectionStatus,
   disconnectCalendar,
 } from '../api/_lib/googleCalendar.js'
+import { buildIcalCalendar, ensureCalendarFeedToken, getProfileIdForFeedToken } from '../api/_lib/icalFeed.js'
 import { FRONTEND_URL } from '../api/_lib/stripe.js'
 import { createNotification } from '../api/_lib/notifications.js'
 import {
@@ -985,6 +986,8 @@ const DisputeStatusSchema = z.object({
 const ResolveDisputeSchema = z.object({
   outcome: z.enum(['refund_employer', 'release_artist', 'split', 'no_action']),
   resolutionNotes: z.string().min(1).max(5000),
+  splitEmployerCents: z.number().int().min(0).optional().nullable(),
+  splitArtistCents: z.number().int().min(0).optional().nullable(),
 })
 
 app.get('/api/disputes', async (req, res) => {
@@ -1180,6 +1183,9 @@ app.post('/api/calendar/status', async (req, res) => {
     if (artistId) {
       const result = await importGoogleBusyBlocks(database, user.id, artistId)
       imported = result.imported
+    } else {
+      const result = await importGoogleBusyBlocks(database, user.id, null)
+      imported = result.imported
     }
     const bookings = await listBookingsForUser(database, user.id)
     for (const b of bookings) {
@@ -1188,6 +1194,55 @@ app.post('/api/calendar/status', async (req, res) => {
       }
     }
     res.json({ ok: true, importedBusyBlocks: imported })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.get('/api/calendar/feed/:token', async (req, res) => {
+  const database = db || supabase
+  if (!database) return res.status(503).send('Database not configured')
+  try {
+    const profile = await getProfileIdForFeedToken(database, req.params.token)
+    if (!profile) return res.status(404).send('Feed not found')
+    const artistId = (await getArtistIdForProfile(database, profile.id)) ?? null
+    let bookingsQuery = database
+      .from('bookings')
+      .select('id, date, start_time, end_time, booking_type, status, artist_name')
+      .in('status', ['confirmed', 'paid', 'completed'])
+      .order('date', { ascending: true })
+    if (artistId) {
+      bookingsQuery = bookingsQuery.or(`employer_id.eq.${profile.id},artist_id.eq.${artistId}`)
+    } else {
+      bookingsQuery = bookingsQuery.eq('employer_id', profile.id)
+    }
+    const { data: bookings } = await bookingsQuery
+    const ical = buildIcalCalendar({
+      name: `The Callsheet — ${profile.full_name || 'Bookings'}`,
+      events: (bookings || []).map((b) => ({
+        uid: b.id,
+        date: String(b.date).slice(0, 10),
+        startTime: b.start_time || '09:00:00',
+        endTime: b.end_time || '10:00:00',
+        summary: `The Callsheet — ${b.booking_type || 'Booking'}`,
+        description: `${b.artist_name || 'Artist'} · ${FRONTEND_URL}/bookings`,
+      })),
+    })
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8')
+    res.send(ical)
+  } catch (err) {
+    res.status(500).send(err.message)
+  }
+})
+
+app.get('/api/calendar/feed-token', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db || supabase
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const token = await ensureCalendarFeedToken(database, user.id)
+    res.json({ token, feedUrl: `${FRONTEND_URL}/api/calendar/feed/${token}` })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

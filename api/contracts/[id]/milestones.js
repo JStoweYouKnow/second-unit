@@ -1,10 +1,16 @@
+import { z } from 'zod'
 import { db } from '../../_lib/db.js'
 import { requireAuth } from '../../_lib/auth.js'
 import {
   listMilestonesForContract,
   userCanAccessMilestoneContract,
   ensureContractMilestones,
+  updateMilestoneAmounts,
 } from '../../_lib/milestones.js'
+
+const AmountsSchema = z.object({
+  amounts: z.array(z.number().int().nonnegative()).length(3),
+})
 
 export default async function handler(req, res) {
   const user = await requireAuth(req, res)
@@ -35,6 +41,19 @@ export default async function handler(req, res) {
       return res.json(milestones)
     } catch (err) {
       return res.status(500).json({ error: err.message })
+    }
+  }
+
+  if (req.method === 'PATCH') {
+    try {
+      const validated = AmountsSchema.parse(req.body)
+      const milestones = await updateMilestoneAmounts(db, contractId, user.id, validated.amounts)
+      return res.json(milestones)
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: err.errors })
+      }
+      return res.status(err.message === 'Forbidden' ? 403 : 500).json({ error: err.message })
     }
   }
 

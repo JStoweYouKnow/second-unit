@@ -4,15 +4,21 @@ export const DEFAULT_MILESTONE_TITLES = [
   { title: 'Final approval & delivery', description: 'Final payment upon approved deliverables' },
 ]
 
-export function splitMilestoneAmounts(totalValue) {
+export function splitMilestoneAmounts(totalValue, customAmounts = null) {
+  if (Array.isArray(customAmounts) && customAmounts.length === 3) {
+    const parsed = customAmounts.map((n) => Math.round(Number(n) || 0))
+    const sum = parsed.reduce((a, b) => a + b, 0)
+    const total = Math.round(Number(totalValue) || 0)
+    if (sum === total && parsed.every((n) => n >= 0)) return parsed
+  }
   const total = Math.round(Number(totalValue) || 0)
   const third = Math.floor(total / 3)
   const remainder = total - third * 2
   return [third, third, remainder]
 }
 
-export function buildDefaultMilestones(contractId, totalValue) {
-  const amounts = splitMilestoneAmounts(totalValue)
+export function buildDefaultMilestones(contractId, totalValue, customAmounts = null) {
+  const amounts = splitMilestoneAmounts(totalValue, customAmounts)
   return DEFAULT_MILESTONE_TITLES.map((m, i) => ({
     id: `ms-${contractId}-${i}`,
     contractId,

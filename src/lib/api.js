@@ -323,6 +323,18 @@ export const calendar = {
   disconnect: () => request('/api/calendar/status', { method: 'DELETE' }),
 
   sync: () => request('/api/calendar/status', { method: 'POST' }),
+
+  getFeedToken: () => request('/api/calendar/feed-token'),
+}
+
+// ---- Portfolio media ----
+export const portfolio = {
+  list: () => request('/api/portfolio'),
+
+  create: (payload) =>
+    request('/api/portfolio', { method: 'POST', body: JSON.stringify(payload) }),
+
+  remove: (id) => request(`/api/portfolio/${id}`, { method: 'DELETE' }),
 }
 
 // ---- Reviews ----

@@ -1,4 +1,5 @@
 import { getArtistIdForProfile } from './bookings.js'
+import { executeDisputePayouts } from './disputePayouts.js'
 
 export function mapDisputeToClient(row, evidence = []) {
   if (!row) return null
@@ -17,6 +18,11 @@ export function mapDisputeToClient(row, evidence = []) {
     resolutionNotes: row.resolution_notes ?? null,
     resolvedBy: row.resolved_by ?? null,
     resolvedAt: row.resolved_at ?? null,
+    splitEmployerCents: row.split_employer_cents ?? null,
+    splitArtistCents: row.split_artist_cents ?? null,
+    payoutStatus: row.payout_status ?? null,
+    payoutError: row.payout_error ?? null,
+    payoutExecutedAt: row.payout_executed_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     evidence: evidence.map(mapEvidenceToClient),
@@ -199,9 +205,34 @@ export async function updateDisputeStatus(db, disputeId, userId, { status }) {
   return mapDisputeToClient(data, evidence)
 }
 
-export async function resolveDispute(db, disputeId, adminId, { outcome, resolutionNotes }) {
+export async function resolveDispute(db, disputeId, adminId, { outcome, resolutionNotes, splitEmployerCents, splitArtistCents }) {
   const admin = await isAdmin(db, adminId)
   if (!admin) throw new Error('Forbidden')
+
+  const { data: existing, error: fetchError } = await db
+    .from('disputes')
+    .select('*')
+    .eq('id', disputeId)
+    .single()
+
+  if (fetchError) throw fetchError
+  if (existing.status === 'resolved' || existing.status === 'closed') {
+    throw new Error('Dispute is already resolved')
+  }
+
+  let payoutResult = { payoutStatus: 'skipped', actions: [], errors: [] }
+  try {
+    payoutResult = await executeDisputePayouts(db, existing, {
+      outcome,
+      splitEmployerCents,
+      splitArtistCents,
+    })
+  } catch (err) {
+    payoutResult = { payoutStatus: 'failed', actions: [], errors: [err.message] }
+  }
+
+  const payoutError =
+    payoutResult.errors?.length > 0 ? payoutResult.errors.join('; ') : null
 
   const { data, error } = await db
     .from('disputes')
@@ -212,6 +243,13 @@ export async function resolveDispute(db, disputeId, adminId, { outcome, resoluti
       resolved_by: adminId,
       resolved_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      split_employer_cents: splitEmployerCents ?? null,
+      split_artist_cents: splitArtistCents ?? null,
+      payout_status: payoutResult.payoutStatus,
+      payout_error: payoutError,
+      payout_executed_at: payoutResult.payoutStatus === 'executed' || payoutResult.payoutStatus === 'partial'
+        ? new Date().toISOString()
+        : null,
     })
     .eq('id', disputeId)
     .select()
@@ -219,7 +257,8 @@ export async function resolveDispute(db, disputeId, adminId, { outcome, resoluti
 
   if (error) throw error
   const evidence = await loadEvidence(db, disputeId)
-  return mapDisputeToClient(data, evidence)
+  const client = mapDisputeToClient(data, evidence)
+  return { ...client, payoutActions: payoutResult.actions }
 }
 
 export async function listOpenDisputesForAdmin(db) {

@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { Mail, Lock, LogIn, ArrowRight } from '../components/icons'
 import { useAuth } from '../context/AuthContext'
 import { PENDING_APPLY_KEY } from '../hooks/useArtistApplication'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import BrandLogo from '../components/BrandLogo'
 import ThemeToggle from '../components/ThemeToggle'
 import OAuthButtons from '../components/OAuthButtons'
@@ -26,7 +27,9 @@ export default function SignIn() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [view, setView] = useState('sign-in') // 'sign-in', 'forgot-password', 'forgot-password-success'
+  const [view, setView] = useState('sign-in') // sign-in | forgot-password | forgot-password-success | mfa
+  const [mfaFactorId, setMfaFactorId] = useState(null)
+  const [mfaCode, setMfaCode] = useState('')
 
   useEffect(() => {
     const msg = readOAuthErrorFromUrl()
@@ -39,6 +42,11 @@ export default function SignIn() {
     }
   }, [])
 
+  const finishSignIn = () => {
+    const hasPendingApplication = sessionStorage.getItem(PENDING_APPLY_KEY)
+    navigate(hasPendingApplication ? '/application-status' : '/home')
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
@@ -47,12 +55,48 @@ export default function SignIn() {
       const { error } = await signIn({ email, password })
       if (error) {
         setError(error.message)
-      } else {
-        const hasPendingApplication = sessionStorage.getItem(PENDING_APPLY_KEY)
-        navigate(hasPendingApplication ? '/application-status' : '/home')
+        return
       }
+
+      if (isSupabaseConfigured && supabase) {
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+        if (aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2') {
+          const { data: factors, error: factorError } = await supabase.auth.mfa.listFactors()
+          if (factorError) throw factorError
+          const verified = factors?.totp?.find((f) => f.status === 'verified')
+          if (verified) {
+            setMfaFactorId(verified.id)
+            setView('mfa')
+            return
+          }
+        }
+      }
+
+      finishSignIn()
     } catch (err) {
       setError(err.message || 'Sign in failed. Try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMfaVerify = async (e) => {
+    e.preventDefault()
+    if (!supabase || !mfaFactorId) return
+    setError('')
+    setLoading(true)
+    try {
+      const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: mfaFactorId })
+      if (challengeError) throw challengeError
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId: mfaFactorId,
+        challengeId: challenge.id,
+        code: mfaCode.trim(),
+      })
+      if (verifyError) throw verifyError
+      finishSignIn()
+    } catch (err) {
+      setError(err.message || 'Invalid authenticator code')
     } finally {
       setLoading(false)
     }
@@ -85,8 +129,8 @@ export default function SignIn() {
           <div className="logo" style={{ justifyContent: 'center', borderBottom: 'none', paddingBottom: 0, marginBottom: 16 }}>
             <BrandLogo variant="auth" />
           </div>
-          <h1>{view === 'sign-in' ? 'Welcome back' : view === 'forgot-password-success' ? 'Check your email' : 'Reset your password'}</h1>
-          <p>{view === 'sign-in' ? 'Sign in to your account to continue' : view === 'forgot-password-success' ? 'A password reset link has been sent.' : 'Enter your email to receive a reset link'}</p>
+          <h1>{view === 'mfa' ? 'Two-factor authentication' : view === 'sign-in' ? 'Welcome back' : view === 'forgot-password-success' ? 'Check your email' : 'Reset your password'}</h1>
+          <p>{view === 'mfa' ? 'Enter the 6-digit code from your authenticator app' : view === 'sign-in' ? 'Sign in to your account to continue' : view === 'forgot-password-success' ? 'A password reset link has been sent.' : 'Enter your email to receive a reset link'}</p>
         </div>
 
         {isMockMode && (
@@ -101,6 +145,27 @@ export default function SignIn() {
           <div style={{ textAlign: 'center', marginTop: 24 }}>
             <button className="btn btn-primary" onClick={() => setView('sign-in')}>Return to Sign In</button>
           </div>
+        ) : view === 'mfa' ? (
+          <form onSubmit={handleMfaVerify}>
+            <div className="form-group">
+              <label className="form-label">Authenticator code</label>
+              <input
+                className="form-input"
+                placeholder="123456"
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+              />
+            </div>
+            <button className="btn btn-primary btn-lg auth-submit" type="submit" disabled={loading || mfaCode.length < 6}>
+              {loading ? 'Verifying…' : 'Verify & continue'}
+            </button>
+            <button type="button" className="btn btn-ghost" style={{ marginTop: 12, width: '100%' }} onClick={() => { setView('sign-in'); setMfaCode('') }}>
+              Back
+            </button>
+          </form>
         ) : (
           <form onSubmit={view === 'sign-in' ? handleSubmit : handleForgotPassword}>
             <div className="form-group">

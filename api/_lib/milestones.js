@@ -16,8 +16,14 @@ export const DEFAULT_MILESTONE_TITLES = [
   { title: 'Final approval & delivery', description: 'Final payment upon approved deliverables' },
 ]
 
-/** Split total contract value into three milestone amounts (33/33/34). */
-export function splitMilestoneAmounts(totalValue) {
+/** Split total contract value into three milestone amounts (33/33/34 or custom). */
+export function splitMilestoneAmounts(totalValue, customAmounts = null) {
+  if (Array.isArray(customAmounts) && customAmounts.length === 3) {
+    const parsed = customAmounts.map((n) => Math.round(Number(n) || 0))
+    const sum = parsed.reduce((a, b) => a + b, 0)
+    const total = Math.round(Number(totalValue) || 0)
+    if (sum === total && parsed.every((n) => n >= 0)) return parsed
+  }
   const total = Math.round(Number(totalValue) || 0)
   const third = Math.floor(total / 3)
   const remainder = total - third * 2
@@ -40,8 +46,8 @@ export function mapMilestoneToClient(row) {
   }
 }
 
-export function buildDefaultMilestoneRows(contractId, totalValue) {
-  const amounts = splitMilestoneAmounts(totalValue)
+export function buildDefaultMilestoneRows(contractId, totalValue, customAmounts = null) {
+  const amounts = splitMilestoneAmounts(totalValue, customAmounts)
   return DEFAULT_MILESTONE_TITLES.map((m, i) => ({
     contract_id: contractId,
     sort_order: i,
@@ -50,6 +56,47 @@ export function buildDefaultMilestoneRows(contractId, totalValue) {
     amount: amounts[i],
     status: 'awaiting_payment',
   }))
+}
+
+export async function updateMilestoneAmounts(db, contractId, userId, amounts) {
+  const { data: contract, error } = await db
+    .from('contracts')
+    .select('*')
+    .eq('id', contractId)
+    .single()
+
+  if (error) throw error
+  if (!(await userCanAccessMilestoneContract(db, userId, contract))) {
+    throw new Error('Forbidden')
+  }
+
+  const parsed = splitMilestoneAmounts(contract.total_value, amounts)
+  const sum = parsed.reduce((a, b) => a + b, 0)
+  if (sum !== Math.round(Number(contract.total_value) || 0)) {
+    throw new Error('Milestone amounts must sum to the contract value')
+  }
+
+  const milestones = await listMilestonesForContract(db, contractId)
+  if (milestones.some((m) => m.status !== 'awaiting_payment')) {
+    throw new Error('Cannot change amounts after payments have started')
+  }
+
+  await db
+    .from('contracts')
+    .update({ milestone_amounts: parsed, updated_at: new Date().toISOString() })
+    .eq('id', contractId)
+
+  for (let i = 0; i < parsed.length; i++) {
+    const milestone = milestones.find((m) => m.sortOrder === i)
+    if (milestone) {
+      await db
+        .from('contract_milestones')
+        .update({ amount: parsed[i], updated_at: new Date().toISOString() })
+        .eq('id', milestone.id)
+    }
+  }
+
+  return listMilestonesForContract(db, contractId)
 }
 
 export async function ensureContractMilestones(db, contract) {
@@ -65,7 +112,7 @@ export async function ensureContractMilestones(db, contract) {
     return listMilestonesForContract(db, contract.id)
   }
 
-  const rows = buildDefaultMilestoneRows(contract.id, contract.total_value)
+  const rows = buildDefaultMilestoneRows(contract.id, contract.total_value, contract.milestone_amounts)
   const { data, error } = await db.from('contract_milestones').insert(rows).select()
   if (error) throw error
   return (data || []).map(mapMilestoneToClient)

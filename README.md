@@ -80,7 +80,7 @@ The project includes a `vercel.json` config. API routes live under `/api/*` as V
    - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `FRONTEND_URL`
    - `RESEND_API_KEY`, `EMAIL_FROM` (optional, for email alerts)
    - `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_CALENDAR_REDIRECT_URI` (optional)
-3. Run SQL migrations in Supabase (see `supabase/*.sql`), including `disputes.sql` and `google-calendar-sync.sql`.
+3. Run SQL migrations in Supabase (see `supabase/*.sql`), including `dispute-payouts-migration.sql` and `portfolio-storage.sql`.
 4. Deploy.
 
 ### Local full-stack (optional)

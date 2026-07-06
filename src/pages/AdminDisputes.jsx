@@ -18,6 +18,8 @@ export default function AdminDisputes() {
   const [selectedId, setSelectedId] = useState(null)
   const [outcome, setOutcome] = useState('no_action')
   const [notes, setNotes] = useState('')
+  const [splitEmployer, setSplitEmployer] = useState('')
+  const [splitArtist, setSplitArtist] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
 
@@ -37,9 +39,24 @@ export default function AdminDisputes() {
     setBusy(true)
     setMsg('')
     try {
-      await resolveDispute(selected.id, { outcome, resolutionNotes: notes.trim() })
-      setMsg('Dispute resolved.')
+      const payload = {
+        outcome,
+        resolutionNotes: notes.trim(),
+      }
+      if (outcome === 'split') {
+        payload.splitEmployerCents = Math.round(parseFloat(splitEmployer || '0') * 100)
+        payload.splitArtistCents = Math.round(parseFloat(splitArtist || '0') * 100)
+      }
+      const resolved = await resolveDispute(selected.id, payload)
+      const payoutNote = resolved.payoutError
+        ? ` Resolved with payout warnings: ${resolved.payoutError}`
+        : resolved.payoutStatus === 'executed'
+          ? ' Stripe payout executed.'
+          : ''
+      setMsg(`Dispute resolved.${payoutNote}`)
       setNotes('')
+      setSplitEmployer('')
+      setSplitArtist('')
       await refetch()
     } catch (err) {
       setMsg(err.message || 'Failed to resolve')
@@ -52,7 +69,7 @@ export default function AdminDisputes() {
     <div className="page-container">
       <div className="page-header">
         <h1>Dispute arbitration</h1>
-        <p>Review open cases, evidence, and record binding outcomes.</p>
+        <p>Review open cases, evidence, and record binding outcomes with automated Stripe refunds/releases.</p>
       </div>
 
       {loading ? (
@@ -103,15 +120,32 @@ export default function AdminDisputes() {
                       ))}
                     </select>
                   </div>
+                  {outcome === 'split' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Refund to employer ($)</label>
+                        <input className="form-input" type="number" min="0" step="0.01" value={splitEmployer} onChange={(e) => setSplitEmployer(e.target.value)} required />
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Release to artist ($)</label>
+                        <input className="form-input" type="number" min="0" step="0.01" value={splitArtist} onChange={(e) => setSplitArtist(e.target.value)} required />
+                      </div>
+                    </div>
+                  )}
                   <div className="form-group">
                     <label className="form-label">Resolution notes (shared with both parties)</label>
                     <textarea className="form-input" rows={4} required value={notes} onChange={(e) => setNotes(e.target.value)} />
                   </div>
-                  {msg && <p style={{ fontSize: 13, color: msg.includes('resolved') ? 'var(--success)' : 'var(--danger)', marginBottom: 12 }}>{msg}</p>}
+                  {msg && <p style={{ fontSize: 13, color: msg.includes('resolved') && !msg.includes('warnings') ? 'var(--success)' : 'var(--danger)', marginBottom: 12 }}>{msg}</p>}
                   <button type="submit" className="btn btn-success" disabled={busy}>
                     <CheckCircle size={16} /> {busy ? 'Saving…' : 'Resolve dispute'}
                   </button>
                 </form>
+              )}
+              {selected.payoutStatus && selected.status === 'resolved' && (
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 16 }}>
+                  Payout: {selected.payoutStatus}{selected.payoutError ? ` — ${selected.payoutError}` : ''}
+                </p>
               )}
             </div>
           ) : (

@@ -37,10 +37,13 @@ export default async function handler(req, res) {
       const artistId = await getArtistIdForProfile(db, user.id)
       let imported = 0
 
-      if (artistId) {
-        const result = await importGoogleBusyBlocks(db, user.id, artistId)
-        imported = result.imported
-      }
+    if (artistId) {
+      const result = await importGoogleBusyBlocks(db, user.id, artistId)
+      imported = result.imported
+    } else {
+      const result = await importGoogleBusyBlocks(db, user.id, null)
+      imported = result.imported
+    }
 
       const bookings = await listBookingsForUser(db, user.id)
       for (const b of bookings) {

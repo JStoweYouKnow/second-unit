@@ -7,6 +7,10 @@ import { useAuth } from '../context/AuthContext'
 import { isArtistProfile } from '../lib/roleView'
 import { useArtist } from '../hooks/useData'
 import { useArtistReviews } from '../hooks/useArtistReviews'
+import { portfolio as portfolioApi } from '../lib/api'
+import { uploadPortfolioMedia } from '../lib/portfolioMedia'
+import { isSupabaseConfigured } from '../lib/supabase'
+import { Upload, Loader2 } from '../components/icons'
 import HirerReviewForm from '../components/HirerReviewForm'
 import ArtistReviewSettings from '../components/ArtistReviewSettings'
 import ReviewList from '../components/ReviewList'
@@ -65,7 +69,23 @@ export default function ArtistProfile() {
 
   const [portfolioItems, setPortfolioItems] = useState([])
   const [videoLinks, setVideoLinks] = useState([])
+  const [portfolioBusy, setPortfolioBusy] = useState(false)
+  const [portfolioError, setPortfolioError] = useState('')
+  const portfolioInputRef = useRef(null)
   const carouselRef = useRef(null)
+
+  function mapPortfolioRow(p) {
+    const url = p.media_url || p.image || p.video
+    const isVideo = p.media_type === 'video' || !!p.video
+    return {
+      id: p.id,
+      title: p.title || 'Portfolio',
+      image: isVideo ? null : url,
+      video: isVideo ? url : null,
+      colorIdx: p.colorIdx ?? 0,
+      storagePath: p.storage_path ?? null,
+    }
+  }
 
   const scrollCarousel = (direction) => {
     if (carouselRef.current) {
@@ -79,11 +99,34 @@ export default function ArtistProfile() {
 
   useEffect(() => {
     if (artist?.portfolio?.length) {
-      setPortfolioItems(artist.portfolio)
+      setPortfolioItems(artist.portfolio.map(mapPortfolioRow))
     } else {
       setPortfolioItems([])
     }
   }, [artist?.portfolio])
+
+  const handlePortfolioUpload = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !artist?.id) return
+    setPortfolioBusy(true)
+    setPortfolioError('')
+    try {
+      const { storagePath, mediaUrl, mediaType } = await uploadPortfolioMedia(artist.id, file)
+      const created = await portfolioApi.create({
+        title: file.name.replace(/\.[^.]+$/, ''),
+        mediaUrl,
+        mediaType,
+        storagePath,
+        sortOrder: portfolioItems.length,
+      })
+      setPortfolioItems((prev) => [...prev, mapPortfolioRow(created)])
+    } catch (err) {
+      setPortfolioError(err.message || 'Upload failed')
+    } finally {
+      setPortfolioBusy(false)
+    }
+  }
 
   useEffect(() => {
     if (artist?.videoLinks) setVideoLinks(artist.videoLinks)
@@ -254,9 +297,20 @@ export default function ArtistProfile() {
 
           {activeTab === 'portfolio' && (
             <div className="slide-up">
+              {isOwnProfile && isSupabaseConfigured && (
+                <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <input ref={portfolioInputRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" hidden onChange={handlePortfolioUpload} />
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => portfolioInputRef.current?.click()} disabled={portfolioBusy}>
+                    {portfolioBusy ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />}
+                    {portfolioBusy ? ' Uploading…' : ' Upload media'}
+                  </button>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>JPG, PNG, WebP, MP4, WebM, MOV — max 50MB</span>
+                  {portfolioError && <span style={{ fontSize: 12, color: 'var(--danger)' }}>{portfolioError}</span>}
+                </div>
+              )}
               {portfolioItems.length === 0 && videoLinks.length === 0 ? (
                 <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
-                  {isOwnProfile ? 'Add portfolio work in your account settings.' : 'No portfolio items yet.'}
+                  {isOwnProfile ? 'Upload portfolio images or video reels above.' : 'No portfolio items yet.'}
                 </div>
               ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>

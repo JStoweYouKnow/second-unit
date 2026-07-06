@@ -20,6 +20,7 @@ const ContractSchema = z.object({
   attachmentUrl: z.string().optional().nullable(),
   attachmentName: z.string().optional().nullable(),
   attachmentMime: z.string().optional().nullable(),
+  milestoneAmounts: z.array(z.number().int().nonnegative()).length(3).optional(),
 })
 
 export default async function handler(req, res) {

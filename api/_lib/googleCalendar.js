@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { FRONTEND_URL } from './stripe.js'
+import { ensureCalendarFeedToken } from './icalFeed.js'
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
@@ -312,11 +313,20 @@ export async function getCalendarConnectionStatus(db, profileId) {
     .eq('profile_id', profileId)
     .maybeSingle()
 
+  let feedUrl = null
+  try {
+    const token = await ensureCalendarFeedToken(db, profileId)
+    feedUrl = `${FRONTEND_URL}/api/calendar/feed/${token}`
+  } catch {
+    feedUrl = null
+  }
+
   return {
     connected: !!data,
     syncEnabled: data?.sync_enabled ?? false,
     calendarId: data?.calendar_id ?? null,
     lastSyncedAt: data?.last_synced_at ?? null,
+    feedUrl,
   }
 }
 

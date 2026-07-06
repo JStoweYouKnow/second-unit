@@ -37,9 +37,7 @@ export default async function handler(req, res) {
     await saveCalendarConnection(db, profileId, tokens)
 
     const artistId = await getArtistIdForProfile(db, profileId)
-    if (artistId) {
-      await importGoogleBusyBlocks(db, profileId, artistId)
-    }
+    await importGoogleBusyBlocks(db, profileId, artistId ?? null)
 
     return res.redirect(`${FRONTEND_URL}/account?calendar=connected`)
   } catch (err) {

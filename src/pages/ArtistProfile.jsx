@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Heart, Star, MapPin, Calendar, Play, Globe, AtSign, Camera, Briefcase, Send, ChevronUp, ChevronDown } from '../components/icons'
 import { useApp } from '../context/AppContext'
 import { useState, useEffect, useRef } from 'react'
@@ -57,12 +57,17 @@ function VideoPlayer({ url }) {
 export default function ArtistProfile() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { favorites, toggleFavorite, startConversation } = useApp()
   const { profile } = useAuth()
   const [showCalendar, setShowCalendar] = useState(false)
   const [activeTab, setActiveTab] = useState('portfolio')
   const { artist, loading: artistLoading } = useArtist(id)
   const reviewState = useArtistReviews(id)
+
+  useEffect(() => {
+    if (searchParams.get('tab') === 'reviews') setActiveTab('reviews')
+  }, [searchParams])
 
   const isOwnProfile = isArtistProfile(profile) && artist?.profileId === profile?.id
   const isHirer = profile && !isArtistProfile(profile)
@@ -192,6 +197,7 @@ export default function ArtistProfile() {
     updateShowOnProfile,
     updateReviewVisibility,
     submitReview,
+    submitReviewResponse,
     getVisibility,
     hirerExistingReview,
   } = reviewState
@@ -538,6 +544,8 @@ export default function ArtistProfile() {
 
               <ReviewList
                 reviews={reviewsForDisplay}
+                isOwnProfile={isOwnProfile}
+                onReply={isOwnProfile ? submitReviewResponse : undefined}
                 emptyMessage={
                   isOwnProfile
                     ? 'No reviews yet. When hirers leave feedback, you can choose what appears on your public profile.'

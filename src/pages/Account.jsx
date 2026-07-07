@@ -7,6 +7,11 @@ import { User, Mail, Shield, Bell, CreditCard, Camera } from '../components/icon
 import { ArtistFormFields } from '../components/ArtistFormFields'
 import ThemeToggle from '../components/ThemeToggle'
 import { MfaSettings } from '../components/MfaSettings'
+import {
+  isPushSupported,
+  subscribeToPushNotifications,
+  unsubscribeFromPushNotifications,
+} from '../lib/pushNotifications'
 import { useArtistProfile, saveArtistProfile } from '../hooks/useArtistProfile'
 import { useMyApplication, isPendingApplicant } from '../hooks/useArtistApplication'
 import { artistRecordToForm, emptyArtistForm } from '../lib/artistProfile'
@@ -32,7 +37,9 @@ export default function Account() {
     projects: true,
     billing: true,
     marketing: false,
+    push: false,
   })
+  const [pushBusy, setPushBusy] = useState(false)
   const [paymentMethods, setPaymentMethods] = useState([])
   const [billingLoading, setBillingLoading] = useState(false)
   const [calendarStatus, setCalendarStatus] = useState({ connected: false, feedUrl: null })
@@ -145,6 +152,44 @@ export default function Account() {
       setError(err.message || 'Failed to save preferences')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleEnablePush = async () => {
+    setPushBusy(true)
+    setError('')
+    try {
+      await subscribeToPushNotifications()
+      if (isSupabaseConfigured) {
+        const savedPrefs = await profileApi.getNotificationPrefs()
+        setNotifPrefs(savedPrefs)
+      } else {
+        setNotifPrefs((p) => ({ ...p, push: true }))
+      }
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (err) {
+      setError(err.message || 'Could not enable push notifications')
+    } finally {
+      setPushBusy(false)
+    }
+  }
+
+  const handleDisablePush = async () => {
+    setPushBusy(true)
+    setError('')
+    try {
+      await unsubscribeFromPushNotifications()
+      if (isSupabaseConfigured) {
+        const savedPrefs = await profileApi.getNotificationPrefs()
+        setNotifPrefs(savedPrefs)
+      } else {
+        setNotifPrefs((p) => ({ ...p, push: false }))
+      }
+    } catch (err) {
+      setError(err.message || 'Could not disable push notifications')
+    } finally {
+      setPushBusy(false)
     }
   }
 
@@ -504,6 +549,34 @@ export default function Account() {
                     </div>
                   </label>
                 ))}
+              </div>
+
+              <div style={{ marginTop: 32, padding: 20, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', maxWidth: 600 }}>
+                <h4 style={{ margin: '0 0 8px 0' }}>Browser push notifications</h4>
+                <p style={{ margin: '0 0 16px 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  Get alerts on this device when you receive messages, booking updates, or review replies — even when The Callsheet tab is in the background.
+                </p>
+                {!isPushSupported() ? (
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
+                    Push notifications are not supported in this browser.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 13, color: notifPrefs.push ? 'var(--success)' : 'var(--text-muted)' }}>
+                      {notifPrefs.push ? 'Enabled on this device' : 'Not enabled'}
+                      {typeof Notification !== 'undefined' && Notification.permission === 'denied' && ' — blocked in browser settings'}
+                    </span>
+                    {notifPrefs.push ? (
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={handleDisablePush} disabled={pushBusy}>
+                        {pushBusy ? 'Updating…' : 'Disable push'}
+                      </button>
+                    ) : (
+                      <button type="button" className="btn btn-primary btn-sm" onClick={handleEnablePush} disabled={pushBusy || (typeof Notification !== 'undefined' && Notification.permission === 'denied')}>
+                        {pushBusy ? 'Enabling…' : 'Enable push'}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div style={{ marginTop: 32, display: 'flex', alignItems: 'center', gap: 16 }}>

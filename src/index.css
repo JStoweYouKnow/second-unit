@@ -1577,6 +1577,60 @@ button.mobile-topbar-brand--home:focus-visible {
   background: var(--surface);
   border: 1px solid var(--border);
 }
+.review-card__response {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--gold);
+  background: var(--surface);
+}
+.review-card__response-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+.review-card__response-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+.review-card__response-date {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.review-response-form {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.review-response-form__label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.review-response-form__input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.review-response-form__error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--danger);
+}
 
 /* ===== Landing page ===== */
 .landing-page {

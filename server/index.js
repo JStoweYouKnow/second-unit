@@ -74,7 +74,15 @@ import {
   updateReviewVisibility,
   updateArtistReviewSettings,
   getArtistReviewSettings,
+  upsertReviewResponse,
 } from '../api/_lib/reviews.js'
+import {
+  getVapidPublicKey,
+  isPushConfigured,
+  savePushSubscription,
+  removePushSubscription,
+} from '../api/_lib/push.js'
+import { updateNotificationPrefs } from '../api/_lib/notifications.js'
 import {
   listMilestonesForContract,
   ensureContractMilestones,
@@ -895,6 +903,61 @@ app.patch('/api/reviews/:id', async (req, res) => {
     res.json(review)
   } catch (err) {
     res.status(err.message === 'Forbidden' ? 403 : 500).json({ error: err.message })
+  }
+})
+
+app.patch('/api/reviews/:id/respond', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db || supabase
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const review = await upsertReviewResponse(database, req.params.id, user.id, req.body.response)
+    res.json(review)
+  } catch (err) {
+    const status =
+      err.message === 'Forbidden' ? 403
+        : err.message.includes('required') || err.message.includes('2000') ? 400
+          : 500
+    res.status(status).json({ error: err.message })
+  }
+})
+
+// ---- Web Push ----
+app.get('/api/push/vapid-public-key', (_req, res) => {
+  res.json({
+    configured: isPushConfigured(),
+    publicKey: getVapidPublicKey(),
+  })
+})
+
+app.post('/api/push/subscribe', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db || supabase
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const userAgent = req.headers['user-agent'] || null
+    await savePushSubscription(database, user.id, req.body, userAgent)
+    const prefs = await updateNotificationPrefs(database, user.id, { push: true })
+    res.status(201).json({ ok: true, prefs })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.delete('/api/push/subscribe', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db || supabase
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const endpoint = typeof req.body?.endpoint === 'string' ? req.body.endpoint : null
+    await removePushSubscription(database, user.id, endpoint)
+    const prefs = await updateNotificationPrefs(database, user.id, { push: false })
+    res.json({ ok: true, prefs })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
   }
 })
 

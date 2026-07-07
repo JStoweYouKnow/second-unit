@@ -361,4 +361,27 @@ export const reviews = {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
+
+  respond: (reviewId, response) =>
+    request(`/api/reviews/${reviewId}/respond`, {
+      method: 'PATCH',
+      body: JSON.stringify({ response }),
+    }),
+}
+
+// ---- Web Push ----
+export const push = {
+  subscribe: (subscription) =>
+    request('/api/push/subscribe', {
+      method: 'POST',
+      body: JSON.stringify(subscription),
+    }),
+
+  unsubscribe: (endpoint) =>
+    request('/api/push/subscribe', {
+      method: 'DELETE',
+      body: JSON.stringify(endpoint ? { endpoint } : {}),
+    }),
+
+  getVapidPublicKey: () => request('/api/push/vapid-public-key'),
 }

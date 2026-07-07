@@ -11,6 +11,7 @@ import {
   getAverageRating,
   submitHirerReview,
   findHirerReview,
+  saveReviewResponseLocal,
 } from '../lib/reviewsStore'
 
 function getAverage(reviews) {
@@ -107,6 +108,20 @@ export function useArtistReviews(artistId) {
     [artistId, bump]
   )
 
+  const submitReviewResponse = useCallback(
+    async (reviewId, response) => {
+      if (isSupabaseConfigured) {
+        const review = await reviewsApi.respond(reviewId, response)
+        bump()
+        return review
+      }
+      const review = saveReviewResponseLocal(artistId, reviewId, response)
+      bump()
+      return review
+    },
+    [artistId, bump]
+  )
+
   const getVisibility = useCallback(
     (reviewId) => {
       if (isSupabaseConfigured) {
@@ -138,6 +153,7 @@ export function useArtistReviews(artistId) {
     updateShowOnProfile,
     updateReviewVisibility,
     submitReview,
+    submitReviewResponse,
     getVisibility,
     hirerExistingReview,
     refresh: bump,

@@ -12,6 +12,7 @@ const PrefsSchema = z.object({
   projects: z.boolean().optional(),
   billing: z.boolean().optional(),
   marketing: z.boolean().optional(),
+  push: z.boolean().optional(),
 })
 
 export default async function handler(req, res) {

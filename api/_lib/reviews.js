@@ -12,6 +12,8 @@ export function mapReviewToClient(row) {
     text: row.body ?? '',
     createdAt: row.created_at,
     visibleOnProfile: row.visible_on_profile !== false,
+    artistResponse: row.artist_response ?? '',
+    artistResponseAt: row.artist_response_at ?? null,
     source: 'hirer',
   }
 }
@@ -88,6 +90,45 @@ export async function updateReviewVisibility(db, reviewId, userId, visible) {
     .single()
 
   if (updateError) throw updateError
+  return mapReviewToClient(data)
+}
+
+export async function upsertReviewResponse(db, reviewId, userId, responseText) {
+  const { data: review, error } = await db
+    .from('reviews')
+    .select('*')
+    .eq('id', reviewId)
+    .single()
+
+  if (error) throw error
+
+  const artistId = await getArtistIdForProfile(db, userId)
+  if (!artistId || review.reviewee_artist_id !== artistId) {
+    throw new Error('Forbidden')
+  }
+
+  const text = (responseText || '').trim()
+  if (!text) throw new Error('Response text required')
+  if (text.length > 2000) throw new Error('Response must be 2000 characters or fewer')
+
+  const { data, error: updateError } = await db
+    .from('reviews')
+    .update({
+      artist_response: text,
+      artist_response_at: new Date().toISOString(),
+    })
+    .eq('id', reviewId)
+    .select()
+    .single()
+
+  if (updateError) throw updateError
+
+  const { notifyReviewResponse } = await import('./notificationEvents.js')
+  await notifyReviewResponse(db, {
+    review: data,
+    artistProfileId: userId,
+  })
+
   return mapReviewToClient(data)
 }
 

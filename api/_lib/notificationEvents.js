@@ -233,3 +233,45 @@ export async function notifyMilestoneReleased(db, { contract, milestone, artistP
       : {}
   )
 }
+
+export async function notifyReviewResponse(db, { review, artistProfileId }) {
+  if (!review?.reviewer_id || !artistProfileId) return null
+
+  const { data: artistRow } = await db
+    .from('artists')
+    .select('stage_name, profile_id')
+    .eq('profile_id', artistProfileId)
+    .maybeSingle()
+
+  const artistName = artistRow?.stage_name || 'Artist'
+  const body = (review.artist_response || '').trim()
+  const preview = body.length > 120 ? `${body.slice(0, 120)}…` : body
+  const profile = await emailProfile(db, review.reviewer_id)
+
+  return notifyUser(
+    db,
+    review.reviewer_id,
+    {
+      type: 'system',
+      title: `${artistName} replied to your review`,
+      body: preview,
+      link: `/artist/${artistProfileId}?tab=reviews`,
+    },
+    profile
+      ? {
+          email: {
+            to: profile.email,
+            subject: `${artistName} replied to your review`,
+            html: emailLayout({
+              title: `${artistName} replied to your review`,
+              body: preview,
+              ctaLabel: 'View review',
+              ctaUrl: `${FRONTEND_URL}/artist/${artistProfileId}?tab=reviews`,
+            }),
+            prefs: profile.notification_prefs,
+            category: 'booking',
+          },
+        }
+      : {}
+  )
+}

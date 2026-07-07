@@ -113,3 +113,20 @@ export function submitHirerReview(input) {
   saveHirerReviews(all)
   return review
 }
+
+export function saveReviewResponseLocal(artistId, reviewId, response) {
+  const all = loadHirerReviews()
+  const idx = all.findIndex(
+    (r) => r.id === reviewId && String(r.artistId) === String(artistId)
+  )
+  if (idx < 0) throw new Error('Review not found')
+
+  const updated = {
+    ...all[idx],
+    artistResponse: response.trim(),
+    artistResponseAt: new Date().toISOString(),
+  }
+  all[idx] = updated
+  saveHirerReviews(all)
+  return updated
+}

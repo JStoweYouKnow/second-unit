@@ -3,6 +3,7 @@ const DEFAULT_PREFS = {
   projects: true,
   billing: true,
   marketing: false,
+  push: false,
 }
 
 export function mapNotificationToClient(row) {
@@ -38,7 +39,8 @@ export async function getNotificationPrefs(db, userId) {
 }
 
 export async function updateNotificationPrefs(db, userId, prefs) {
-  const next = { ...DEFAULT_PREFS, ...prefs }
+  const current = await getNotificationPrefs(db, userId)
+  const next = { ...current, ...prefs }
   const { data, error } = await db
     .from('profiles')
     .update({ notification_prefs: next, updated_at: new Date().toISOString() })
@@ -78,7 +80,13 @@ export async function createNotification(db, {
     console.error('[notifications] insert failed:', error.message)
     return null
   }
-  return mapNotificationToClient(data)
+  const notification = mapNotificationToClient(data)
+  import('./push.js')
+    .then(({ sendPushToUser }) =>
+      sendPushToUser(db, userId, { title, body: body ?? '', link, type })
+    )
+    .catch((err) => console.error('[push] dispatch failed:', err.message))
+  return notification
 }
 
 export async function listNotificationsForUser(db, userId, { limit = 50 } = {}) {

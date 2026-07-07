@@ -14,6 +14,7 @@ import { useConversations } from './hooks/useConversations'
 import { useMessageRealtime } from './hooks/useMessageRealtime'
 import { useContracts } from './hooks/useContracts'
 import NotificationPanel from './components/NotificationPanel'
+import PushNotificationSync from './components/PushNotificationSync'
 import ErrorBoundary from './components/ErrorBoundary'
 import BrandLogo from './components/BrandLogo'
 import ThemeToggle from './components/ThemeToggle'
@@ -480,6 +481,7 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <NotificationProvider>
+          <PushNotificationSync />
           <Suspense fallback={<LoadingScreen />}>
             <Routes>
               <Route path="/" element={<Landing />} />

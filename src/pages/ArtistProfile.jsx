@@ -8,9 +8,9 @@ import { isArtistProfile } from '../lib/roleView'
 import { useArtist } from '../hooks/useData'
 import { useArtistReviews } from '../hooks/useArtistReviews'
 import { portfolio as portfolioApi } from '../lib/api'
-import { uploadPortfolioMedia } from '../lib/portfolioMedia'
+import { uploadPortfolioMedia, deletePortfolioStoragePath } from '../lib/portfolioMedia'
 import { isSupabaseConfigured } from '../lib/supabase'
-import { Upload, Loader2 } from '../components/icons'
+import { Upload, Loader2, Trash2 } from '../components/icons'
 import HirerReviewForm from '../components/HirerReviewForm'
 import ArtistReviewSettings from '../components/ArtistReviewSettings'
 import ReviewList from '../components/ReviewList'
@@ -105,6 +105,45 @@ export default function ArtistProfile() {
     }
   }, [artist?.portfolio])
 
+  const persistPortfolioOrder = async (nextList) => {
+    setPortfolioItems(nextList)
+    if (!isOwnProfile || !isSupabaseConfigured) return
+    try {
+      await portfolioApi.reorder(nextList.map((p) => p.id))
+    } catch (err) {
+      setPortfolioError(err.message || 'Could not save order')
+    }
+  }
+
+  const movePortfolioItem = (index, direction) => {
+    const newList = [...portfolioItems]
+    const targetIndex = index + direction
+    if (targetIndex < 0 || targetIndex >= newList.length) return
+    const temp = newList[index]
+    newList[index] = newList[targetIndex]
+    newList[targetIndex] = temp
+    persistPortfolioOrder(newList)
+  }
+
+  const handleDeletePortfolioItem = async (item) => {
+    if (!item?.id || !window.confirm('Remove this portfolio item?')) return
+    setPortfolioBusy(true)
+    setPortfolioError('')
+    try {
+      if (isSupabaseConfigured) {
+        await portfolioApi.remove(item.id)
+      }
+      if (item.storagePath) {
+        await deletePortfolioStoragePath(item.storagePath)
+      }
+      setPortfolioItems((prev) => prev.filter((p) => p.id !== item.id))
+    } catch (err) {
+      setPortfolioError(err.message || 'Could not delete item')
+    } finally {
+      setPortfolioBusy(false)
+    }
+  }
+
   const handlePortfolioUpload = async (e) => {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -131,12 +170,6 @@ export default function ArtistProfile() {
   useEffect(() => {
     if (artist?.videoLinks) setVideoLinks(artist.videoLinks)
   }, [artist?.videoLinks])
-
-  useEffect(() => {
-    if (portfolioItems.length > 0) {
-      localStorage.setItem(`su_portfolio_order_${id}`, JSON.stringify(portfolioItems.map(p => p.id)))
-    }
-  }, [portfolioItems, id])
 
   const moveItem = (list, setList, index, direction) => {
     const newList = [...list]
@@ -370,19 +403,32 @@ export default function ArtistProfile() {
                         backdropFilter: 'blur(4px)',
                         border: '1px solid rgba(255,255,255,0.1)'
                       }}>
-                        <button 
-                          onClick={() => moveItem(portfolioItems, setPortfolioItems, i, -1)} 
-                          disabled={i === 0}
+                        <button
+                          type="button"
+                          onClick={() => movePortfolioItem(i, -1)}
+                          disabled={i === 0 || portfolioBusy}
                           style={{ background: 'none', border: 'none', color: i === 0 ? 'rgba(255,255,255,0.2)' : 'white', cursor: i === 0 ? 'default' : 'pointer', padding: 2 }}
+                          aria-label="Move up"
                         >
                           <ChevronUp size={16} />
                         </button>
-                        <button 
-                          onClick={() => moveItem(portfolioItems, setPortfolioItems, i, 1)} 
-                          disabled={i === portfolioItems.length - 1}
+                        <button
+                          type="button"
+                          onClick={() => movePortfolioItem(i, 1)}
+                          disabled={i === portfolioItems.length - 1 || portfolioBusy}
                           style={{ background: 'none', border: 'none', color: i === portfolioItems.length - 1 ? 'rgba(255,255,255,0.2)' : 'white', cursor: i === portfolioItems.length - 1 ? 'default' : 'pointer', padding: 2 }}
+                          aria-label="Move down"
                         >
                           <ChevronDown size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePortfolioItem(item)}
+                          disabled={portfolioBusy}
+                          style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: portfolioBusy ? 'default' : 'pointer', padding: 2 }}
+                          aria-label="Delete"
+                        >
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     )}

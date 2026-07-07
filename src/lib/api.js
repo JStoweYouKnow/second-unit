@@ -335,6 +335,9 @@ export const portfolio = {
     request('/api/portfolio', { method: 'POST', body: JSON.stringify(payload) }),
 
   remove: (id) => request(`/api/portfolio/${id}`, { method: 'DELETE' }),
+
+  reorder: (ids) =>
+    request('/api/portfolio/reorder', { method: 'PATCH', body: JSON.stringify({ ids }) }),
 }
 
 // ---- Reviews ----

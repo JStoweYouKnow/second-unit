@@ -1,9 +1,13 @@
 import { useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Calendar, Heart, Play, Star, MedalGold, MedalSilver, MedalBronze, Filter, DollarSign, MapPin, Globe, AtSign, ExternalLink, X } from '../components/icons'
-import { availableProjects } from '../data/mockData'
+import { Search, Calendar, Heart, Play, Star, Filter, DollarSign, MapPin, Globe, AtSign, X } from '../components/icons'
+import { buildOpenBriefCards } from '../lib/openBriefs'
 import { useArtists } from '../hooks/useData'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
+import { useBookings } from '../hooks/useBookings'
+import { useArtistProfile } from '../hooks/useArtistProfile'
+import { isArtistProfile } from '../lib/roleView'
 import CalendarModal from '../components/CalendarModal'
 
 function formatBudgetRange(min, max) {
@@ -58,7 +62,12 @@ function getVideoThumbnail(url) {
 
 export default function Leaderboard() {
   const navigate = useNavigate()
-  const { favorites, toggleFavorite } = useApp()
+  const { favorites, toggleFavorite, localProjects } = useApp()
+  const { profile, isAuthenticated } = useAuth()
+  const { artist: myArtist } = useArtistProfile(profile?.id)
+  const { bookings } = useBookings(isAuthenticated)
+  const isArtist = isArtistProfile(profile)
+  const me = isArtist ? myArtist : null
   const [search, setSearch] = useState('')
   const [calendarArtist, setCalendarArtist] = useState(null)
   const [hoveredId, setHoveredId] = useState(null)
@@ -148,6 +157,19 @@ export default function Leaderboard() {
     setAvailableOnly(false)
     setAvailableDate('')
   }, [])
+
+  const openBriefs = useMemo(
+    () =>
+      isAuthenticated
+        ? buildOpenBriefCards({
+            bookings,
+            contracts: localProjects,
+            isArtist,
+            artistId: me?.id,
+          })
+        : [],
+    [isAuthenticated, bookings, localProjects, isArtist, me?.id]
+  )
 
   return (
     <div className="page-container">
@@ -310,6 +332,62 @@ export default function Leaderboard() {
           </p>
         </section>
       </div>
+
+      {isAuthenticated && (
+        <section className="spotlight-projects slide-up" style={{ marginBottom: 32 }}>
+          <div className="spotlight-projects__head">
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20 }}>Your open briefs</h2>
+            <p className="spotlight-projects__sub">
+              Live booking requests and contract offers from your account — budgets are for reference; final fees are negotiated in thread.
+            </p>
+          </div>
+          <div className="spotlight-projects__grid">
+            {openBriefs.length === 0 ? (
+              <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
+                No open briefs yet. Pending bookings and active contracts appear here.
+              </div>
+            ) : (
+              openBriefs.map((proj) => (
+                <article
+                  key={proj.id}
+                  className="spotlight-project-card card"
+                  style={proj.isOffer ? { borderColor: 'var(--accent)', borderWidth: 1, borderStyle: 'solid' } : undefined}
+                >
+                  {proj.isOffer && (
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                      Contract offer
+                    </div>
+                  )}
+                  <div className="spotlight-project-card__top">
+                    <div>
+                      <h3 className="spotlight-project-card__title">{proj.title}</h3>
+                      <div className="spotlight-project-card__meta">
+                        <span className="spotlight-project-card__client">{proj.client}</span>
+                        <span className="spotlight-project-card__posted">Posted {proj.posted}</span>
+                      </div>
+                    </div>
+                    <div className="spotlight-project-card__budget" title="Budget for this brief">
+                      <DollarSign size={18} aria-hidden />
+                      <span>{formatBudgetRange(proj.budgetMin, proj.budgetMax)}</span>
+                    </div>
+                  </div>
+                  <div className="spotlight-project-card__row">
+                    <span className="spotlight-project-card__label"><MapPin size={14} aria-hidden /> {proj.location}</span>
+                    <span className="spotlight-project-card__label">Timeline: {proj.timeline}</span>
+                  </div>
+                  {proj.skills.length > 0 && (
+                    <div className="artist-skills" style={{ marginTop: 10 }}>
+                      {proj.skills.map((s) => (
+                        <span key={s} className="skill-tag">{s}</span>
+                      ))}
+                    </div>
+                  )}
+                </article>
+              ))
+            )}
+          </div>
+        </section>
+      )}
 
       <div className="artist-gallery-grid">
         {artistsLoading && (

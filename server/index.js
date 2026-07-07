@@ -1248,6 +1248,125 @@ app.get('/api/calendar/feed-token', async (req, res) => {
   }
 })
 
+const PortfolioReorderSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1),
+})
+
+app.get('/api/portfolio', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db || supabase
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  const artistId = await getArtistIdForProfile(database, user.id)
+  if (!artistId) return res.status(403).json({ error: 'Artist profile required' })
+  const { data, error } = await database
+    .from('portfolio_items')
+    .select('*')
+    .eq('artist_id', artistId)
+    .order('sort_order', { ascending: true })
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data || [])
+})
+
+app.post('/api/portfolio', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db || supabase
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  const artistId = await getArtistIdForProfile(database, user.id)
+  if (!artistId) return res.status(403).json({ error: 'Artist profile required' })
+  try {
+    const body = z.object({
+      title: z.string().min(1).max(200),
+      description: z.string().max(2000).optional().nullable(),
+      mediaUrl: z.string().url(),
+      mediaType: z.enum(['image', 'video']).default('image'),
+      storagePath: z.string().optional().nullable(),
+      sortOrder: z.number().int().min(0).optional(),
+    }).parse(req.body)
+    const { data, error } = await database
+      .from('portfolio_items')
+      .insert({
+        artist_id: artistId,
+        title: body.title,
+        description: body.description ?? null,
+        media_url: body.mediaUrl,
+        media_type: body.mediaType,
+        storage_path: body.storagePath ?? null,
+        sort_order: body.sortOrder ?? 0,
+      })
+      .select()
+      .single()
+    if (error) return res.status(500).json({ error: error.message })
+    res.status(201).json(data)
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validation failed', details: err.errors })
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.patch('/api/portfolio/reorder', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db || supabase
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  const artistId = await getArtistIdForProfile(database, user.id)
+  if (!artistId) return res.status(403).json({ error: 'Artist profile required' })
+  try {
+    const { ids } = PortfolioReorderSchema.parse(req.body)
+    const { data: existing, error: fetchError } = await database
+      .from('portfolio_items')
+      .select('id')
+      .eq('artist_id', artistId)
+    if (fetchError) return res.status(500).json({ error: fetchError.message })
+    const owned = new Set((existing || []).map((r) => r.id))
+    if (!ids.every((id) => owned.has(id)) || ids.length !== owned.size) {
+      return res.status(400).json({ error: 'Invalid portfolio item order' })
+    }
+    for (let i = 0; i < ids.length; i++) {
+      const { error } = await database
+        .from('portfolio_items')
+        .update({ sort_order: i })
+        .eq('id', ids[i])
+        .eq('artist_id', artistId)
+      if (error) return res.status(500).json({ error: error.message })
+    }
+    const { data, error } = await database
+      .from('portfolio_items')
+      .select('*')
+      .eq('artist_id', artistId)
+      .order('sort_order', { ascending: true })
+    if (error) return res.status(500).json({ error: error.message })
+    res.json(data || [])
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validation failed', details: err.errors })
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.delete('/api/portfolio/:id', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db || supabase
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  const artistId = await getArtistIdForProfile(database, user.id)
+  if (!artistId) return res.status(403).json({ error: 'Artist profile required' })
+  const { data: row, error: fetchError } = await database
+    .from('portfolio_items')
+    .select('id, storage_path')
+    .eq('id', req.params.id)
+    .eq('artist_id', artistId)
+    .maybeSingle()
+  if (fetchError) return res.status(500).json({ error: fetchError.message })
+  if (!row) return res.status(404).json({ error: 'Portfolio item not found' })
+  const { error } = await database.from('portfolio_items').delete().eq('id', req.params.id).eq('artist_id', artistId)
+  if (error) return res.status(500).json({ error: error.message })
+  if (row.storage_path) {
+    await database.storage.from('portfolio-media').remove([row.storage_path]).catch(() => {})
+  }
+  res.json({ ok: true })
+})
+
 // =============================================
 // FRONTEND SERVING (Monolith Fallback)
 // =============================================

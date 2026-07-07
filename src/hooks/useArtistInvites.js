@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { readMockJson, writeMockJson } from '../lib/artistProfile'
 import { getInviteBaseUrl } from '../lib/siteUrl'
+import { resolveApiOrigin } from '../lib/apiBaseUrl'
 
 export const INVITE_SESSION_KEY = 'artist_invite_token'
 export const MOCK_INVITES_KEY = 'mock_artist_invites'
@@ -31,14 +32,7 @@ function withTimeout(promise, ms, message) {
 const INVITE_REQUEST_TIMEOUT_MS = 10000
 
 function getApiBaseUrl() {
-  const configured = (import.meta.env.VITE_API_URL ?? '').trim().replace(/\/$/, '')
-  if (configured && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(configured)) {
-    return configured
-  }
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return window.location.origin
-  }
-  return ''
+  return resolveApiOrigin()
 }
 
 /** Read ?invite= from React Router params or window.location (SPA rewrite fallback). */

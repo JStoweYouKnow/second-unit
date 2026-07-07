@@ -1,8 +1,9 @@
 import { supabase, isSupabaseConfigured } from './supabase.js'
+import { resolveApiBaseUrl } from './apiBaseUrl.js'
 
 // Relative URL in production (Vercel Functions at same origin).
 // VITE_API_URL can override for local dev without the Vite proxy.
-const API_URL = import.meta.env.VITE_API_URL ?? ''
+const API_URL = resolveApiBaseUrl()
 
 async function request(path, options = {}) {
   let token = null

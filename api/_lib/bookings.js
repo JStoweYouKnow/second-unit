@@ -72,7 +72,7 @@ export async function listBookingsForUser(db, userId) {
     .from('bookings')
     .select(`
       *,
-      contract:contracts(
+      contract:contracts!contract_id(
         id,
         title,
         status,

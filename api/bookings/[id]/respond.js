@@ -73,7 +73,7 @@ export default async function handler(req, res) {
       .from('bookings')
       .select(`
         *,
-        contract:contracts(
+        contract:contracts!contract_id(
           id,
           title,
           status,

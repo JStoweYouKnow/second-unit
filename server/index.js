@@ -511,7 +511,7 @@ app.patch('/api/bookings/:id/respond', async (req, res) => {
         .from('bookings')
         .select(`
           *,
-          contract:contracts(
+          contract:contracts!contract_id(
             id,
             title,
             status,

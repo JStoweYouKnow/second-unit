@@ -125,6 +125,7 @@ export function useArtists({ search = '', roleFilter = 'all' } = {}) {
         name: a.display_name,
         role: a.role_title,
         avatar: a.display_name.split(' ').map((n) => n[0]).join(''),
+        avatarUrl: a.profile?.avatar_url || null,
         bio: a.bio,
         hourlyRate: a.hourly_rate,
         dailyRate: a.day_rate ?? undefined,

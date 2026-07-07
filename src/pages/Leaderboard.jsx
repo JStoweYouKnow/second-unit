@@ -52,11 +52,18 @@ function getVideoThumbnail(url) {
     if (url.includes('v=')) {
       id = url.split('v=')[1].split('&')[0]
     } else {
-      // Handle youtu.be/ID?params
       id = url.split('/').pop().split('?')[0]
     }
     return id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : null
   }
+  return null
+}
+
+function getArtistTileThumb(artist) {
+  if (artist.videoLinks?.length > 0) {
+    return getVideoThumbnail(artist.videoLinks[0])
+  }
+  if (artist.avatarUrl) return artist.avatarUrl
   return null
 }
 
@@ -396,16 +403,7 @@ export default function Leaderboard() {
           </div>
         )}
         {!artistsLoading && filtered.map((artist, i) => {
-          const rank = i + 1
-          // Use video thumbnail if available, otherwise fallback to generated or null
-          const videoThumb = artist.videoLinks?.length > 0 ? getVideoThumbnail(artist.videoLinks[0]) : null
-          
-          const fallbackThumb = i === 0 ? '/Users/v/.gemini/antigravity/brain/9dc5a748-79f9-42e5-ae4f-5345ea3cb839/ai_artist_portfolio_1_1777161530365.png' 
-                        : i === 1 ? '/Users/v/.gemini/antigravity/brain/9dc5a748-79f9-42e5-ae4f-5345ea3cb839/ai_artist_portfolio_2_1777161543445.png'
-                        : i === 2 ? '/Users/v/.gemini/antigravity/brain/9dc5a748-79f9-42e5-ae4f-5345ea3cb839/ai_artist_portfolio_3_1777161554677.png'
-                        : null
-          
-          const thumbUrl = videoThumb || fallbackThumb
+          const thumbUrl = getArtistTileThumb(artist)
 
           return (
             <div

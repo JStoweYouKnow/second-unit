@@ -31,6 +31,7 @@ export default function Projects() {
   const { allMessages, sendMessage, localProjects, createContract, signContract, signContractAsArtist, payMilestone, approveMilestone, refetchContracts } = useApp()
   const [searchParams, setSearchParams] = useSearchParams()
   const [milestoneBusy, setMilestoneBusy] = useState(null)
+  const [milestoneError, setMilestoneError] = useState('')
   const isArtist = isArtistProfile(profile)
   const { artist: myArtistRecord } = useArtistProfile(profile?.id)
   const me = demoArtistPersona(profile, myArtistRecord)
@@ -71,19 +72,27 @@ export default function Projects() {
   }, [searchParams])
 
   const handlePayMilestone = async (contract, milestone) => {
+    setMilestoneError('')
     setMilestoneBusy(milestone.id)
     try {
-      const { url } = await payMilestone(contract.id, milestone.id)
-      if (url) window.location.href = url
-      else await refetchContracts()
+      const result = await payMilestone(contract.id, milestone.id)
+      if (result?.url) {
+        window.location.href = result.url
+        return
+      }
+      const list = await refetchContracts()
+      const refreshed = list?.find((p) => p.id === contract.id)
+      if (refreshed) setShowView(refreshed)
     } catch (err) {
       console.error(err)
+      setMilestoneError(err.message || 'Could not start milestone payment. Please try again.')
     } finally {
       setMilestoneBusy(null)
     }
   }
 
   const handleApproveMilestone = async (contract, milestone) => {
+    setMilestoneError('')
     setMilestoneBusy(milestone.id)
     try {
       await approveMilestone(contract.id, milestone.id)
@@ -92,6 +101,7 @@ export default function Projects() {
       if (refreshed) setShowView(refreshed)
     } catch (err) {
       console.error(err)
+      setMilestoneError(err.message || 'Could not approve milestone. Please try again.')
     } finally {
       setMilestoneBusy(null)
     }
@@ -795,6 +805,9 @@ ${divider}
               onPay={handlePayMilestone}
               onApprove={handleApproveMilestone}
             />
+            {milestoneError && (
+              <div className="auth-error" style={{ marginBottom: 16 }}>{milestoneError}</div>
+            )}
 
             {/* Terms */}
             <div style={{ marginBottom: 24 }}>

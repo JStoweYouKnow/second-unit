@@ -22,7 +22,8 @@ export default async function handler(req, res) {
 
   if (!db) return res.status(503).json({ error: 'Database not configured' })
 
-  const { id: contractId, milestoneId } = req.query
+  const contractId = req.query?.id || req.query?.contractId
+  const milestoneId = req.query?.milestoneId
   if (!contractId || !milestoneId) {
     return res.status(400).json({ error: 'Contract id and milestone id required' })
   }
@@ -39,13 +40,24 @@ export default async function handler(req, res) {
     }
 
     if (contract.status !== 'active' && contract.status !== 'completed') {
-      return res.status(400).json({ error: 'Contract must be active to pay milestones' })
+      return res.status(400).json({
+        error: 'Both parties must sign the agreement before milestone payments unlock',
+      })
     }
 
     const all = await listMilestonesForContract(db, contractId)
     const clientMilestone = mapMilestoneToClient(milestone)
     if (!canPayMilestone(clientMilestone, all)) {
-      return res.status(400).json({ error: 'Complete the previous milestone before paying this one' })
+      return res.status(400).json({
+        error: clientMilestone.status !== 'awaiting_payment'
+          ? 'This milestone has already been paid'
+          : 'Complete the previous milestone before paying this one',
+      })
+    }
+
+    const amountDollars = Number(milestone.amount)
+    if (!Number.isFinite(amountDollars) || amountDollars <= 0) {
+      return res.status(400).json({ error: 'Milestone amount is invalid' })
     }
 
     if (!stripe) {
@@ -64,17 +76,22 @@ export default async function handler(req, res) {
       .maybeSingle()
 
     const session = await createProjectCheckoutSession(stripe, {
-      amountDollars: milestone.amount,
+      amountDollars,
       productName: `${contract.title} — ${milestone.title}`,
-      productDescription: `Milestone payment to ${artist?.display_name || 'artist'} — 15% platform fee deducted at payment`,
+      productDescription: `Milestone payment to ${artist?.display_name || 'artist'} — platform fee deducted at payment`,
       successUrl: `${FRONTEND_URL}/projects?milestone_paid=1&contract_id=${contractId}`,
       cancelUrl: `${FRONTEND_URL}/projects?milestone_cancelled=1&contract_id=${contractId}`,
       metadata: { contractId, milestoneId },
       artistStripeAccountId: artist?.stripe_account_id ?? null,
     })
 
+    if (!session?.url) {
+      return res.status(500).json({ error: 'Stripe did not return a checkout URL' })
+    }
+
     return res.json({ url: session.url })
   } catch (err) {
-    return res.status(500).json({ error: err.message })
+    console.error('[milestones/pay]', err?.message || err)
+    return res.status(500).json({ error: err.message || 'Failed to start milestone payment' })
   }
 }

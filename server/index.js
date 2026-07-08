@@ -1456,5 +1456,10 @@ httpServer.listen(PORT, () => {
   console.log(`\n🚀 The Callsheet API running on http://localhost:${PORT}`)
   console.log(`   Security: ✅ Helmet + Rate Limiting`)
   console.log(`   Persistence: ${supabase ? '✅ Supabase' : '⚠️  In-memory'}`)
+  if (!supabase) {
+    console.warn(
+      '   Missing VITE_SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY (or VITE_SUPABASE_ANON_KEY) — set these in Railway Variables'
+    )
+  }
   console.log()
 })

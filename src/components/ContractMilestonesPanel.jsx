@@ -5,7 +5,7 @@ import {
   milestoneStatusLabel,
   milestoneStatusColor,
 } from '../lib/milestones'
-import { PLATFORM_FEE_PERCENT, artistPayoutAmount } from '../lib/fees'
+import { PLATFORM_FEE_PERCENT } from '../lib/fees'
 
 export function ContractMilestonesPanel({
   contract,
@@ -62,8 +62,8 @@ export function ContractMilestonesPanel({
         <Shield size={14} style={{ flexShrink: 0, marginTop: 1 }} />
         <span>
           {isArtist
-            ? `Hirer pays each milestone via Stripe. You receive ${100 - PLATFORM_FEE_PERCENT}% when they approve delivery (${PLATFORM_FEE_PERCENT}% platform fee).`
-            : `Pay milestones in order. Approve each deliverable to release ${100 - PLATFORM_FEE_PERCENT}% to the artist.`}
+            ? 'Clients pay each milestone at project start. Payouts are sent to your connected Stripe account when work is approved.'
+            : `Pay milestones in order to start each phase. The ${PLATFORM_FEE_PERCENT}% platform fee is deducted at payment; the artist receives ${100 - PLATFORM_FEE_PERCENT}%.`}
         </span>
       </div>
     </div>
@@ -100,11 +100,6 @@ function MilestoneRow({ milestone, all, isArtist, busy, onPay, onApprove }) {
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700 }}>
           ${milestone.amount.toLocaleString()}
         </div>
-        {isArtist && milestone.status !== 'awaiting_payment' && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-            Net ~${artistPayoutAmount(milestone.amount).toLocaleString()}
-          </div>
-        )}
       </div>
 
       <div style={{ display: 'flex', gap: 8 }}>

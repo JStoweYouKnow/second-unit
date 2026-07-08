@@ -8,7 +8,7 @@ import { bookings as bookingsApi, payments as paymentsApi } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
 import { bookingSubtotal, bookingScheduleCaption } from '../lib/pricing'
-import { PLATFORM_FEE_PERCENT, ARTIST_PAYOUT_RATE } from '../lib/fees'
+import { PLATFORM_FEE_PERCENT } from '../lib/fees'
 
 export default function Bookings() {
   const { profile, isAuthenticated } = useAuth()
@@ -219,7 +219,7 @@ export default function Bookings() {
         <Shield size={16} style={{ flexShrink: 0, marginTop: 2, color: 'var(--accent)' }} />
         <span>
           {isArtist
-            ? `Confirmed bookings create a linked project contract. Payment runs through milestone escrow (${Math.round(ARTIST_PAYOUT_RATE * 100)}% released per approved milestone, ${PLATFORM_FEE_PERCENT}% platform fee).`
+            ? 'Confirmed bookings create a linked project contract. Milestone payouts are released to your Stripe account as each phase is approved.'
             : `After the artist confirms, a project contract is created automatically. Pay through milestone escrow on Projects (${PLATFORM_FEE_PERCENT}% platform fee).`}
         </span>
       </div>
@@ -495,7 +495,7 @@ export default function Bookings() {
                     </span>
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    15% platform fee is deducted from the artist's payout when the project is marked complete. You pay the agreed fee only.
+                    15% platform fee is deducted when you pay to start the project. The artist receives 85% of the agreed fee (via Stripe Connect when onboarded).
                   </div>
                 </div>
               )}
@@ -522,29 +522,29 @@ export default function Bookings() {
 
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 700, marginBottom: 4 }}>
-                ${Math.round(bookingSubtotal(showComplete) * 0.85).toLocaleString()}
+                Complete project
               </div>
-              <div style={{ color: 'var(--text-muted)' }}>released to {showComplete.artistName}</div>
+              <div style={{ color: 'var(--text-muted)' }}>with {showComplete.artistName}</div>
             </div>
 
             <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Total paid</span>
+                <span style={{ color: 'var(--text-muted)' }}>Total paid at project start</span>
                 <span>${bookingSubtotal(showComplete).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Platform fee (15%)</span>
+                <span style={{ color: 'var(--text-muted)' }}>Platform fee (15% — collected at payment)</span>
                 <span>−${Math.round(bookingSubtotal(showComplete) * 0.15).toLocaleString()}</span>
               </div>
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                <span>Artist payout</span>
+                <span>Artist share (85%)</span>
                 <span>${Math.round(bookingSubtotal(showComplete) * 0.85).toLocaleString()}</span>
               </div>
             </div>
 
             <div style={{ padding: '14px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <Shield size={14} style={{ color: 'var(--warning)', marginTop: 1, flexShrink: 0 }} />
-              <span>This will immediately transfer ${Math.round(bookingSubtotal(showComplete) * 0.85).toLocaleString()} to {showComplete.artistName} via Stripe. This action cannot be undone.</span>
+              <span>Confirming completion closes the booking. If the artist share was held in escrow, it will be released now; otherwise it was already sent at checkout.</span>
             </div>
 
             <button
@@ -556,7 +556,7 @@ export default function Bookings() {
             >
               {loading === showComplete.id
                 ? <Loader2 size={18} className="animate-spin" />
-                : <><CheckCircle size={18} /> Release Payment to Artist</>}
+                : <><CheckCircle size={18} /> Mark Project Complete</>}
             </button>
           </div>
         </div>
@@ -582,15 +582,19 @@ export default function Bookings() {
 
             <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: 'var(--text-muted)' }}>You pay</span>
+                <span style={{ color: 'var(--text-muted)' }}>You pay (project start)</span>
                 <span style={{ fontWeight: 700 }}>${bookingSubtotal(showPay).toLocaleString()}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={{ color: 'var(--text-muted)' }}>Platform fee (15%)</span>
-                <span style={{ color: 'var(--text-muted)' }}>deducted from artist payout</span>
+                <span>−${Math.round(bookingSubtotal(showPay) * 0.15).toLocaleString()}</span>
               </div>
-              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                Artist receives ${Math.round(bookingSubtotal(showPay) * 0.85).toLocaleString()} when you mark the project complete.
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                <span>Artist receives</span>
+                <span>${Math.round(bookingSubtotal(showPay) * 0.85).toLocaleString()}</span>
+              </div>
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                Fee is deducted at checkout when the project begins. If the artist has not finished Stripe Connect, their share is held until onboarding is complete.
               </div>
             </div>
 

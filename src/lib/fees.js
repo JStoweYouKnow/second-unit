@@ -18,3 +18,15 @@ export function platformFeeAmountCents(amountCents) {
 export function artistPayoutAmountCents(amountCents) {
   return Math.round(Number(amountCents) * ARTIST_PAYOUT_RATE)
 }
+
+/** Artist-facing earnings for a payment row (uses stored payout when available). */
+export function artistEarningsAmount(payment) {
+  if (payment?.artistPayout != null) return payment.artistPayout
+  return artistPayoutAmount(payment?.amount ?? 0)
+}
+
+/** Role-aware amount for lists, stats, and receipts — hirers see gross; artists see earnings only. */
+export function paymentDisplayAmount(payment, isArtist) {
+  if (isArtist) return artistEarningsAmount(payment)
+  return payment?.amount ?? 0
+}

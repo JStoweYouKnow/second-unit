@@ -595,9 +595,11 @@ export default function Account() {
               <div className="card" style={{ padding: 24, background: 'rgba(245, 197, 66, 0.05)', borderColor: 'var(--gold)', marginBottom: 24 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--gold)' }}>Private Beta Plan</h4>
+                    <h4 style={{ margin: '0 0 4px 0', color: 'var(--gold)' }}>{isApprovedArtist ? 'Artist account' : 'Private Beta Plan'}</h4>
                     <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 14 }}>
-                      No monthly subscription during beta. A 15% platform fee applies to completed bookings (deducted from the artist payout).
+                      {isApprovedArtist
+                        ? 'No monthly subscription during beta. Payouts are processed via Stripe Connect when clients pay for your work.'
+                        : 'No monthly subscription during beta. A 15% platform fee is deducted when a project payment begins (at checkout or first milestone).'}
                     </p>
                   </div>
                   <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>$0<span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-muted)' }}>/mo</span></div>

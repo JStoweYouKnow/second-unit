@@ -337,18 +337,18 @@ export default function ArtistApply() {
               <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                 <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--success-muted-bg)', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>3</div>
                 <div>
-                  <div style={{ fontWeight: 600, marginBottom: 2 }}>You receive 85% via Stripe</div>
-                  <div style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>On completion, 85% of the agreed fee is transferred directly to your connected Stripe account. The Callsheet retains a 15% platform fee.</div>
+                  <div style={{ fontWeight: 600, marginBottom: 2 }}>You get paid via Stripe</div>
+                  <div style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>When the client pays to start the project, your payout is sent to your connected Stripe account.</div>
                 </div>
               </div>
             </div>
             <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              Example: on a $1,000 booking, you receive <strong style={{ color: 'var(--text-primary)' }}>$850</strong>. The $150 platform fee covers discovery, payment processing, and dispute support.
+              Example: on a $1,000 booking, you receive your agreed payout via Stripe Connect once the client pays to start the project.
             </div>
           </div>
 
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20, lineHeight: 1.5 }}>
-            By submitting, you agree that the information provided is accurate and that you accept The Callsheet's 15% platform fee on all completed bookings. Approved artists receive a profile on our invite-only marketplace.
+            By submitting, you agree that the information provided is accurate and that you accept The Callsheet's artist terms. Approved artists receive a profile on our invite-only marketplace.
           </p>
 
           <button

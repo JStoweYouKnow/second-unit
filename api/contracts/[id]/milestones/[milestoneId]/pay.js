@@ -9,6 +9,7 @@ import {
   listMilestonesForContract,
   mapMilestoneToClient,
 } from '../../../_lib/milestones.js'
+import { createProjectCheckoutSession } from '../../../_lib/checkout.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -58,29 +59,18 @@ export default async function handler(req, res) {
 
     const { data: artist } = await db
       .from('artists')
-      .select('display_name')
+      .select('display_name, stripe_account_id')
       .eq('id', contract.artist_id)
       .maybeSingle()
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: `${contract.title} — ${milestone.title}`,
-            description: `Milestone payment to ${artist?.display_name || 'artist'}`,
-          },
-          unit_amount: Math.round(Number(milestone.amount) * 100),
-        },
-        quantity: 1,
-      }],
-      payment_intent_data: {
-        metadata: { contractId, milestoneId },
-      },
+    const session = await createProjectCheckoutSession(stripe, {
+      amountDollars: milestone.amount,
+      productName: `${contract.title} — ${milestone.title}`,
+      productDescription: `Milestone payment to ${artist?.display_name || 'artist'} — 15% platform fee deducted at payment`,
+      successUrl: `${FRONTEND_URL}/projects?milestone_paid=1&contract_id=${contractId}`,
+      cancelUrl: `${FRONTEND_URL}/projects?milestone_cancelled=1&contract_id=${contractId}`,
       metadata: { contractId, milestoneId },
-      success_url: `${FRONTEND_URL}/projects?milestone_paid=1&contract_id=${contractId}`,
-      cancel_url: `${FRONTEND_URL}/projects?milestone_cancelled=1&contract_id=${contractId}`,
+      artistStripeAccountId: artist?.stripe_account_id ?? null,
     })
 
     return res.json({ url: session.url })

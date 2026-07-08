@@ -21,6 +21,7 @@ import {
 } from '../api/_lib/bookings.js'
 import { listPaymentsForUser } from '../api/_lib/payments.js'
 import { completeBookingPayment } from '../api/_lib/completeBookingPayment.js'
+import { createProjectCheckoutSession, paymentSplitAtInitiation } from '../api/_lib/checkout.js'
 import {
   listConversationsForUser,
   getOrCreateConversation,
@@ -413,24 +414,31 @@ app.post('/api/payments/create-checkout', async (req, res) => {
   }
 
   try {
-    // Separate charges model: full payment lands on the platform account.
-    // Platform keeps its 15% immediately; artist's 85% is released on project completion.
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: { name: description || `Booking with ${artistName}` },
-          unit_amount: Math.round(amount * 100),
-        },
-        quantity: 1,
-      }],
-      payment_intent_data: {
-        metadata: { bookingId: bookingId || '' },
-      },
+    let artistStripeAccountId = null
+    if (bookingId && database) {
+      const { data: bookingRow } = await database
+        .from('bookings')
+        .select('artist_id')
+        .eq('id', bookingId)
+        .maybeSingle()
+      if (bookingRow?.artist_id) {
+        const { data: artistRow } = await database
+          .from('artists')
+          .select('stripe_account_id')
+          .eq('id', bookingRow.artist_id)
+          .maybeSingle()
+        artistStripeAccountId = artistRow?.stripe_account_id ?? null
+      }
+    }
+
+    const session = await createProjectCheckoutSession(stripe, {
+      amountDollars: amount,
+      productName: description || `Booking with ${artistName}`,
+      productDescription: 'Project payment — 15% platform fee deducted at checkout',
+      successUrl: `${FRONTEND_URL}/bookings?payment_success=1&booking_id=${bookingId || ''}`,
+      cancelUrl: `${FRONTEND_URL}/bookings?payment_cancelled=1`,
       metadata: { bookingId: bookingId || '' },
-      success_url: `${FRONTEND_URL}/bookings?payment_success=1&booking_id=${bookingId || ''}`,
-      cancel_url: `${FRONTEND_URL}/bookings?payment_cancelled=1`,
+      artistStripeAccountId,
     })
     res.json({ url: session.url })
   } catch (err) {
@@ -574,34 +582,36 @@ app.post('/api/bookings/:id/complete', async (req, res) => {
 
   const { data: payment, error: paymentFetchError } = await database
     .from('payments').select('*')
-    .eq('booking_id', id).eq('status', 'paid').eq('payout_status', 'pending')
+    .eq('booking_id', id).eq('status', 'paid')
     .maybeSingle()
   if (paymentFetchError) return res.status(500).json({ error: paymentFetchError.message })
-  if (!payment) return res.status(404).json({ error: 'No pending payout found for this booking' })
+  if (!payment) return res.status(404).json({ error: 'No payment found for this booking' })
 
-  if (stripe && payment.artist_stripe_account_id) {
-    const account = await stripe.accounts.retrieve(payment.artist_stripe_account_id).catch(() => null)
-    if (!account?.payouts_enabled) {
-      return res.status(400).json({
-        error: 'Artist has not completed Stripe onboarding and cannot receive payouts yet',
-      })
+  if (payment.payout_status === 'pending') {
+    if (stripe && payment.artist_stripe_account_id) {
+      const account = await stripe.accounts.retrieve(payment.artist_stripe_account_id).catch(() => null)
+      if (!account?.payouts_enabled) {
+        return res.status(400).json({
+          error: 'Artist has not completed Stripe onboarding and cannot receive payouts yet',
+        })
+      }
+      let transfer
+      try {
+        transfer = await stripe.transfers.create({
+          amount: payment.artist_payout_amount,
+          currency: 'usd',
+          destination: payment.artist_stripe_account_id,
+          transfer_group: id,
+          metadata: { bookingId: id },
+        })
+      } catch (err) {
+        return res.status(500).json({ error: err.message })
+      }
+      await database.from('payments')
+        .update({ payout_status: 'paid', transfer_id: transfer.id }).eq('id', payment.id)
+    } else {
+      await database.from('payments').update({ payout_status: 'paid' }).eq('id', payment.id)
     }
-    let transfer
-    try {
-      transfer = await stripe.transfers.create({
-        amount: payment.artist_payout_amount,
-        currency: 'usd',
-        destination: payment.artist_stripe_account_id,
-        transfer_group: id,
-        metadata: { bookingId: id },
-      })
-    } catch (err) {
-      return res.status(500).json({ error: err.message })
-    }
-    await database.from('payments')
-      .update({ payout_status: 'paid', transfer_id: transfer.id }).eq('id', payment.id)
-  } else {
-    await database.from('payments').update({ payout_status: 'paid' }).eq('id', payment.id)
   }
 
   const { data: updatedBooking, error: updateError } = await database
@@ -641,10 +651,11 @@ async function handleWebhook(req, res) {
     database &&
     (event.type === 'payment_intent.succeeded' || event.type === 'checkout.session.completed')
   ) {
+    const splitAtPayment = await paymentSplitAtInitiation(stripe, paymentIntentId, meta)
     if (milestoneId) {
-      await completeMilestonePayment(database, milestoneId, { paymentIntentId })
+      await completeMilestonePayment(database, milestoneId, { paymentIntentId, splitAtPayment })
     } else if (bookingId) {
-      await completeBookingPayment(database, bookingId, { paymentIntentId })
+      await completeBookingPayment(database, bookingId, { paymentIntentId, splitAtPayment })
     }
   } else if (bookingId) {
     const booking = bookingsStore.find(b => b.id === bookingId)
@@ -814,21 +825,15 @@ app.post('/api/contracts/:id/milestones/:milestoneId/pay', async (req, res) => {
       if (result.error) return res.status(400).json({ error: result.error })
       return res.json({ url: `${FRONTEND_URL}/projects?milestone_paid=1&contract_id=${contractId}` })
     }
-    const { data: artist } = await database.from('artists').select('display_name').eq('id', contract.artist_id).maybeSingle()
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: { name: `${contract.title} — ${milestone.title}` },
-          unit_amount: Math.round(Number(milestone.amount) * 100),
-        },
-        quantity: 1,
-      }],
-      payment_intent_data: { metadata: { contractId, milestoneId } },
+    const { data: artist } = await database.from('artists').select('display_name, stripe_account_id').eq('id', contract.artist_id).maybeSingle()
+    const session = await createProjectCheckoutSession(stripe, {
+      amountDollars: milestone.amount,
+      productName: `${contract.title} — ${milestone.title}`,
+      productDescription: `Milestone payment to ${artist?.display_name || 'artist'} — 15% platform fee deducted at payment`,
+      successUrl: `${FRONTEND_URL}/projects?milestone_paid=1&contract_id=${contractId}`,
+      cancelUrl: `${FRONTEND_URL}/projects?milestone_cancelled=1&contract_id=${contractId}`,
       metadata: { contractId, milestoneId },
-      success_url: `${FRONTEND_URL}/projects?milestone_paid=1&contract_id=${contractId}`,
-      cancel_url: `${FRONTEND_URL}/projects?milestone_cancelled=1&contract_id=${contractId}`,
+      artistStripeAccountId: artist?.stripe_account_id ?? null,
     })
     res.json({ url: session.url })
   } catch (err) {

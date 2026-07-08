@@ -3,6 +3,7 @@ import { requireAuth } from '../_lib/auth.js'
 import { rateLimit, getClientIp } from '../_lib/ratelimit.js'
 import { db } from '../_lib/db.js'
 import { completeBookingPayment } from '../_lib/completeBookingPayment.js'
+import { createProjectCheckoutSession } from '../_lib/checkout.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -37,25 +38,32 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Separate charges model: full payment lands on the platform account.
-    // The platform keeps its 15% immediately; the artist's 85% is released
-    // explicitly when the project is marked complete via POST /bookings/:id/complete.
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: { name: description || `Booking with ${artistName}` },
-          unit_amount: Math.round(amount * 100),
-        },
-        quantity: 1,
-      }],
-      payment_intent_data: {
-        metadata: { bookingId: bookingId || '' },
-      },
+    let artistStripeAccountId = null
+    if (bookingId && db) {
+      const { data: bookingRow } = await db
+        .from('bookings')
+        .select('artist_id')
+        .eq('id', bookingId)
+        .maybeSingle()
+
+      if (bookingRow?.artist_id) {
+        const { data: artistRow } = await db
+          .from('artists')
+          .select('stripe_account_id')
+          .eq('id', bookingRow.artist_id)
+          .maybeSingle()
+        artistStripeAccountId = artistRow?.stripe_account_id ?? null
+      }
+    }
+
+    const session = await createProjectCheckoutSession(stripe, {
+      amountDollars: amount,
+      productName: description || `Booking with ${artistName}`,
+      productDescription: `Project payment — 15% platform fee deducted at checkout`,
+      successUrl: `${FRONTEND_URL}/bookings?payment_success=1&booking_id=${bookingId || ''}`,
+      cancelUrl: `${FRONTEND_URL}/bookings?payment_cancelled=1`,
       metadata: { bookingId: bookingId || '' },
-      success_url: `${FRONTEND_URL}/bookings?payment_success=1&booking_id=${bookingId || ''}`,
-      cancel_url: `${FRONTEND_URL}/bookings?payment_cancelled=1`,
+      artistStripeAccountId,
     })
     res.json({ url: session.url })
   } catch (err) {

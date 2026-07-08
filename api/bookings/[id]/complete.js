@@ -35,47 +35,47 @@ export default async function handler(req, res) {
     .select('*')
     .eq('booking_id', id)
     .eq('status', 'paid')
-    .eq('payout_status', 'pending')
     .maybeSingle()
 
   if (paymentFetchError) return res.status(500).json({ error: paymentFetchError.message })
-  if (!payment) return res.status(404).json({ error: 'No pending payout found for this booking' })
+  if (!payment) return res.status(404).json({ error: 'No payment found for this booking' })
 
-  if (stripe && payment.artist_stripe_account_id) {
-    const account = await stripe.accounts.retrieve(payment.artist_stripe_account_id).catch(() => null)
-    if (!account?.payouts_enabled) {
-      return res.status(400).json({
-        error: 'Artist has not completed Stripe onboarding and cannot receive payouts yet',
-      })
+  if (payment.payout_status === 'pending') {
+    if (stripe && payment.artist_stripe_account_id) {
+      const account = await stripe.accounts.retrieve(payment.artist_stripe_account_id).catch(() => null)
+      if (!account?.payouts_enabled) {
+        return res.status(400).json({
+          error: 'Artist has not completed Stripe onboarding and cannot receive payouts yet',
+        })
+      }
+
+      let transfer
+      try {
+        transfer = await stripe.transfers.create({
+          amount: payment.artist_payout_amount,
+          currency: 'usd',
+          destination: payment.artist_stripe_account_id,
+          transfer_group: id,
+          metadata: { bookingId: id },
+        })
+      } catch (err) {
+        return res.status(500).json({ error: err.message })
+      }
+
+      const { error: payoutUpdateError } = await db
+        .from('payments')
+        .update({ payout_status: 'paid', transfer_id: transfer.id })
+        .eq('id', payment.id)
+
+      if (payoutUpdateError) return res.status(500).json({ error: payoutUpdateError.message })
+    } else {
+      const { error: payoutUpdateError } = await db
+        .from('payments')
+        .update({ payout_status: 'paid' })
+        .eq('id', payment.id)
+
+      if (payoutUpdateError) return res.status(500).json({ error: payoutUpdateError.message })
     }
-
-    let transfer
-    try {
-      transfer = await stripe.transfers.create({
-        amount: payment.artist_payout_amount,
-        currency: 'usd',
-        destination: payment.artist_stripe_account_id,
-        transfer_group: id,
-        metadata: { bookingId: id },
-      })
-    } catch (err) {
-      return res.status(500).json({ error: err.message })
-    }
-
-    const { error: payoutUpdateError } = await db
-      .from('payments')
-      .update({ payout_status: 'paid', transfer_id: transfer.id })
-      .eq('id', payment.id)
-
-    if (payoutUpdateError) return res.status(500).json({ error: payoutUpdateError.message })
-  } else {
-    // No Stripe or artist not connected — mark payout complete without a transfer
-    const { error: payoutUpdateError } = await db
-      .from('payments')
-      .update({ payout_status: 'paid' })
-      .eq('id', payment.id)
-
-    if (payoutUpdateError) return res.status(500).json({ error: payoutUpdateError.message })
   }
 
   const { data: updatedBooking, error: updateError } = await db

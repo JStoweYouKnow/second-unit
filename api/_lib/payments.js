@@ -1,9 +1,14 @@
 /** Map DB payment row → client shape used by Payments.jsx */
+import { artistPayoutAmountCents } from './fees.js'
 import { getArtistIdForProfile } from './bookings.js'
 
 export function mapPaymentToClient(row) {
   if (!row) return null
   const artistName = row.artist?.display_name ?? row.artist_name ?? 'Artist'
+  const amountCents = Number(row.amount)
+  const artistPayoutCents = row.artist_payout_amount != null
+    ? Number(row.artist_payout_amount)
+    : artistPayoutAmountCents(amountCents)
   return {
     id: row.id,
     bookingId: row.booking_id,
@@ -11,7 +16,8 @@ export function mapPaymentToClient(row) {
       ? new Date(row.paid_at).toISOString().slice(0, 10)
       : new Date(row.created_at).toISOString().slice(0, 10),
     status: row.status === 'paid' ? 'paid' : row.status,
-    amount: Math.round(Number(row.amount) / 100),
+    amount: Math.round(amountCents / 100),
+    artistPayout: Math.round(artistPayoutCents / 100),
     description: row.description || 'Booking payment',
     artistName,
   }

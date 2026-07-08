@@ -185,7 +185,7 @@ export async function userCanAccessMilestoneContract(db, userId, contract) {
   return artistId != null && contract.artist_id === artistId
 }
 
-export async function completeMilestonePayment(db, milestoneId, { paymentIntentId = null } = {}) {
+export async function completeMilestonePayment(db, milestoneId, { paymentIntentId = null, splitAtPayment = false } = {}) {
   const { milestone, contract } = await getMilestoneWithContract(db, milestoneId)
 
   if (milestone.status !== 'awaiting_payment') {
@@ -233,7 +233,7 @@ export async function completeMilestonePayment(db, milestoneId, { paymentIntentI
       artist_stripe_account_id: artist?.stripe_account_id ?? null,
       platform_fee_amount: platformFeeAmountCents(amountCents),
       artist_payout_amount: artistPayoutAmountCents(amountCents),
-      payout_status: 'pending',
+      payout_status: splitAtPayment ? 'paid' : 'pending',
     })
     .select()
     .single()
@@ -290,32 +290,33 @@ export async function releaseMilestonePayout(db, milestoneId, userId) {
     .select('*')
     .eq('milestone_id', milestoneId)
     .eq('status', 'paid')
-    .eq('payout_status', 'pending')
     .maybeSingle()
 
   if (paymentError) throw paymentError
-  if (!payment) throw new Error('No pending payout found for this milestone')
+  if (!payment) throw new Error('No payment found for this milestone')
 
-  if (stripe && payment.artist_stripe_account_id) {
-    const account = await stripe.accounts.retrieve(payment.artist_stripe_account_id).catch(() => null)
-    if (!account?.payouts_enabled) {
-      throw new Error('Artist has not completed Stripe onboarding and cannot receive payouts yet')
+  if (payment.payout_status === 'pending') {
+    if (stripe && payment.artist_stripe_account_id) {
+      const account = await stripe.accounts.retrieve(payment.artist_stripe_account_id).catch(() => null)
+      if (!account?.payouts_enabled) {
+        throw new Error('Artist has not completed Stripe onboarding and cannot receive payouts yet')
+      }
+
+      const transfer = await stripe.transfers.create({
+        amount: payment.artist_payout_amount,
+        currency: 'usd',
+        destination: payment.artist_stripe_account_id,
+        transfer_group: String(milestoneId),
+        metadata: { milestoneId, contractId: contract.id },
+      })
+
+      await db
+        .from('payments')
+        .update({ payout_status: 'paid', transfer_id: transfer.id })
+        .eq('id', payment.id)
+    } else {
+      await db.from('payments').update({ payout_status: 'paid' }).eq('id', payment.id)
     }
-
-    const transfer = await stripe.transfers.create({
-      amount: payment.artist_payout_amount,
-      currency: 'usd',
-      destination: payment.artist_stripe_account_id,
-      transfer_group: String(milestoneId),
-      metadata: { milestoneId, contractId: contract.id },
-    })
-
-    await db
-      .from('payments')
-      .update({ payout_status: 'paid', transfer_id: transfer.id })
-      .eq('id', payment.id)
-  } else {
-    await db.from('payments').update({ payout_status: 'paid' }).eq('id', payment.id)
   }
 
   const now = new Date().toISOString()

@@ -12,7 +12,8 @@ import { stripeConnect, payments as paymentsApi } from '../lib/api'
 import {
   PLATFORM_FEE_PERCENT,
   platformFeeAmount,
-  artistPayoutAmount,
+  artistEarningsAmount,
+  paymentDisplayAmount,
 } from '../lib/fees'
 
 function loadLS(key) {
@@ -59,7 +60,7 @@ function SetupModal({ profile, onClose, onDone }) {
             </div>
             <div style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <Shield size={14} style={{ color: 'var(--success)', marginTop: 1, flexShrink: 0 }} />
-              <span>Payments are processed via Stripe Checkout. A {PLATFORM_FEE_PERCENT}% platform fee is deducted from the artist payout on completion.</span>
+              <span>Payments are processed via Stripe Checkout. The {PLATFORM_FEE_PERCENT}% platform fee is deducted when you pay to start a project or milestone.</span>
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
@@ -154,7 +155,7 @@ function ConnectModal({ userEmail, artistId, onClose, onDone }) {
         {error && <p style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 12 }}>{error}</p>}
         <div style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 8 }}>
           <Lock size={14} style={{ color: 'var(--accent)', marginTop: 1, flexShrink: 0 }} />
-          <span>Stripe handles identity verification. The {PLATFORM_FEE_PERCENT}% platform fee is deducted from your payout when the hirer marks the project complete.</span>
+          <span>Stripe handles identity verification and sends payouts to your connected bank account when clients pay.</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
           <button type="button" className="btn btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
@@ -222,13 +223,19 @@ export default function Payments() {
     return true
   })
 
-  const total = paymentPool.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
-  const pending = paymentPool.filter(p => p.status === 'pending' || p.status === 'upcoming').reduce((s, p) => s + p.amount, 0)
+  const sumAmount = (payments) =>
+    payments.reduce((s, p) => s + paymentDisplayAmount(p, isArtist), 0)
+
+  const total = sumAmount(paymentPool.filter(p => p.status === 'paid'))
+  const pending = sumAmount(paymentPool.filter(p => p.status === 'pending' || p.status === 'upcoming'))
   const monthPrefix = new Date().toISOString().slice(0, 7)
-  const thisMonth = paymentPool
-    .filter(p => p.status === 'paid' && p.date?.startsWith(monthPrefix))
-    .reduce((s, p) => s + p.amount, 0)
-  const platformFees = platformFeeAmount(total)
+  const thisMonth = sumAmount(
+    paymentPool.filter(p => p.status === 'paid' && p.date?.startsWith(monthPrefix)),
+  )
+  const platformFees = platformFeeAmount(
+    paymentPool.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0),
+  )
+  const paidCount = paymentPool.filter(p => p.status === 'paid').length
 
   const statusStyles = {
     paid: { bg: 'var(--success-muted-bg)', color: 'var(--success)', icon: <CheckCircle size={14} />, label: 'Paid' },
@@ -238,7 +245,34 @@ export default function Payments() {
   }
 
   const handleDownloadReceipt = (payment) => {
-    const content = `
+    const displayAmount = paymentDisplayAmount(payment, isArtist)
+    const content = isArtist
+      ? `
+═══════════════════════════════════════
+         THE CALLSHEET — RECEIPT
+═══════════════════════════════════════
+
+Receipt #: ${payment.id}
+Date: ${payment.date}
+Status: ${payment.status.toUpperCase()}
+
+───────────────────────────────────────
+PAYOUT DETAILS
+───────────────────────────────────────
+
+Description: ${payment.description}
+Client payment for your work
+
+Amount paid to you: $${displayAmount.toLocaleString()}
+
+Settlement: processed via Stripe Connect on The Callsheet
+
+═══════════════════════════════════════
+Thank you for using The Callsheet!
+https://thecallsheet.ai
+═══════════════════════════════════════
+`
+      : `
 ═══════════════════════════════════════
          THE CALLSHEET — RECEIPT
 ═══════════════════════════════════════
@@ -255,8 +289,8 @@ Description: ${payment.description}
 Artist: ${payment.artistName}
 
 Subtotal:      $${payment.amount.toLocaleString()}
-Platform Fee:  $${platformFeeAmount(payment.amount).toLocaleString()} (${PLATFORM_FEE_PERCENT}% — from artist payout)
-Artist Payout: $${artistPayoutAmount(payment.amount).toLocaleString()}
+Platform Fee:  $${platformFeeAmount(payment.amount).toLocaleString()} (${PLATFORM_FEE_PERCENT}% — deducted at payment)
+Artist Payout: $${artistEarningsAmount(payment).toLocaleString()}
 ───────────────────────────────────────
 Total Charged: $${payment.amount.toLocaleString()}
 
@@ -279,13 +313,42 @@ https://thecallsheet.ai
 
   const handleDownloadInvoice = (payment) => {
     const viewer = profile?.full_name || (isArtist ? 'Artist' : 'Client')
-    const platformFee = platformFeeAmount(payment.amount)
-    const artistShare = artistPayoutAmount(payment.amount)
-    const tot = payment.amount
-    const roleNote = isArtist
-      ? 'Artist copy — amounts shown reflect your payout / milestone record on The Callsheet.'
-      : 'Client copy — amounts shown reflect your payment record on The Callsheet.'
-    const content = `
+    const displayAmount = paymentDisplayAmount(payment, isArtist)
+    const content = isArtist
+      ? `
+═══════════════════════════════════════
+         THE CALLSHEET — INVOICE
+═══════════════════════════════════════
+
+Invoice #: INV-${payment.id}
+Issue date: ${payment.date}
+Status: ${String(payment.status).toUpperCase()}
+
+Record for: ${viewer}
+Artist copy — payout record on The Callsheet.
+
+───────────────────────────────────────
+LINE ITEMS
+───────────────────────────────────────
+
+${payment.description}
+
+  Payout amount                         $${displayAmount.toLocaleString()}
+───────────────────────────────────────
+  Total paid to you                     $${displayAmount.toLocaleString()}
+
+Payment reference: ${payment.id}
+Settlement: processed via Stripe Connect on The Callsheet
+
+═══════════════════════════════════════
+https://thecallsheet.ai
+═══════════════════════════════════════
+`
+      : (() => {
+        const platformFee = platformFeeAmount(payment.amount)
+        const artistShare = artistEarningsAmount(payment)
+        const tot = payment.amount
+        return `
 ═══════════════════════════════════════
          THE CALLSHEET — INVOICE
 ═══════════════════════════════════════
@@ -295,7 +358,7 @@ Issue date: ${payment.date}
 Status: ${String(payment.status).toUpperCase()}
 
 Bill to / Record for: ${viewer}
-${roleNote}
+Client copy — amounts shown reflect your payment record on The Callsheet.
 
 ───────────────────────────────────────
 LINE ITEMS
@@ -305,7 +368,7 @@ ${payment.description}
 Service provider (artist): ${payment.artistName}
 
   Line subtotal                         $${payment.amount.toLocaleString()}
-  Platform fee (${PLATFORM_FEE_PERCENT}%, artist payout)  $${platformFee.toLocaleString()}
+  Platform fee (${PLATFORM_FEE_PERCENT}%, deducted at payment)  $${platformFee.toLocaleString()}
   Artist net payout                     $${artistShare.toLocaleString()}
 ───────────────────────────────────────
   Total paid by client                  $${tot.toLocaleString()}
@@ -317,6 +380,7 @@ Settlement: processed via Stripe on The Callsheet
 https://thecallsheet.ai
 ═══════════════════════════════════════
 `
+      })()
     const blob = new Blob([content], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -352,7 +416,7 @@ https://thecallsheet.ai
         <div className="stat-card">
           <span className="stat-label"><DollarSign size={14} /> {isArtist ? 'Paid to you' : 'Total paid'}</span>
           <span className="stat-value" style={{ color: 'var(--success)' }}>${total.toLocaleString()}</span>
-          <span className="stat-change"><ArrowUpRight size={12} /> {paymentPool.filter(p => p.status === 'paid').length} {isArtist ? 'payouts' : 'payments'}</span>
+          <span className="stat-change"><ArrowUpRight size={12} /> {paidCount} {isArtist ? 'payouts' : 'payments'}</span>
         </div>
         <div className="stat-card">
           <span className="stat-label"><Clock size={14} /> {isArtist ? 'Incoming' : 'Outstanding'}</span>
@@ -363,11 +427,19 @@ https://thecallsheet.ai
           <span className="stat-label"><TrendingUp size={14} /> This month</span>
           <span className="stat-value">${thisMonth.toLocaleString()}</span>
         </div>
-        <div className="stat-card">
-          <span className="stat-label"><Receipt size={14} /> {isArtist ? 'Fees withheld' : 'Platform fees'}</span>
-          <span className="stat-value" style={{ color: 'var(--accent)' }}>${platformFees.toLocaleString()}</span>
-          <span className="stat-change">{PLATFORM_FEE_PERCENT}% facilitation fee</span>
-        </div>
+        {isArtist ? (
+          <div className="stat-card">
+            <span className="stat-label"><CheckCircle size={14} /> Completed</span>
+            <span className="stat-value">{paidCount}</span>
+            <span className="stat-change">Paid milestones &amp; bookings</span>
+          </div>
+        ) : (
+          <div className="stat-card">
+            <span className="stat-label"><Receipt size={14} /> Platform fees</span>
+            <span className="stat-value" style={{ color: 'var(--accent)' }}>${platformFees.toLocaleString()}</span>
+            <span className="stat-change">{PLATFORM_FEE_PERCENT}% facilitation fee</span>
+          </div>
+        )}
       </div>
 
       {/* Stripe status banner */}
@@ -509,7 +581,7 @@ https://thecallsheet.ai
                 <span style={{ fontSize: 14 }}>{isArtist ? me?.name ?? p.artistName : p.artistName}</span>
                 <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{p.date}</span>
                 <span style={{ textAlign: 'right', fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700 }}>
-                  ${p.amount.toLocaleString()}
+                  ${paymentDisplayAmount(p, isArtist).toLocaleString()}
                 </span>
                 <div
                   style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}
@@ -543,7 +615,7 @@ https://thecallsheet.ai
 
             <div style={{ textAlign: 'center', marginBottom: 24, paddingBottom: 24, borderBottom: '1px solid var(--border)' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 700, marginBottom: 4 }}>
-                ${showReceipt.amount.toLocaleString()}
+                ${paymentDisplayAmount(showReceipt, isArtist).toLocaleString()}
               </div>
               <div style={{ color: 'var(--text-muted)' }}>{showReceipt.description}</div>
               <div style={{
@@ -569,20 +641,29 @@ https://thecallsheet.ai
               ))}
             </div>
 
-            <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 24, fontSize: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Subtotal</span>
-                <span>${showReceipt.amount.toLocaleString()}</span>
+            {isArtist ? (
+              <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 24, fontSize: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                  <span>Paid to you</span>
+                  <span>${paymentDisplayAmount(showReceipt, true).toLocaleString()}</span>
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Platform fee ({PLATFORM_FEE_PERCENT}%)</span>
-                <span>${platformFeeAmount(showReceipt.amount).toLocaleString()}</span>
+            ) : (
+              <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 24, fontSize: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Subtotal</span>
+                  <span>${showReceipt.amount.toLocaleString()}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Platform fee ({PLATFORM_FEE_PERCENT}%)</span>
+                  <span>${platformFeeAmount(showReceipt.amount).toLocaleString()}</span>
+                </div>
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                  <span>Total charged</span>
+                  <span>${showReceipt.amount.toLocaleString()}</span>
+                </div>
               </div>
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                <span>Total charged</span>
-                <span>${showReceipt.amount.toLocaleString()}</span>
-              </div>
-            </div>
+            )}
 
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               <button type="button" className="btn btn-secondary" onClick={() => handleDownloadReceipt(showReceipt)}>
@@ -634,7 +715,7 @@ https://thecallsheet.ai
                 <span>Milestone amount</span><span>${selectedPayment.amount.toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, color: 'var(--text-muted)' }}>
-                <span>Platform fee ({PLATFORM_FEE_PERCENT}%, from artist payout)</span><span>${platformFeeAmount(selectedPayment.amount).toLocaleString()}</span>
+                <span>Platform fee ({PLATFORM_FEE_PERCENT}%, deducted at payment)</span><span>${platformFeeAmount(selectedPayment.amount).toLocaleString()}</span>
               </div>
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14 }}>
                 <span>Total charge</span>

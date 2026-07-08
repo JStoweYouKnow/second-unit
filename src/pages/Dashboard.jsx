@@ -177,9 +177,8 @@ export default function Dashboard() {
 
 
   const paidTotal = useMemo(() => {
-    // Filter payments by date (mock logic: last N payments)
     const filtered = myPayments.filter((p) => p.status === 'paid').slice(0, rangeMonths * 2)
-    return filtered.reduce((s, p) => s + p.amount, 0)
+    return filtered.reduce((s, p) => s + artistPayoutAmount(p.amount), 0)
   }, [myPayments, rangeMonths])
 
   const upcomingGigs = useMemo(() => {
@@ -249,7 +248,7 @@ export default function Dashboard() {
           <div className="stat-card">
             <span className="stat-label"><DollarSign size={14} /> Paid (demo)</span>
             <span className="stat-value" style={{ color: 'var(--success)' }}>${paidTotal.toLocaleString()}</span>
-            <span className="stat-change">After platform fees in production</span>
+            <span className="stat-change">All-time earnings</span>
           </div>
           <div className="stat-card">
             <span className="stat-label"><Calendar size={14} /> Upcoming gigs</span>

@@ -42,10 +42,10 @@ import {
   markAllNotificationsRead,
   getNotificationPrefs,
   updateNotificationPrefs,
+  createNotification,
 } from '../api/_lib/notifications.js'
 import { ensureContractForBooking } from '../api/_lib/bookingContract.js'
 import { notifyBookingConfirmed } from '../api/_lib/notificationEvents.js'
-import { syncBookingToConnectedCalendars } from '../api/_lib/googleCalendar.js'
 import {
   listDisputesForUser,
   createDispute,
@@ -65,10 +65,10 @@ import {
   importGoogleBusyBlocks,
   getCalendarConnectionStatus,
   disconnectCalendar,
+  syncBookingToConnectedCalendars,
 } from '../api/_lib/googleCalendar.js'
 import { buildIcalCalendar, ensureCalendarFeedToken, getProfileIdForFeedToken } from '../api/_lib/icalFeed.js'
 import { FRONTEND_URL } from '../api/_lib/stripe.js'
-import { createNotification } from '../api/_lib/notifications.js'
 import {
   listReviewsForArtist,
   upsertReview,
@@ -83,7 +83,6 @@ import {
   savePushSubscription,
   removePushSubscription,
 } from '../api/_lib/push.js'
-import { updateNotificationPrefs } from '../api/_lib/notifications.js'
 import {
   listMilestonesForContract,
   ensureContractMilestones,
@@ -94,7 +93,6 @@ import {
   canPayMilestone,
   mapMilestoneToClient,
 } from '../api/_lib/milestones.js'
-import { FRONTEND_URL } from '../api/_lib/stripe.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -102,12 +100,6 @@ const __dirname = path.dirname(__filename)
 const app = express()
 const httpServer = createServer(app)
 const PORT = process.env.PORT || process.env.API_PORT || 3001
-let FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173'
-
-// Fix: Ensure FRONTEND_URL has a protocol (required by CORS policy)
-if (FRONTEND_URL && !FRONTEND_URL.startsWith('http')) {
-  FRONTEND_URL = `https://${FRONTEND_URL}`
-}
 
 // ---- Security Middleware (Items 2 & 3) ----
 app.use(helmet()) // Security headers

@@ -1,4 +1,5 @@
 import { mapContractToClient } from './contracts.js'
+import { buildAgreementTerms } from './agreementTemplate.js'
 
 function addDays(dateStr, days) {
   const d = new Date(`${dateStr}T12:00:00`)
@@ -58,7 +59,7 @@ export async function ensureContractForBooking(db, bookingRow) {
     .maybeSingle()
 
   const title = `${bookingRow.booking_type || 'Project'} — ${bookingRow.artist_name || 'Artist'}`
-  const notes = bookingRow.notes?.trim()
+  const notes = bookingRow.notes?.trim() || null
 
   const { data: contract, error } = await db
     .from('contracts')
@@ -73,9 +74,7 @@ export async function ensureContractForBooking(db, bookingRow) {
       start_date: startDate,
       end_date: endDate,
       client_name: profile?.full_name ?? null,
-      terms: notes
-        ? `Booking notes from hirer:\n${notes}\n\nStandard platform terms apply upon signature.`
-        : null,
+      terms: buildAgreementTerms({ bookingNotes: notes }),
     })
     .select(`*, artist:artists(display_name)`)
     .single()

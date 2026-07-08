@@ -5,6 +5,7 @@ import {
   attachMilestonesToContracts,
 } from './milestones.js'
 import { notifyContractSigned } from './notificationEvents.js'
+import { buildAgreementTerms } from './agreementTemplate.js'
 
 function mapStatusToClient(status) {
   return status
@@ -43,6 +44,7 @@ export function mapContractToClient(row) {
 }
 
 export function mapContractToDb(payload, employerId) {
+  const hasAttachment = !!(payload.attachmentUrl || payload.attachmentName || payload.attachmentStoragePath)
   return {
     employer_id: employerId,
     artist_id: payload.artistId,
@@ -52,7 +54,10 @@ export function mapContractToDb(payload, employerId) {
     total_value: Math.round(Number(payload.value) || 0),
     start_date: payload.startDate || null,
     end_date: payload.endDate || null,
-    terms: payload.terms || null,
+    terms: buildAgreementTerms({
+      importedTerms: payload.terms,
+      hasAttachment,
+    }),
     client_name: payload.clientName || null,
     attachment_url: payload.attachmentUrl || null,
     attachment_name: payload.attachmentName || null,

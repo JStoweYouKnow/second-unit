@@ -750,7 +750,18 @@ app.post('/api/contracts', async (req, res) => {
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const row = mapContractToDb(req.body, user.id)
-    const { data, error } = await database.from('contracts').insert(row).select(`*, artist:artists(display_name)`).single()
+    let { data, error } = await database.from('contracts').insert(row).select(`*, artist:artists(display_name)`).single()
+    if (error && /milestone_amounts|attachment_|client_name|column .* does not exist/i.test(error.message || '')) {
+      const {
+        milestone_amounts: _m,
+        attachment_url: _au,
+        attachment_name: _an,
+        attachment_mime: _am,
+        client_name: _cn,
+        ...legacyRow
+      } = row
+      ;({ data, error } = await database.from('contracts').insert(legacyRow).select(`*, artist:artists(display_name)`).single())
+    }
     if (error) return res.status(500).json({ error: error.message })
     res.status(201).json(mapContractToClient(data))
   } catch (err) {

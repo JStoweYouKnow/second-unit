@@ -45,16 +45,36 @@ export default async function handler(req, res) {
     try {
       const validated = ContractSchema.parse(req.body)
       const row = mapContractToDb(validated, user.id)
-      const { data, error } = await db
+      let { data, error } = await db
         .from('contracts')
         .insert(row)
         .select(`*, artist:artists(display_name)`)
         .single()
+
+      // Older DBs may lack milestone_amounts / attachment columns — retry without optional fields.
+      if (error && /milestone_amounts|attachment_|client_name|column .* does not exist/i.test(error.message || '')) {
+        const {
+          milestone_amounts: _m,
+          attachment_url: _au,
+          attachment_name: _an,
+          attachment_mime: _am,
+          client_name: _cn,
+          ...legacyRow
+        } = row
+        ;({ data, error } = await db
+          .from('contracts')
+          .insert(legacyRow)
+          .select(`*, artist:artists(display_name)`)
+          .single())
+      }
+
       if (error) return res.status(500).json({ error: error.message })
       return res.status(201).json(mapContractToClient(data))
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ error: 'Validation failed', details: err.errors })
+        const first = err.errors?.[0]
+        const detail = first ? `${first.path?.join('.') || 'field'}: ${first.message}` : 'Validation failed'
+        return res.status(400).json({ error: detail, details: err.errors })
       }
       return res.status(500).json({ error: err.message })
     }

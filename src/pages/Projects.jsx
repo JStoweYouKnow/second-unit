@@ -9,6 +9,7 @@ import { useApp } from '../context/AppContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
 import { contracts as contractsApi } from '../lib/api'
 import { isSupabaseConfigured } from '../lib/supabase'
+import { uploadContractAttachment, downloadContractAttachment } from '../lib/contractAttachments'
 import { splitMilestoneAmounts, DEFAULT_MILESTONE_TITLES } from '../lib/milestones'
 
 const STANDARD_TERMS = `INDEPENDENT CONTRACTOR AGREEMENT
@@ -90,6 +91,8 @@ export default function Projects() {
   /** Pending upload in the modal only (blob URL revoked on discard). On create, URL is kept on the contract row. */
   const [customAgreementUpload, setCustomAgreementUpload] = useState(null)
   const [customUploadError, setCustomUploadError] = useState('')
+  const [createError, setCreateError] = useState('')
+  const [creating, setCreating] = useState(false)
   const customAgreementInputRef = useRef(null)
   const [signatureName, setSignatureName] = useState('')
   const [signatureAgreed, setSignatureAgreed] = useState(false)
@@ -153,8 +156,14 @@ export default function Projects() {
   function closeNewProjectModal() {
     discardCustomAgreementUpload()
     setCustomUploadError('')
+    setCreateError('')
+    setCreating(false)
     setProjectType('standard')
-    setNewProject({ title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: '' })
+    setUseCustomMilestones(false)
+    setNewProject({
+      title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: '',
+      milestone1: '', milestone2: '', milestone3: '',
+    })
     setShowNew(false)
   }
 
@@ -192,9 +201,13 @@ export default function Projects() {
       return
     }
     setCustomUploadError('')
+    setCreateError('')
 
     const artist = artists.find((a) => String(a.id) === String(newProject.artistId))
-    if (!artist) return
+    if (!artist) {
+      setCreateError('Select an artist for this project.')
+      return
+    }
 
     let terms = STANDARD_TERMS
     let attachmentUrl = null
@@ -234,39 +247,47 @@ export default function Projects() {
       return
     }
 
-    const created = await createContract({
-      title: newProject.title,
-      artistId: artist.id,
-      artistName: artist.name,
-      clientName: profile?.full_name || 'Client',
-      type: projectType,
-      value: totalValue,
-      startDate: newProject.startDate,
-      endDate: newProject.endDate,
-      terms,
-      attachmentUrl,
-      attachmentName,
-      attachmentMime,
-      milestoneAmounts,
-    })
+    setCreating(true)
+    try {
+      const created = await createContract({
+        title: newProject.title,
+        artistId: artist.id,
+        artistName: artist.name,
+        clientName: profile?.full_name || 'Client',
+        type: projectType,
+        value: totalValue,
+        startDate: newProject.startDate,
+        endDate: newProject.endDate,
+        terms,
+        attachmentUrl,
+        attachmentName,
+        attachmentMime,
+        milestoneAmounts,
+      })
 
-    if (pendingFile && created?.id && isSupabaseConfigured) {
-      try {
-        const storagePath = await uploadContractAttachment(created.id, pendingFile)
-        await contractsApi.updateAttachment(created.id, {
-          attachmentStoragePath: storagePath,
-          attachmentName: customAgreementUpload.name,
-          attachmentMime: customAgreementUpload.mimeType,
-        })
-        await refetchContracts()
-      } catch (uploadErr) {
-        console.error('Attachment upload failed:', uploadErr)
-        setCustomUploadError('Project created but file upload failed. Try uploading again from the project view.')
-        return
+      if (pendingFile && created?.id && isSupabaseConfigured) {
+        try {
+          const storagePath = await uploadContractAttachment(created.id, pendingFile)
+          await contractsApi.updateAttachment(created.id, {
+            attachmentStoragePath: storagePath,
+            attachmentName: customAgreementUpload.name,
+            attachmentMime: customAgreementUpload.mimeType,
+          })
+          await refetchContracts()
+        } catch (uploadErr) {
+          console.error('Attachment upload failed:', uploadErr)
+          setCustomUploadError('Project created but file upload failed. Try uploading again from the project view.')
+          setCreating(false)
+          return
+        }
       }
-    }
 
-    closeNewProjectModal()
+      closeNewProjectModal()
+    } catch (err) {
+      console.error('Create project failed:', err)
+      setCreateError(err.message || 'Failed to create project. Please try again.')
+      setCreating(false)
+    }
   }
 
   const handleDownloadAttachment = async (contract) => {
@@ -733,9 +754,17 @@ ${divider}
                 </div>
               )}
 
+              {createError && (
+                <div className="auth-error" style={{ marginBottom: 16 }} role="alert">
+                  {createError}
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-secondary" onClick={closeNewProjectModal}>Cancel</button>
-                <button type="submit" className="btn btn-primary"><FileText size={16} /> Create Project</button>
+                <button type="button" className="btn btn-secondary" onClick={closeNewProjectModal} disabled={creating}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={creating}>
+                  <FileText size={16} /> {creating ? 'Creating…' : 'Create Project'}
+                </button>
               </div>
             </form>
           </div>

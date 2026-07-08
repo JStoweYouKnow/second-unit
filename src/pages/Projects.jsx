@@ -481,7 +481,7 @@ ${divider}
         <div className="page-header-row">
           <div>
             <h1>Projects</h1>
-            <p>{isArtist ? 'Engagements clients have sent you' : 'Manage agreements with your artists'}</p>
+            <p>{isArtist ? 'Engagements clients have sent you' : 'Create a project to send an agreement and booking request to your artist'}</p>
           </div>
           {!isArtist && (
             <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New Project</button>
@@ -584,6 +584,10 @@ ${divider}
               <h2>Create New Project</h2>
               <button type="button" className="btn-icon" onClick={closeNewProjectModal}><X size={18} /></button>
             </div>
+
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.5 }}>
+              Creating a project also sends a pending booking to the artist. They confirm the booking, then both of you sign the agreement.
+            </p>
 
             <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
               <button

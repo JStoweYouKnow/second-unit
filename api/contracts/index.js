@@ -4,9 +4,9 @@ import { requireAuth } from '../_lib/auth.js'
 import { rateLimit, getClientIp } from '../_lib/ratelimit.js'
 import {
   listContractsForUser,
-  mapContractToClient,
   mapContractToDb,
 } from '../_lib/contracts.js'
+import { linkBookingAfterContractCreate } from '../_lib/linkContractBooking.js'
 
 const ContractSchema = z.object({
   title: z.string().min(1),
@@ -69,12 +69,13 @@ export default async function handler(req, res) {
       }
 
       if (error) return res.status(500).json({ error: error.message })
-      return res.status(201).json(mapContractToClient(data))
+      const linked = await linkBookingAfterContractCreate(db, data)
+      return res.status(201).json(linked)
     } catch (err) {
       if (err instanceof z.ZodError) {
-        const first = err.errors?.[0]
+        const first = err.issues?.[0] || err.errors?.[0]
         const detail = first ? `${first.path?.join('.') || 'field'}: ${first.message}` : 'Validation failed'
-        return res.status(400).json({ error: detail, details: err.errors })
+        return res.status(400).json({ error: detail, details: err.issues || err.errors })
       }
       return res.status(500).json({ error: err.message })
     }

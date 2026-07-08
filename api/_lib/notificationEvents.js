@@ -39,6 +39,41 @@ export async function notifyMessageReceived(db, {
   )
 }
 
+export async function notifyBookingRequested(db, { booking, employerId, artistProfileId }) {
+  if (!artistProfileId) return null
+
+  const employer = await emailProfile(db, employerId)
+  const artist = await emailProfile(db, artistProfileId)
+  const employerName = employer?.full_name || 'A client'
+  const dateLabel = booking.date
+    ? String(booking.date).slice(0, 10)
+    : 'TBD'
+  const title = `New booking request from ${employerName}`
+  const body = `${booking.type || booking.booking_type || 'Project'} on ${dateLabel} — confirm to activate the agreement.`
+
+  return notifyUser(
+    db,
+    artistProfileId,
+    { type: 'booking', title, body, link: '/bookings' },
+    artist
+      ? {
+          email: {
+            to: artist.email,
+            subject: title,
+            html: emailLayout({
+              title,
+              body,
+              ctaLabel: 'Review Booking',
+              ctaUrl: `${FRONTEND_URL}/bookings`,
+            }),
+            prefs: artist.notification_prefs,
+            category: 'booking',
+          },
+        }
+      : {}
+  )
+}
+
 export async function notifyBookingConfirmed(db, { booking, employerId, artistProfileId }) {
   const employer = await emailProfile(db, employerId)
   const title = `${booking.artist_name || 'Artist'} confirmed your booking`

@@ -78,6 +78,7 @@ export function useContracts(enabled = true) {
 
   const createContract = useCallback(async (payload) => {
     if (!isSupabaseConfigured) {
+      const bookingId = `bk_${Date.now()}`
       const project = withMilestonesIfActive({
         id: `pj_${Date.now()}`,
         status: 'pending',
@@ -86,9 +87,29 @@ export function useContracts(enabled = true) {
         employerSignature: null,
         artistSignature: null,
         milestones: [],
+        bookingId,
         createdAt: new Date().toISOString(),
         ...payload,
       })
+      try {
+        const bookings = JSON.parse(localStorage.getItem('mock_bookings') || '[]')
+        bookings.unshift({
+          id: bookingId,
+          artistId: payload.artistId,
+          artistName: payload.artistName || 'Artist',
+          date: payload.startDate || new Date().toISOString().slice(0, 10),
+          time: '09:00',
+          duration: 1,
+          durationUnit: 'project',
+          type: 'Project Work',
+          agreedTotal: Math.round(Number(payload.value) || 0),
+          status: 'pending',
+          notes: `Created from project: ${payload.title}`,
+          contractId: project.id,
+          createdAt: new Date().toISOString(),
+        })
+        localStorage.setItem('mock_bookings', JSON.stringify(bookings))
+      } catch {}
       const next = [project, ...loadMock()]
       saveMock(next)
       setContracts(next.map(withMilestonesIfActive))

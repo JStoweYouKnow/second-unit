@@ -8,6 +8,7 @@ import {
   mapBookingToDb,
   userCanAccessBooking,
 } from '../_lib/bookings.js'
+import { notifyBookingRequested } from '../_lib/notificationEvents.js'
 
 const BookingSchema = z.object({
   artistId: z.string().uuid(),
@@ -49,6 +50,20 @@ export default async function handler(req, res) {
       const { data, error } = await db.from('bookings').insert(row).select().single()
 
       if (error) return res.status(500).json({ error: error.message })
+      try {
+        const { data: artistRow } = await db
+          .from('artists')
+          .select('profile_id')
+          .eq('id', data.artist_id)
+          .maybeSingle()
+        await notifyBookingRequested(db, {
+          booking: data,
+          employerId: data.employer_id,
+          artistProfileId: artistRow?.profile_id ?? null,
+        })
+      } catch (notifyErr) {
+        console.error('[bookings] notify requested failed:', notifyErr?.message || notifyErr)
+      }
       return res.status(201).json(mapBookingToClient(data))
     } catch (err) {
       if (err instanceof z.ZodError) {

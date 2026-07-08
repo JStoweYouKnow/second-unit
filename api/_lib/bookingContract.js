@@ -1,4 +1,5 @@
 import { mapContractToClient } from './contracts.js'
+import { mapBookingToClient } from './bookings.js'
 import { buildAgreementTerms } from './agreementTemplate.js'
 
 function addDays(dateStr, days) {
@@ -16,6 +17,18 @@ function estimateEndDate(booking) {
   if (dur <= 4) return addDays(start, 7)
   if (dur <= 16) return addDays(start, 14)
   return addDays(start, 30)
+}
+
+function estimateDurationFromContract(contract) {
+  const start = contract.start_date ? String(contract.start_date).slice(0, 10) : null
+  const end = contract.end_date ? String(contract.end_date).slice(0, 10) : null
+  if (!start || !end || end === start) {
+    return { durationHours: 1, durationUnit: 'project' }
+  }
+  const ms = new Date(`${end}T12:00:00`) - new Date(`${start}T12:00:00`)
+  const days = Math.max(1, Math.round(ms / 86400000) + 1)
+  if (days <= 1) return { durationHours: 1, durationUnit: 'project' }
+  return { durationHours: days, durationUnit: 'days' }
 }
 
 /**
@@ -87,6 +100,99 @@ export async function ensureContractForBooking(db, bookingRow) {
     .eq('id', bookingRow.id)
 
   return mapContractToClient(contract)
+}
+
+/**
+ * When a client creates a project directly, create a linked pending booking for the artist (idempotent).
+ * Artist still confirms the booking; both parties still sign the agreement.
+ */
+export async function ensureBookingForContract(db, contractRow) {
+  if (!db || !contractRow?.id) return null
+
+  if (contractRow.booking_id) {
+    const { data } = await db
+      .from('bookings')
+      .select('*')
+      .eq('id', contractRow.booking_id)
+      .maybeSingle()
+    return data ? mapBookingToClient(data) : null
+  }
+
+  const { data: byContract } = await db
+    .from('bookings')
+    .select('*')
+    .eq('contract_id', contractRow.id)
+    .maybeSingle()
+
+  if (byContract) {
+    await db
+      .from('contracts')
+      .update({ booking_id: byContract.id, updated_at: new Date().toISOString() })
+      .eq('id', contractRow.id)
+    return mapBookingToClient(byContract)
+  }
+
+  const { data: artist } = await db
+    .from('artists')
+    .select('id, display_name, profile_id')
+    .eq('id', contractRow.artist_id)
+    .maybeSingle()
+
+  const artistName =
+    contractRow.artist?.display_name ||
+    artist?.display_name ||
+    'Artist'
+
+  const startDate = contractRow.start_date
+    ? String(contractRow.start_date).slice(0, 10)
+    : new Date().toISOString().slice(0, 10)
+  const { durationHours, durationUnit } = estimateDurationFromContract(contractRow)
+  const agreedTotal = Math.max(Math.round(Number(contractRow.total_value) || 0), 1)
+  const rate = Math.max(Math.round(agreedTotal / Math.max(durationHours, 1)), 1)
+
+  const bookingInsert = {
+    employer_id: contractRow.employer_id,
+    artist_id: contractRow.artist_id,
+    artist_name: artistName,
+    date: startDate,
+    start_time: '09:00',
+    duration_hours: durationHours,
+    duration_unit: durationUnit,
+    booking_type: 'Project Work',
+    rate,
+    agreed_total: agreedTotal,
+    status: 'pending',
+    notes: `Created from project: ${contractRow.title}`,
+    contract_id: contractRow.id,
+  }
+
+  let { data: booking, error } = await db.from('bookings').insert(bookingInsert).select().single()
+
+  // Older DBs may lack optional booking columns — retry with core fields only.
+  if (error && /agreed_total|duration_unit|artist_name|contract_id|column .* does not exist/i.test(error.message || '')) {
+    const {
+      agreed_total: _at,
+      duration_unit: _du,
+      artist_name: _an,
+      contract_id: _cid,
+      ...legacy
+    } = bookingInsert
+    ;({ data: booking, error } = await db.from('bookings').insert(legacy).select().single())
+  }
+
+  if (error) throw error
+
+  // Link contract → booking (ignore if booking_id column missing).
+  const { error: linkError } = await db
+    .from('contracts')
+    .update({ booking_id: booking.id, updated_at: new Date().toISOString() })
+    .eq('id', contractRow.id)
+
+  if (linkError && !/booking_id|column .* does not exist/i.test(linkError.message || '')) {
+    console.error('[bookingContract] link contract→booking failed:', linkError.message)
+  }
+
+  return mapBookingToClient(booking)
 }
 
 export async function syncBookingStatusFromContract(db, contractId) {

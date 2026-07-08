@@ -45,7 +45,8 @@ import {
   createNotification,
 } from '../api/_lib/notifications.js'
 import { ensureContractForBooking } from '../api/_lib/bookingContract.js'
-import { notifyBookingConfirmed } from '../api/_lib/notificationEvents.js'
+import { linkBookingAfterContractCreate } from '../api/_lib/linkContractBooking.js'
+import { notifyBookingConfirmed, notifyBookingRequested } from '../api/_lib/notificationEvents.js'
 import {
   listDisputesForUser,
   createDispute,
@@ -280,6 +281,20 @@ app.post('/api/bookings', async (req, res) => {
       const row = mapBookingToDb(validatedData, user.id)
       const { data, error } = await database.from('bookings').insert(row).select().single()
       if (error) return res.status(500).json({ error: error.message })
+      try {
+        const { data: artistRow } = await database
+          .from('artists')
+          .select('profile_id')
+          .eq('id', data.artist_id)
+          .maybeSingle()
+        await notifyBookingRequested(database, {
+          booking: data,
+          employerId: data.employer_id,
+          artistProfileId: artistRow?.profile_id ?? null,
+        })
+      } catch (notifyErr) {
+        console.error('[bookings] notify requested failed:', notifyErr?.message || notifyErr)
+      }
       return res.status(201).json(mapBookingToClient(data))
     }
 
@@ -763,7 +778,8 @@ app.post('/api/contracts', async (req, res) => {
       ;({ data, error } = await database.from('contracts').insert(legacyRow).select(`*, artist:artists(display_name)`).single())
     }
     if (error) return res.status(500).json({ error: error.message })
-    res.status(201).json(mapContractToClient(data))
+    const linked = await linkBookingAfterContractCreate(database, data)
+    res.status(201).json(linked)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

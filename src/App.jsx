@@ -302,7 +302,7 @@ function AppShell() {
             <BrandLogo />
             <span className="sr-only">The Callsheet — AI artist platform</span>
           </button>
-          <nav>
+          <nav className="sidebar-nav">
             <div className="nav-section">
               <div className="nav-label">Main</div>
               {navItems.map((item) => {
@@ -325,7 +325,7 @@ function AppShell() {
               })}
             </div>
             {isAdmin && (
-              <div className="nav-section" style={{ marginTop: 'auto' }}>
+              <div className="nav-section">
                 <div className="nav-label">View as</div>
                 <div style={{ display: 'flex', gap: 4, padding: '4px 0' }}>
                   {[null, 'employer', 'artist'].map((mode) => {
@@ -351,23 +351,25 @@ function AppShell() {
                 </div>
               </div>
             )}
-            <div className="nav-section" style={{ marginTop: isAdmin ? 0 : 'auto' }}>
+          </nav>
+          <div className="sidebar-footer">
+            <div className="nav-section" style={{ marginBottom: 0 }}>
               <div className="nav-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 Account
                 <NotificationPanel />
               </div>
-              <div 
-                className="nav-link" 
+              <div
+                className="nav-link"
                 onClick={() => goNav('/account')}
-                style={{ 
-                  padding: '8px 12px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 10, 
+                style={{
+                  padding: '8px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
                   marginBottom: 8,
                   cursor: 'pointer',
                   border: '1px solid transparent',
-                  transition: 'var(--transition)'
+                  transition: 'var(--transition)',
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = 'transparent'}
@@ -385,9 +387,9 @@ function AppShell() {
                 </div>
               </div>
               <ThemeToggle showLabel />
-              <button 
-                type="button" 
-                className="nav-link sign-out-btn" 
+              <button
+                type="button"
+                className="nav-link sign-out-btn"
                 onClick={handleSignOut}
                 disabled={signingOut}
                 aria-busy={signingOut}
@@ -447,7 +449,7 @@ function AppShell() {
                 </div>
               )}
             </div>
-          </nav>
+          </div>
         </aside>
         <main id="main-content" className="main-content" tabIndex={-1}>
           <ErrorBoundary>

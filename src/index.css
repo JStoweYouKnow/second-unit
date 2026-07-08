@@ -172,8 +172,8 @@ input, textarea, select { font-family: inherit; }
 .app-layout { display: flex; min-height: 100vh; }
 .sidebar {
   width: 264px; background: var(--bg-secondary); border-right: 1px solid var(--border-strong);
-  padding: 10px 20px 24px; display: flex; flex-direction: column; position: fixed;
-  top: 0; left: 0; bottom: 0; z-index: 100;
+  padding: 4px 16px 12px; display: flex; flex-direction: column; position: fixed;
+  top: 0; left: 0; bottom: 0; z-index: 100; overflow: hidden;
 }
 .main-content { flex: 1; margin-left: 264px; min-height: 100vh; }
 .page-container { max-width: 1400px; margin: 0 auto; padding: 32px 40px; }
@@ -183,9 +183,10 @@ input, textarea, select { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 0 12px;
+  padding: 0 0 6px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 16px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
 }
 button.logo {
   width: 100%;
@@ -216,14 +217,15 @@ button.logo:focus-visible {
 /* Brand lockup — full-width home control (transparent PNG) */
 img.brand-logo {
   display: block;
-  width: min(250px, 100%);
+  width: min(200px, 100%);
   height: auto;
   object-fit: contain;
   object-position: left center;
   filter: invert(1);
 }
 .logo--home img.brand-logo {
-  margin-left: -48px;
+  margin-left: -28px;
+  margin-top: -6px;
 }
 img.brand-logo.brand-logo--on-dark {
   filter: none;
@@ -247,14 +249,23 @@ img.brand-logo.brand-logo--auth {
   margin: 0 auto;
 }
 
-.sidebar nav {
+.sidebar-nav {
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.sidebar-footer {
+  flex-shrink: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
 }
 
 /* ===== Nav ===== */
-.nav-section { margin-bottom: 24px; }
+.nav-section { margin-bottom: 16px; }
 .nav-label { font-size: 10px; text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--text-muted); padding: 0 12px; margin-bottom: 8px; font-weight: 600; }
 .nav-link {
   display: flex; align-items: center; gap: 12px; padding: 10px 12px;

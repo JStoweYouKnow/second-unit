@@ -2,7 +2,8 @@ import { useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Calendar, Heart, Play, Star, Filter, DollarSign, MapPin, Globe, AtSign, X } from '../components/icons'
 import { buildOpenBriefCards } from '../lib/openBriefs'
-import { useArtists } from '../hooks/useData'
+import { brandName } from '../lib/brands'
+import ArtistRateCard from '../components/ArtistRateCard'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { useBookings } from '../hooks/useBookings'
@@ -138,7 +139,7 @@ export default function Leaderboard() {
           a.role,
           a.location,
           ...a.skills,
-          ...a.brands,
+          ...a.brands.map(brandName),
         ]
           .join(' ')
           .toLowerCase()
@@ -485,10 +486,11 @@ export default function Leaderboard() {
                   </button>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--gold)', fontSize: 13, fontWeight: 700 }}>
                     <Star size={14} fill="var(--gold)" /> {artist.rating}
                   </div>
+                  <ArtistRateCard artist={artist} compact />
                   {artist.available && (
                     <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--success)', textTransform: 'uppercase' }}>
                       ● Available

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Send, Check, HelpCircle, Wifi, WifiOff, User } from '../components/icons'
+import { Send, Check, CheckCheck, HelpCircle, Wifi, WifiOff, User } from '../components/icons'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { getSocket } from '../lib/socket'
@@ -250,7 +250,14 @@ export default function Messages() {
               return (
                 <div key={msg.id} className={`chat-bubble ${isMe ? 'sent' : 'received'}`}>
                   {msg.text}
-                  <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4, textAlign: isMe ? 'right' : 'left' }}>{msg.time}</div>
+                  <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4, textAlign: isMe ? 'right' : 'left', display: 'flex', alignItems: 'center', justifyContent: isMe ? 'flex-end' : 'flex-start', gap: 4 }}>
+                    <span>{msg.time}</span>
+                    {isMe && (
+                      msg.read
+                        ? <CheckCheck size={12} aria-label="Read" style={{ opacity: 0.9 }} />
+                        : <Check size={12} aria-label="Sent" style={{ opacity: 0.6 }} />
+                    )}
+                  </div>
                 </div>
               )
             })}

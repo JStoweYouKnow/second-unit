@@ -12,7 +12,21 @@ function formatMessageTime(iso) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-function mapMessageToThread(row, viewerIsArtist) {
+function messageReadByRecipient(row, conversation, viewerIsArtist) {
+  if (!conversation) return false
+  const fromMe = viewerIsArtist
+    ? row.sender_role === 'artist'
+    : row.sender_role === 'employer'
+  if (!fromMe) return false
+
+  const recipientReadAt = viewerIsArtist
+    ? conversation.employer_last_read_at
+    : conversation.artist_last_read_at
+  if (!recipientReadAt) return false
+  return new Date(recipientReadAt) >= new Date(row.created_at)
+}
+
+function mapMessageToThread(row, viewerIsArtist, conversation) {
   const fromEmployer = row.sender_role === 'employer'
   const sender = viewerIsArtist
     ? (fromEmployer ? 'user' : 'artist')
@@ -23,6 +37,7 @@ function mapMessageToThread(row, viewerIsArtist) {
     text: row.body,
     time: formatMessageTime(row.created_at),
     createdAt: row.created_at,
+    read: messageReadByRecipient(row, conversation, viewerIsArtist),
   }
 }
 
@@ -41,7 +56,7 @@ export function mapConversationToClient(row, messages, { viewerIsArtist }) {
     unread,
     lastMessage: row.last_message ?? '',
     time: formatMessageTime(row.last_message_at) || 'Now',
-    thread: (messages || []).map((m) => mapMessageToThread(m, viewerIsArtist)),
+    thread: (messages || []).map((m) => mapMessageToThread(m, viewerIsArtist, row)),
   }
 }
 
@@ -200,13 +215,33 @@ export async function markConversationRead(db, conversationId, userId) {
   if (!canAccess) throw new Error('Forbidden')
 
   const artistId = await getArtistIdForProfile(db, userId)
-  const patch =
-    artistId != null && conversation.artist_id === artistId
-      ? { artist_unread: 0 }
-      : { employer_unread: 0 }
+  const now = new Date().toISOString()
+  const viewerIsArtist = artistId != null && conversation.artist_id === artistId
+  const patch = viewerIsArtist
+    ? { artist_unread: 0, artist_last_read_at: now }
+    : { employer_unread: 0, employer_last_read_at: now }
 
-  await db.from('conversations').update(patch).eq('id', conversationId)
-  return { ok: true }
+  const { data: updated, error: updateError } = await db
+    .from('conversations')
+    .update(patch)
+    .eq('id', conversationId)
+    .select(`
+      *,
+      artist:artists(id, display_name, profile_id)
+    `)
+    .single()
+
+  if (updateError) throw updateError
+
+  const { data: messages, error: msgError } = await db
+    .from('messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true })
+
+  if (msgError) throw msgError
+
+  return mapConversationToClient(updated, messages || [], { viewerIsArtist })
 }
 
 export { formatMessageTime, mapMessageToThread }

@@ -13,8 +13,8 @@ export default async function handler(req, res) {
 
   if (req.method === 'PATCH') {
     try {
-      await markConversationRead(db, id, user.id)
-      return res.json({ ok: true })
+      const conversation = await markConversationRead(db, id, user.id)
+      return res.json({ ok: true, conversation })
     } catch (err) {
       return res.status(err.message === 'Forbidden' ? 403 : 500).json({ error: err.message })
     }

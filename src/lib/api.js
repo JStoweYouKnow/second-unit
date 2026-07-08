@@ -386,3 +386,12 @@ export const push = {
 
   getVapidPublicKey: () => request('/api/push/vapid-public-key'),
 }
+
+// ---- Artist admin (brand verification) ----
+export const artists = {
+  verifyBrand: (artistId, brandName, verified) =>
+    request(`/api/artists/${artistId}/brands`, {
+      method: 'PATCH',
+      body: JSON.stringify({ brandName, verified }),
+    }),
+}

@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { availabilityDatesFromRows } from '../lib/discoveryAvailability'
+import { normalizeBrands } from '../lib/brands'
 import { groupSlotsByDate } from '../lib/availability'
 
 const MOCK_ARTISTS = [
@@ -16,7 +18,7 @@ const MOCK_ARTISTS = [
     rating: 4.9,
     projects: 24,
     skills: ['Midjourney', 'Stable Diffusion', 'ComfyUI', 'After Effects'],
-    brands: ['Gucci', 'Vogue', 'Apple'],
+    brands: ['Gucci', 'Vogue', 'Apple'].map((name) => ({ name, verified: true })),
     videoLinks: [
       'https://vimeo.com/834816616',
       'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
@@ -49,7 +51,7 @@ const MOCK_ARTISTS = [
     rating: 5.0,
     projects: 18,
     skills: ['Runway', 'Sora', 'Pika Labs', 'Premiere Pro'],
-    brands: ['Marvel', 'Netflix', 'Epic Games'],
+    brands: ['Marvel', 'Netflix', 'Epic Games'].map((name) => ({ name, verified: false })),
     videoLinks: [
       'https://vimeo.com/347119253',
       'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
@@ -103,7 +105,7 @@ export function useArtists({ search = '', roleFilter = 'all' } = {}) {
           *,
           profile:profiles!artists_profile_id_fkey(email, avatar_url),
           skills:artist_skills(skill:skills(name)),
-          brands:artist_brands(brand:brands(name)),
+          brands:artist_brands(verified, brand:brands(name)),
           availability:availability_slots(*)
         `)
         .order('rating', { ascending: false })
@@ -118,6 +120,21 @@ export function useArtists({ search = '', roleFilter = 'all' } = {}) {
 
       const { data, error: fetchError } = await query
       if (fetchError) throw fetchError
+
+      const artistIds = (data || []).map((a) => a.id)
+      let busyByArtist = new Map()
+
+      if (artistIds.length > 0) {
+        const { data: busyRows } = await supabase
+          .from('google_busy_blocks')
+          .select('artist_id, date, start_time, end_time')
+          .in('artist_id', artistIds)
+
+        for (const row of busyRows || []) {
+          if (!busyByArtist.has(row.artist_id)) busyByArtist.set(row.artist_id, [])
+          busyByArtist.get(row.artist_id).push(row)
+        }
+      }
 
       const formatted = (data || []).map((a) => ({
         id: a.id,
@@ -135,9 +152,14 @@ export function useArtists({ search = '', roleFilter = 'all' } = {}) {
         rating: parseFloat(a.rating),
         projects: a.total_projects,
         skills: a.skills?.map((s) => s.skill.name) || [],
-        brands: a.brands?.map((b) => b.brand.name) || [],
+        brands: normalizeBrands(
+          a.brands?.map((b) => ({ name: b.brand?.name, verified: b.verified })).filter((b) => b.name) || []
+        ),
         videoLinks: a.video_links || [],
-        availabilitySlots: a.availability?.filter(slot => !slot.is_booked).map(slot => slot.date) || [],
+        availabilitySlots: availabilityDatesFromRows(
+          a.availability || [],
+          busyByArtist.get(a.id) || []
+        ),
         socials: {
           twitter: a.twitter || '#',
           instagram: a.instagram || '#',
@@ -186,12 +208,21 @@ export function useArtist(id) {
         .select(`
           *,
           skills:artist_skills(skill:skills(name)),
-          brands:artist_brands(brand:brands(name)),
+          brands:artist_brands(verified, brand:brands(name)),
           portfolio:portfolio_items(*),
           availability:availability_slots(*)
         `)
         .eq('id', id)
         .single()
+
+      let busyRows = []
+      if (data?.id) {
+        const { data: busy } = await supabase
+          .from('google_busy_blocks')
+          .select('artist_id, date, start_time, end_time')
+          .eq('artist_id', data.id)
+        busyRows = busy || []
+      }
 
       if (data) {
         setArtist({
@@ -209,7 +240,9 @@ export function useArtist(id) {
           rating: parseFloat(data.rating),
           projects: data.total_projects,
           skills: data.skills?.map((s) => s.skill.name) || [],
-          brands: data.brands?.map((b) => b.brand.name) || [],
+          brands: normalizeBrands(
+            data.brands?.map((b) => ({ name: b.brand?.name, verified: b.verified })).filter((b) => b.name) || []
+          ),
           videoLinks: data.video_links || [],
           socials: {
             twitter: data.twitter || '#',
@@ -222,6 +255,7 @@ export function useArtist(id) {
             (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
           ),
           availability: groupSlotsByDate(data.availability || []),
+          availabilitySlots: availabilityDatesFromRows(data.availability || [], busyRows),
         })
       } else {
         setArtist(null)

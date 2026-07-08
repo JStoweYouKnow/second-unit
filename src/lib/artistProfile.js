@@ -83,7 +83,9 @@ export function artistRecordToForm(artist) {
     dailyRate: artist.day_rate != null ? String(artist.day_rate) : (artist.dailyRate != null ? String(artist.dailyRate) : ''),
     projectFlatRate: artist.project_flat_rate != null ? String(artist.project_flat_rate) : (artist.projectFlatRate != null ? String(artist.projectFlatRate) : ''),
     skills: joinCommaList(artist.skills),
-    brands: joinCommaList(artist.brands),
+    brands: joinCommaList(
+      (artist.brands || []).map((b) => (typeof b === 'string' ? b : b?.name)).filter(Boolean)
+    ),
     website: artist.website || '',
     twitter: artist.twitter || '',
     instagram: artist.instagram || '',

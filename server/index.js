@@ -721,8 +721,8 @@ app.patch('/api/conversations/:id/read', async (req, res) => {
   const database = db || supabase
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
-    await markConversationRead(database, req.params.id, user.id)
-    res.json({ ok: true })
+    const conversation = await markConversationRead(database, req.params.id, user.id)
+    res.json({ ok: true, conversation })
   } catch (err) {
     res.status(err.message === 'Forbidden' ? 403 : 500).json({ error: err.message })
   }

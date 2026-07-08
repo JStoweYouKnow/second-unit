@@ -4,6 +4,9 @@ import { useApp } from '../context/AppContext'
 import { useState, useEffect, useRef } from 'react'
 import CalendarModal from '../components/CalendarModal'
 import { useAuth } from '../context/AuthContext'
+import { artists as artistsApi } from '../lib/api'
+import ArtistRateCard from '../components/ArtistRateCard'
+import BrandChip from '../components/BrandChip'
 import { isArtistProfile } from '../lib/roleView'
 import { useArtist } from '../hooks/useData'
 import { useArtistReviews } from '../hooks/useArtistReviews'
@@ -59,9 +62,11 @@ export default function ArtistProfile() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { favorites, toggleFavorite, startConversation } = useApp()
-  const { profile } = useAuth()
+  const { profile, isAdmin } = useAuth()
   const [showCalendar, setShowCalendar] = useState(false)
   const [activeTab, setActiveTab] = useState('portfolio')
+  const [brandBusy, setBrandBusy] = useState(null)
+  const [localBrands, setLocalBrands] = useState(null)
   const { artist, loading: artistLoading } = useArtist(id)
   const reviewState = useArtistReviews(id)
 
@@ -71,6 +76,32 @@ export default function ArtistProfile() {
 
   const isOwnProfile = isArtistProfile(profile) && artist?.profileId === profile?.id
   const isHirer = profile && !isArtistProfile(profile)
+
+  useEffect(() => {
+    setLocalBrands(null)
+  }, [artist?.id])
+
+  const displayBrands = localBrands ?? artist?.brands ?? []
+
+  const handleVerifyBrand = async (brandName, verified) => {
+    if (!artist?.id || !isAdmin) return
+    setBrandBusy(brandName)
+    try {
+      const updated = await artistsApi.verifyBrand(artist.id, brandName, verified)
+      setLocalBrands((prev) => {
+        const base = prev ?? artist.brands ?? []
+        return base.map((b) =>
+          (typeof b === 'string' ? b : b.name) === updated.name
+            ? { name: updated.name, verified: updated.verified }
+            : b
+        )
+      })
+    } catch (err) {
+      window.alert(err.message || 'Could not update brand verification')
+    } finally {
+      setBrandBusy(null)
+    }
+  }
 
   const [portfolioItems, setPortfolioItems] = useState([])
   const [videoLinks, setVideoLinks] = useState([])
@@ -277,9 +308,7 @@ export default function ArtistProfile() {
               </span>
             </div>
             {!hasHeroVisual && (
-              <p style={{ marginTop: 10, marginBottom: 0, fontSize: 14, color: 'var(--text-muted)', maxWidth: '52ch', lineHeight: 1.5 }}>
-                Compensation is not listed publicly — scope and fees are negotiated with the client for each engagement.
-              </p>
+              <ArtistRateCard artist={artist} />
             )}
             <div className="profile-socials">
               <a href={artist.socials.twitter} className="social-btn" title="Twitter"><AtSign size={16} /></a>
@@ -560,15 +589,26 @@ export default function ArtistProfile() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="card">
+            <h3 style={{ marginBottom: 16 }}>Rates</h3>
+            <ArtistRateCard artist={artist} />
+          </div>
+          <div className="card">
             <h3 style={{ marginBottom: 16 }}>Brands & Clients</h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {artist.brands.map(b => (
-                <div key={b} style={{
-                  padding: '8px 16px', borderRadius: 'var(--radius-sm)', background: 'var(--surface)',
-                  border: '1px solid var(--border)', fontSize: 13, fontWeight: 500
-                }}>{b}</div>
+              {displayBrands.map((b) => (
+                <BrandChip
+                  key={typeof b === 'string' ? b : b.name}
+                  brand={b}
+                  onVerify={isAdmin ? handleVerifyBrand : undefined}
+                  verifyBusy={brandBusy === (typeof b === 'string' ? b : b.name)}
+                />
               ))}
             </div>
+            {isAdmin && (
+              <p style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+                Admin: verify credits after confirming client work.
+              </p>
+            )}
           </div>
           <div className="card">
             <h3 style={{ marginBottom: 16 }}>Quick Stats</h3>

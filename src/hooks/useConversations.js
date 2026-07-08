@@ -138,7 +138,12 @@ export function useConversations(enabled = true) {
     }
 
     try {
-      await conversationsApi.markRead(conversationId)
+      const result = await conversationsApi.markRead(conversationId)
+      if (result?.conversation) {
+        setConversations((prev) =>
+          prev.map((c) => (c.id === conversationId ? result.conversation : c))
+        )
+      }
     } catch {
       /* non-fatal */
     }

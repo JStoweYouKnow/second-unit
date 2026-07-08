@@ -38,7 +38,7 @@ export default async function handler(req, res) {
         return res.json(updated)
       }
 
-      const validated = SignSchema.parse(req.body)
+      const validated = SignSchema.parse(req.body || {})
       const signed = await signContract(db, id, user.id, {
         name: validated.name,
         ip: getClientIp(req),
@@ -46,7 +46,9 @@ export default async function handler(req, res) {
       return res.json(signed)
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ error: 'Validation failed', details: err.errors })
+        const first = err.issues?.[0] || err.errors?.[0]
+        const detail = first ? `${first.path?.join('.') || 'field'}: ${first.message}` : 'Validation failed'
+        return res.status(400).json({ error: detail, details: err.issues || err.errors })
       }
       return res.status(err.message === 'Forbidden' ? 403 : 500).json({ error: err.message })
     }

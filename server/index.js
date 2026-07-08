@@ -783,6 +783,9 @@ app.patch('/api/contracts/:id', async (req, res) => {
       })
       return res.json(updated)
     }
+    if (!req.body?.name?.trim()) {
+      return res.status(400).json({ error: 'name: Signature name is required' })
+    }
     const signed = await signContract(database, req.params.id, user.id, { name: req.body.name })
     res.json(signed)
   } catch (err) {

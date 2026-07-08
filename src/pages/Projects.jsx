@@ -48,6 +48,8 @@ export default function Projects() {
   const [customAgreementUpload, setCustomAgreementUpload] = useState(null)
   const [customUploadError, setCustomUploadError] = useState('')
   const [createError, setCreateError] = useState('')
+  const [signError, setSignError] = useState('')
+  const [signing, setSigning] = useState(false)
   const [creating, setCreating] = useState(false)
   const customAgreementInputRef = useRef(null)
   const [signatureName, setSignatureName] = useState('')
@@ -301,27 +303,41 @@ export default function Projects() {
   }
 
   const handleSign = async () => {
-    if (!signatureName.trim() || !signatureAgreed || !showSign) return
+    if (!signatureName.trim() || !signatureAgreed || !showSign || signing) return
 
-    const updated = isArtist
-      ? await signContractAsArtist(showSign.id, signatureName.trim())
-      : await signContract(showSign.id, signatureName.trim())
+    setSignError('')
+    setSigning(true)
+    try {
+      const updated = isArtist
+        ? await signContractAsArtist(showSign.id, signatureName.trim())
+        : await signContract(showSign.id, signatureName.trim())
 
-    if (updated) {
-      const conv = allMessages.find((m) => m.artistId === updated.artistId)
-      if (conv) {
-        const sigNote = `✅ AGREEMENT SIGNED\nProject: ${updated.title}\nValue: $${updated.value?.toLocaleString()}\nStatus: ${(updated.status || 'pending').toUpperCase()}\n\nThis copy has been sent to both parties for their records.`
-        sendMessage(conv.id, sigNote, isArtist ? 'artist' : 'user')
+      if (!updated) {
+        setSignError('Signature could not be saved. Please try again.')
+        return
       }
-      if (updated.status === 'active') {
-        await refetchContracts()
-        setShowView(updated)
+
+      try {
+        const conv = allMessages.find((m) => m.artistId === updated.artistId)
+        if (conv) {
+          const sigNote = `✅ AGREEMENT SIGNED\nProject: ${updated.title}\nValue: $${updated.value?.toLocaleString()}\nStatus: ${(updated.status || 'pending').toUpperCase()}\n\nThis copy has been sent to both parties for their records.`
+          await sendMessage(conv.id, sigNote, isArtist ? 'artist' : 'user')
+        }
+      } catch {
+        // Signing succeeded; messaging is best-effort.
       }
+
+      const list = await refetchContracts()
+      const refreshed = list?.find((p) => p.id === updated.id) || updated
+      setShowView(refreshed)
+      setShowSign(null)
+      setSignatureName('')
+      setSignatureAgreed(false)
+    } catch (err) {
+      setSignError(err.message || 'Failed to sign project. Please try again.')
+    } finally {
+      setSigning(false)
     }
-
-    setShowSign(null)
-    setSignatureName('')
-    setSignatureAgreed(false)
   }
 
   const handleDownloadPDF = (contract) => {
@@ -527,7 +543,14 @@ ${divider}
                   {s.icon} {s.label}
                 </div>
                 {c.status === 'pending' && ((!isArtist && !c.signedByEmployer) || (isArtist && !c.signedByArtist)) && (
-                  <button type="button" className="btn btn-success btn-sm" onClick={() => setShowSign(c)}>
+                  <button
+                    type="button"
+                    className="btn btn-success btn-sm"
+                    onClick={() => {
+                      setSignError('')
+                      setShowSign(c)
+                    }}
+                  >
                     <PenTool size={14} /> Sign Project
                   </button>
                 )}
@@ -843,7 +866,7 @@ ${divider}
 
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               {showView.status === 'pending' && ((!isArtist && !showView.signedByEmployer) || (isArtist && !showView.signedByArtist)) && (
-                <button type="button" className="btn btn-success" onClick={() => { setShowView(null); setShowSign(showView) }}>
+                <button type="button" className="btn btn-success" onClick={() => { setSignError(''); setShowView(null); setShowSign(showView) }}>
                   <PenTool size={16} /> Sign Project
                 </button>
               )}
@@ -878,11 +901,11 @@ ${divider}
 
       {/* ========== E-Sign Modal ========== */}
       {showSign && (
-        <div className="modal-overlay" onClick={() => setShowSign(null)}>
+        <div className="modal-overlay" onClick={() => !signing && setShowSign(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Sign Project</h2>
-              <button className="btn-icon" onClick={() => setShowSign(null)}><X size={18} /></button>
+              <button type="button" className="btn-icon" disabled={signing} onClick={() => setShowSign(null)}><X size={18} /></button>
             </div>
 
             <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 24 }}>
@@ -892,6 +915,10 @@ ${divider}
                 {' · '}Value: ${(showSign.value || 0).toLocaleString()} · {showSign.startDate} → {showSign.endDate}
               </div>
             </div>
+
+            {signError && (
+              <div className="auth-error" style={{ marginBottom: 16 }}>{signError}</div>
+            )}
 
             {/* Agreement Summary */}
             <div style={{ padding: 16, background: 'var(--accent-tint-05)', border: '1px solid var(--accent-tint-border)', borderRadius: 'var(--radius-sm)', marginBottom: 24, fontSize: 13 }}>
@@ -914,6 +941,7 @@ ${divider}
                 placeholder="Your full name"
                 value={signatureName}
                 onChange={e => setSignatureName(e.target.value)}
+                disabled={signing}
                 style={{ fontFamily: 'Georgia, serif', fontSize: 20, fontStyle: 'italic', textAlign: 'center', padding: '16px' }}
               />
             </div>
@@ -937,6 +965,7 @@ ${divider}
                 type="checkbox"
                 checked={signatureAgreed}
                 onChange={e => setSignatureAgreed(e.target.checked)}
+                disabled={signing}
                 style={{ marginTop: 2, accentColor: 'var(--accent)' }}
               />
               <span>
@@ -945,14 +974,15 @@ ${divider}
             </label>
 
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              <button className="btn btn-secondary" onClick={() => setShowSign(null)}>Cancel</button>
+              <button type="button" className="btn btn-secondary" disabled={signing} onClick={() => setShowSign(null)}>Cancel</button>
               <button
+                type="button"
                 className="btn btn-success btn-lg"
-                disabled={!signatureName.trim() || !signatureAgreed}
+                disabled={!signatureName.trim() || !signatureAgreed || signing}
                 onClick={handleSign}
-                style={{ opacity: (!signatureName.trim() || !signatureAgreed) ? 0.5 : 1 }}
+                style={{ opacity: (!signatureName.trim() || !signatureAgreed || signing) ? 0.5 : 1 }}
               >
-                <PenTool size={18} /> Sign Project
+                <PenTool size={18} /> {signing ? 'Signing…' : 'Sign Project'}
               </button>
             </div>
 

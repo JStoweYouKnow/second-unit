@@ -100,7 +100,15 @@ export async function userCanAccessContract(db, userId, row) {
   return artistId != null && row.artist_id === artistId
 }
 
+function isMissingColumnError(err) {
+  const msg = err?.message || ''
+  return /column .* does not exist|Could not find the .* column|employer_signature|artist_signature/i.test(msg)
+}
+
 export async function signContract(db, contractId, userId, { name, ip = null }) {
+  const trimmedName = typeof name === 'string' ? name.trim() : ''
+  if (!trimmedName) throw new Error('Signature name is required')
+
   const { data: row, error } = await db
     .from('contracts')
     .select('*')
@@ -112,14 +120,29 @@ export async function signContract(db, contractId, userId, { name, ip = null }) 
   if (!canAccess) throw new Error('Forbidden')
 
   const artistId = await getArtistIdForProfile(db, userId)
-  const isArtist = artistId != null && row.artist_id === artistId
-  const signature = { name: name.trim(), date: new Date().toISOString(), ip }
+  const isArtistParty = artistId != null && row.artist_id === artistId
+  const isEmployerParty = row.employer_id === userId
+
+  // Prefer the employer role when the same user somehow matches both (edge case).
+  if (!isArtistParty && !isEmployerParty) throw new Error('Forbidden')
+  const signingAsArtist = isArtistParty && !isEmployerParty
+
+  if (signingAsArtist && row.signed_by_artist) {
+    const milestones = await listMilestonesForContract(db, contractId)
+    return { ...mapContractToClient(row), milestones }
+  }
+  if (!signingAsArtist && row.signed_by_employer) {
+    const milestones = await listMilestonesForContract(db, contractId)
+    return { ...mapContractToClient(row), milestones }
+  }
+
+  const signature = { name: trimmedName, date: new Date().toISOString(), ip }
 
   const patch = {
     updated_at: new Date().toISOString(),
   }
 
-  if (isArtist) {
+  if (signingAsArtist) {
     patch.signed_by_artist = true
     patch.artist_signature = signature
   } else {
@@ -127,13 +150,13 @@ export async function signContract(db, contractId, userId, { name, ip = null }) 
     patch.employer_signature = signature
   }
 
-  const signedByEmployer = isArtist ? row.signed_by_employer : true
-  const signedByArtist = isArtist ? true : row.signed_by_artist
+  const signedByEmployer = signingAsArtist ? !!row.signed_by_employer : true
+  const signedByArtist = signingAsArtist ? true : !!row.signed_by_artist
   if (signedByEmployer && signedByArtist) {
     patch.status = 'active'
   }
 
-  const { data: updated, error: updateError } = await db
+  let { data: updated, error: updateError } = await db
     .from('contracts')
     .update(patch)
     .eq('id', contractId)
@@ -143,6 +166,24 @@ export async function signContract(db, contractId, userId, { name, ip = null }) 
     `)
     .single()
 
+  // Older DBs may lack employer_signature / artist_signature jsonb columns.
+  if (updateError && isMissingColumnError(updateError)) {
+    const {
+      employer_signature: _es,
+      artist_signature: _as,
+      ...legacyPatch
+    } = patch
+    ;({ data: updated, error: updateError } = await db
+      .from('contracts')
+      .update(legacyPatch)
+      .eq('id', contractId)
+      .select(`
+        *,
+        artist:artists(display_name)
+      `)
+      .single())
+  }
+
   if (updateError) throw updateError
 
   const { data: artistRow } = await db
@@ -151,20 +192,37 @@ export async function signContract(db, contractId, userId, { name, ip = null }) 
     .eq('id', row.artist_id)
     .maybeSingle()
 
-  const otherPartyId = isArtist ? row.employer_id : artistRow?.profile_id
-  await notifyContractSigned(db, {
-    contract: updated,
-    signedByUserId: userId,
-    otherPartyId,
-    bothSigned: signedByEmployer && signedByArtist,
-  })
+  const otherPartyId = signingAsArtist ? row.employer_id : artistRow?.profile_id
+  try {
+    await notifyContractSigned(db, {
+      contract: updated,
+      signedByUserId: userId,
+      otherPartyId,
+      bothSigned: signedByEmployer && signedByArtist,
+    })
+  } catch (notifyErr) {
+    console.error('[contracts] notify after sign failed:', notifyErr?.message || notifyErr)
+  }
 
   if (signedByEmployer && signedByArtist) {
-    await ensureContractMilestones(db, updated)
+    try {
+      await ensureContractMilestones(db, updated)
+    } catch (milestoneErr) {
+      console.error('[contracts] ensure milestones after sign failed:', milestoneErr?.message || milestoneErr)
+    }
   }
 
   const milestones = await listMilestonesForContract(db, contractId)
-  return { ...mapContractToClient(updated), milestones }
+  const mapped = { ...mapContractToClient(updated), milestones }
+  // If jsonb signature columns are missing, still return the signature we just recorded.
+  if (signingAsArtist) {
+    mapped.signedByArtist = true
+    mapped.artistSignature = mapped.artistSignature || signature
+  } else {
+    mapped.signedByEmployer = true
+    mapped.employerSignature = mapped.employerSignature || signature
+  }
+  return mapped
 }
 
 export async function updateContractAttachment(

@@ -4,6 +4,7 @@ import { Search, Calendar, Heart, Play, Star, Filter, DollarSign, MapPin, Globe,
 import { buildOpenBriefCards } from '../lib/openBriefs'
 import { brandName } from '../lib/brands'
 import ArtistRateCard from '../components/ArtistRateCard'
+import { useArtists } from '../hooks/useData'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { useBookings } from '../hooks/useBookings'

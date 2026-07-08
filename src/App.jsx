@@ -169,7 +169,6 @@ function AppShell() {
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
         { path: '/bookings', icon: Calendar, label: 'Bookings' },
-        { path: '/disputes', icon: Shield, label: 'Disputes' },
         { path: '/projects', icon: FileText, label: 'Projects' },
         { path: '/payments', icon: CreditCard, label: 'Payments' },
       ]

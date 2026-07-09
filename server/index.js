@@ -46,7 +46,7 @@ import {
   createNotification,
 } from '../api/_lib/notifications.js'
 import { ensureContractForBooking } from '../api/_lib/bookingContract.js'
-import { linkBookingAfterContractCreate } from '../api/_lib/linkContractBooking.js'
+import { linkBookingAfterContractCreate, backfillMissingBookingsForUser } from '../api/_lib/linkContractBooking.js'
 import { notifyBookingConfirmed, notifyBookingRequested } from '../api/_lib/notificationEvents.js'
 import {
   listDisputesForUser,
@@ -323,6 +323,7 @@ app.get('/api/bookings', async (req, res) => {
   const database = db || supabase
   if (database) {
     try {
+      await backfillMissingBookingsForUser(database, user.id)
       const bookings = await listBookingsForUser(database, user.id)
       return res.json(bookings)
     } catch (err) {
@@ -770,6 +771,7 @@ app.get('/api/contracts', async (req, res) => {
   const database = db || supabase
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
+    await backfillMissingBookingsForUser(database, user.id)
     res.json(await listContractsForUser(database, user.id))
   } catch (err) {
     res.status(500).json({ error: err.message })

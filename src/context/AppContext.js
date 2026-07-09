@@ -15,6 +15,10 @@ const defaultAppContext = {
   payMilestone: async () => null,
   approveMilestone: async () => null,
   refetchContracts: () => {},
+  bookings: [],
+  bookingsLoading: false,
+  bookingsError: null,
+  refetchBookings: async () => [],
   realtimeConnected: false,
 }
 

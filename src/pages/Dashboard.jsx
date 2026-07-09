@@ -4,13 +4,13 @@ import { Heart, Star, Calendar, TrendingUp, Users, DollarSign, FileText, ArrowUp
 import { useArtists } from '../hooks/useData'
 import { buildOpenBriefCards } from '../lib/openBriefs'
 import { useArtistProfile } from '../hooks/useArtistProfile'
-import { useBookings } from '../hooks/useBookings'
 import { usePayments } from '../hooks/usePayments'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { demoArtistPersona } from '../lib/roleView'
 import { buildMonthlySeries, buildMonthlyCounts, parseRowDate } from '../lib/analytics'
 import { artistReleasedAmount } from '../lib/fees'
+import { bookingSubtotal } from '../lib/pricing'
 import ArtistAvailabilityEditor from '../components/ArtistAvailabilityEditor'
 
 // Simple bar chart component (pure CSS)
@@ -86,10 +86,9 @@ function Sparkline({ data, color = 'var(--accent)', height = 40 }) {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { profile, effectiveRole, isAuthenticated } = useAuth()
-  const { favorites, localProjects } = useApp()
+  const { favorites, localProjects, bookings: allBookings } = useApp()
   const { artists } = useArtists()
   const { artist: myArtistRecord } = useArtistProfile(profile?.id)
-  const { bookings: allBookings } = useBookings(isAuthenticated)
   const { payments: allPayments } = usePayments(isAuthenticated)
   const isArtist = effectiveRole === 'artist'
   const me = demoArtistPersona(profile, myArtistRecord)
@@ -97,11 +96,15 @@ export default function Dashboard() {
   const [timeRange, setTimeRange] = useState('6m')
 
   const myBookings = useMemo(() => {
-    if (!me) return []
-    return allBookings.filter(
-      (b) => String(b.artistId) === String(me.id) && (b.status === 'confirmed' || b.status === 'pending')
+    if (!isArtist) return []
+    // Prefer artists.id match; if persona isn't ready yet, still show pending/confirmed
+    // rows the API already scoped to this artist (avoids empty dashboard flash / wrong-id filter).
+    const upcoming = allBookings.filter(
+      (b) => b.status === 'confirmed' || b.status === 'pending'
     )
-  }, [me, allBookings])
+    if (!me?.id) return upcoming
+    return upcoming.filter((b) => String(b.artistId) === String(me.id))
+  }, [isArtist, me, allBookings])
 
   const employerBookings = useMemo(
     () => allBookings.filter((b) => b.status === 'confirmed' || b.status === 'pending'),
@@ -356,16 +359,27 @@ export default function Dashboard() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 32 }}>
           {myBookings.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-              No upcoming bookings.
+              No upcoming bookings. New project requests from clients appear here as pending.
             </div>
           ) : (
             myBookings.map((b) => (
-              <div key={b.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px' }}>
+              <div
+                key={b.id}
+                className="card"
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate('/bookings')}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate('/bookings') }}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', cursor: 'pointer' }}
+              >
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                   <Calendar size={18} style={{ color: 'var(--accent)' }} />
                   <div>
                     <div style={{ fontWeight: 600 }}>{b.type}</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{b.date} at {b.time}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                      {b.date}{b.time ? ` at ${b.time}` : ''}
+                      {b.notes?.startsWith('Created from project:') ? ' · From project' : ''}
+                    </div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -646,16 +660,27 @@ export default function Dashboard() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 40 }}>
         {employerBookings.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-            No upcoming bookings.
+            No upcoming bookings. Creating a project also sends a pending booking to the artist.
           </div>
         ) : (
           employerBookings.map((b) => (
-          <div key={b.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px' }}>
+          <div
+            key={b.id}
+            className="card"
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate('/bookings')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate('/bookings') }}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', cursor: 'pointer' }}
+          >
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <Calendar size={18} style={{ color: 'var(--accent)' }} />
               <div>
                 <div style={{ fontWeight: 600 }}>{b.artistName}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{b.type} · {b.date} at {b.time}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                  {b.type} · {b.date}{b.time ? ` at ${b.time}` : ''}
+                  {b.notes?.startsWith('Created from project:') ? ' · From project' : ''}
+                </div>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>

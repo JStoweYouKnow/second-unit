@@ -9,6 +9,7 @@ import {
   userCanAccessBooking,
 } from '../_lib/bookings.js'
 import { notifyBookingRequested } from '../_lib/notificationEvents.js'
+import { backfillMissingBookingsForUser } from '../_lib/linkContractBooking.js'
 
 const BookingSchema = z.object({
   artistId: z.string().uuid(),
@@ -35,6 +36,8 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
+      // Older projects may predate auto-booking — create missing pending bookings first.
+      await backfillMissingBookingsForUser(db, user.id)
       const bookings = await listBookingsForUser(db, user.id)
       return res.json(bookings)
     } catch (err) {

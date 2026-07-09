@@ -33,6 +33,44 @@ function updateMockContract(contractId, updater) {
   return next
 }
 
+function backfillMockBookingsFromContracts(contracts) {
+  try {
+    const bookings = JSON.parse(localStorage.getItem('mock_bookings') || '[]')
+    const byContract = new Set(bookings.map((b) => b.contractId).filter(Boolean))
+    let changed = false
+    for (const c of contracts) {
+      if (!c?.id || c.bookingId || byContract.has(c.id)) continue
+      if (c.status === 'cancelled' || c.status === 'declined' || c.status === 'rejected') continue
+      const bookingId = `bk_${c.id}`
+      bookings.unshift({
+        id: bookingId,
+        artistId: c.artistId,
+        artistName: c.artistName || 'Artist',
+        employerId: c.employerId || null,
+        date: c.startDate || new Date().toISOString().slice(0, 10),
+        time: '09:00',
+        duration: 1,
+        durationUnit: 'project',
+        type: 'Project Work',
+        rate: Math.max(Math.round(Number(c.value) || 0), 1),
+        agreedTotal: Math.round(Number(c.value) || 0),
+        status: 'pending',
+        notes: `Created from project: ${c.title}`,
+        contractId: c.id,
+        createdAt: new Date().toISOString(),
+      })
+      c.bookingId = bookingId
+      byContract.add(c.id)
+      changed = true
+    }
+    if (changed) {
+      localStorage.setItem('mock_bookings', JSON.stringify(bookings))
+      saveMock(contracts)
+    }
+  } catch {}
+  return contracts
+}
+
 export function useContracts(enabled = true) {
   const [contracts, setContracts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -50,7 +88,7 @@ export function useContracts(enabled = true) {
 
     try {
       if (!isSupabaseConfigured) {
-        const list = loadMock().map(withMilestonesIfActive)
+        const list = backfillMockBookingsFromContracts(loadMock().map(withMilestonesIfActive))
         setContracts(list)
         return list
       }
@@ -97,11 +135,13 @@ export function useContracts(enabled = true) {
           id: bookingId,
           artistId: payload.artistId,
           artistName: payload.artistName || 'Artist',
+          employerId: payload.employerId || null,
           date: payload.startDate || new Date().toISOString().slice(0, 10),
           time: '09:00',
           duration: 1,
           durationUnit: 'project',
           type: 'Project Work',
+          rate: Math.max(Math.round(Number(payload.value) || 0), 1),
           agreedTotal: Math.round(Number(payload.value) || 0),
           status: 'pending',
           notes: `Created from project: ${payload.title}`,

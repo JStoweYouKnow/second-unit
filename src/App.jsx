@@ -13,6 +13,7 @@ import { useFavorites } from './hooks/useData'
 import { useConversations } from './hooks/useConversations'
 import { useMessageRealtime } from './hooks/useMessageRealtime'
 import { useContracts } from './hooks/useContracts'
+import { useBookings } from './hooks/useBookings'
 import NotificationPanel from './components/NotificationPanel'
 import PushNotificationSync from './components/PushNotificationSync'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -146,6 +147,12 @@ function AppShell() {
     payMilestone,
     approveMilestone,
   } = useContracts(isAuthenticated)
+  const {
+    bookings,
+    loading: bookingsLoading,
+    error: bookingsError,
+    refetch: refetchBookings,
+  } = useBookings(isAuthenticated)
 
   const startConversation = async (artist) => {
     const conv = await startConversationApi(artist)
@@ -213,6 +220,10 @@ function AppShell() {
     payMilestone,
     approveMilestone,
     refetchContracts,
+    bookings,
+    bookingsLoading,
+    bookingsError,
+    refetchBookings,
     realtimeConnected,
   }
 

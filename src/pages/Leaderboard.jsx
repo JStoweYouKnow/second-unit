@@ -7,7 +7,6 @@ import ArtistRateCard from '../components/ArtistRateCard'
 import { useArtists } from '../hooks/useData'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
-import { useBookings } from '../hooks/useBookings'
 import { useArtistProfile } from '../hooks/useArtistProfile'
 import { isArtistProfile } from '../lib/roleView'
 import CalendarModal from '../components/CalendarModal'
@@ -71,10 +70,9 @@ function getArtistTileThumb(artist) {
 
 export default function Leaderboard() {
   const navigate = useNavigate()
-  const { favorites, toggleFavorite, localProjects } = useApp()
+  const { favorites, toggleFavorite, localProjects, bookings } = useApp()
   const { profile, isAuthenticated } = useAuth()
   const { artist: myArtist } = useArtistProfile(profile?.id)
-  const { bookings } = useBookings(isAuthenticated)
   const isArtist = isArtistProfile(profile)
   const me = isArtist ? myArtist : null
   const [search, setSearch] = useState('')

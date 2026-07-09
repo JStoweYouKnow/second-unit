@@ -15,11 +15,10 @@ export default function Messages() {
   const isArtist = isArtistProfile(profile)
 
   const visibleMessages = useMemo(() => {
-    if (isArtist) {
-      const persona = demoArtistPersona(profile, myArtistRecord)
-      return allMessages.filter((m) => m.artistId === persona?.id)
-    }
-    return allMessages
+    if (!isArtist) return allMessages
+    const persona = demoArtistPersona(profile, myArtistRecord)
+    if (!persona?.id) return allMessages
+    return allMessages.filter((m) => String(m.artistId) === String(persona.id))
   }, [allMessages, profile, myArtistRecord, isArtist])
 
   const [activeConv, setActiveConv] = useState(null)

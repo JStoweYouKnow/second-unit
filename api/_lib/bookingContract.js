@@ -118,13 +118,14 @@ export async function ensureBookingForContract(db, contractRow) {
     return data ? mapBookingToClient(data) : null
   }
 
-  const { data: byContract } = await db
+  // Prefer lookup by contract_id when the column exists.
+  const { data: byContract, error: byContractError } = await db
     .from('bookings')
     .select('*')
     .eq('contract_id', contractRow.id)
     .maybeSingle()
 
-  if (byContract) {
+  if (!byContractError && byContract) {
     await db
       .from('contracts')
       .update({ booking_id: byContract.id, updated_at: new Date().toISOString() })
@@ -149,6 +150,7 @@ export async function ensureBookingForContract(db, contractRow) {
   const { durationHours, durationUnit } = estimateDurationFromContract(contractRow)
   const agreedTotal = Math.max(Math.round(Number(contractRow.total_value) || 0), 1)
   const rate = Math.max(Math.round(agreedTotal / Math.max(durationHours, 1)), 1)
+  const notes = `Created from project: ${contractRow.title}`
 
   const bookingInsert = {
     employer_id: contractRow.employer_id,
@@ -162,21 +164,25 @@ export async function ensureBookingForContract(db, contractRow) {
     rate,
     agreed_total: agreedTotal,
     status: 'pending',
-    notes: `Created from project: ${contractRow.title}`,
+    notes,
     contract_id: contractRow.id,
   }
 
   let { data: booking, error } = await db.from('bookings').insert(bookingInsert).select().single()
 
-  // Older DBs may lack optional booking columns — retry with core fields only.
-  if (error && /agreed_total|duration_unit|artist_name|contract_id|column .* does not exist/i.test(error.message || '')) {
-    const {
-      agreed_total: _at,
-      duration_unit: _du,
-      artist_name: _an,
-      contract_id: _cid,
-      ...legacy
-    } = bookingInsert
+  // Older DBs may lack optional booking columns — strip and retry.
+  if (error && /agreed_total|duration_unit|artist_name|contract_id|column .* does not exist|Could not find the .* column/i.test(error.message || '')) {
+    const legacy = {
+      employer_id: bookingInsert.employer_id,
+      artist_id: bookingInsert.artist_id,
+      date: bookingInsert.date,
+      start_time: bookingInsert.start_time,
+      duration_hours: bookingInsert.duration_hours,
+      booking_type: bookingInsert.booking_type,
+      rate: bookingInsert.rate,
+      status: 'pending',
+      notes,
+    }
     ;({ data: booking, error } = await db.from('bookings').insert(legacy).select().single())
   }
 
@@ -188,7 +194,7 @@ export async function ensureBookingForContract(db, contractRow) {
     .update({ booking_id: booking.id, updated_at: new Date().toISOString() })
     .eq('id', contractRow.id)
 
-  if (linkError && !/booking_id|column .* does not exist/i.test(linkError.message || '')) {
+  if (linkError && !/booking_id|column .* does not exist|Could not find the .* column/i.test(linkError.message || '')) {
     console.error('[bookingContract] link contract→booking failed:', linkError.message)
   }
 

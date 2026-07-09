@@ -28,7 +28,18 @@ function isAllowedCustomAgreementFile(file) {
 
 export default function Projects() {
   const { profile } = useAuth()
-  const { allMessages, sendMessage, localProjects, createContract, signContract, signContractAsArtist, payMilestone, approveMilestone, refetchContracts } = useApp()
+  const {
+    allMessages,
+    sendMessage,
+    localProjects,
+    createContract,
+    signContract,
+    signContractAsArtist,
+    payMilestone,
+    approveMilestone,
+    refetchContracts,
+    refetchBookings,
+  } = useApp()
   const [searchParams, setSearchParams] = useSearchParams()
   const [milestoneBusy, setMilestoneBusy] = useState(null)
   const [milestoneError, setMilestoneError] = useState('')
@@ -272,6 +283,21 @@ export default function Projects() {
         }
       }
 
+      // Project create also inserts a pending booking — refresh so both dashboards see it.
+      try {
+        await refetchBookings?.()
+      } catch (bookingRefreshErr) {
+        console.error('Booking refresh after project create failed:', bookingRefreshErr)
+      }
+
+      if (isSupabaseConfigured && created && !created.bookingId) {
+        setCreateError(
+          'Project created, but the linked booking could not be created. Open Bookings or try creating again.'
+        )
+        setCreating(false)
+        return
+      }
+
       closeNewProjectModal()
     } catch (err) {
       console.error('Create project failed:', err)
@@ -445,8 +471,10 @@ https://thecallsheet.ai
   }
 
   const displayProjects = useMemo(() => {
-    if (!isArtist || !me) return localProjects
-    return localProjects.filter((p) => p.artistId === me.id)
+    if (!isArtist) return localProjects
+    // API already scopes contracts; only narrow once artists.id is known.
+    if (!me?.id) return localProjects
+    return localProjects.filter((p) => String(p.artistId) === String(me.id))
   }, [isArtist, me, localProjects])
 
   function generateContractText(contract) {

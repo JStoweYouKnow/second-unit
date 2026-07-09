@@ -3,22 +3,27 @@ import { useSearchParams, Link } from 'react-router-dom'
 import { Calendar, Clock, Plus, CheckCircle, AlertCircle, X, Send, CreditCard, Loader2, Shield, ExternalLink } from '../components/icons'
 import { useArtists } from '../hooks/useData'
 import { useArtistProfile } from '../hooks/useArtistProfile'
-import { useBookings } from '../hooks/useBookings'
 import { bookings as bookingsApi, payments as paymentsApi } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
+import { useApp } from '../context/AppContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
 import { bookingSubtotal, bookingScheduleCaption } from '../lib/pricing'
 import { PLATFORM_FEE_PERCENT } from '../lib/fees'
 import { isSupabaseConfigured } from '../lib/supabase'
 
 export default function Bookings() {
-  const { profile, isAuthenticated } = useAuth()
+  const { profile, effectiveRole } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
-  const isArtist = isArtistProfile(profile)
-  const { artist: myArtistRecord } = useArtistProfile(profile?.id)
+  const isArtist = effectiveRole === 'artist' || isArtistProfile(profile)
+  const { artist: myArtistRecord, loading: artistLoading } = useArtistProfile(profile?.id)
   const myArtist = demoArtistPersona(profile, myArtistRecord)
   const { artists } = useArtists()
-  const { bookings, loading: bookingsLoading, error: bookingsError, refetch } = useBookings(isAuthenticated)
+  const {
+    bookings,
+    bookingsLoading,
+    bookingsError,
+    refetchBookings: refetch,
+  } = useApp()
   const [tab, setTab] = useState('upcoming')
   const [showNew, setShowNew] = useState(false)
   const [showPay, setShowPay] = useState(null)
@@ -62,7 +67,10 @@ export default function Bookings() {
   }, [searchParams, refetch, setSearchParams])
 
   const roleBookings = useMemo(() => {
-    if (!isArtist || !myArtist) return bookings
+    // API already scopes to this user. Only narrow further once we have artists.id —
+    // never filter by profiles.id (that hid every booking for artists).
+    if (!isArtist) return bookings
+    if (!myArtist?.id) return bookings
     return bookings.filter((b) => String(b.artistId) === String(myArtist.id))
   }, [isArtist, myArtist, bookings])
 
@@ -258,7 +266,7 @@ export default function Bookings() {
         <button type="button" className={`tab ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>All Bookings</button>
       </div>
 
-      {bookingsLoading ? (
+      {(bookingsLoading || (isArtist && artistLoading)) ? (
         <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
           <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
           <p>Loading bookings…</p>

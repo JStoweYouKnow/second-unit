@@ -6,7 +6,7 @@ import {
   listContractsForUser,
   mapContractToDb,
 } from '../_lib/contracts.js'
-import { linkBookingAfterContractCreate } from '../_lib/linkContractBooking.js'
+import { linkBookingAfterContractCreate, backfillMissingBookingsForUser } from '../_lib/linkContractBooking.js'
 
 const ContractSchema = z.object({
   title: z.string().min(1),
@@ -34,6 +34,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
+      await backfillMissingBookingsForUser(db, user.id)
       const contracts = await listContractsForUser(db, user.id)
       return res.json(contracts)
     } catch (err) {

@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom'
 import { FileText, Plus, X, Upload, Loader2, Shield } from '../components/icons'
 import { useDisputes } from '../hooks/useDisputes'
 import { useAuth } from '../context/AuthContext'
-import { useBookings } from '../hooks/useBookings'
 import { useApp } from '../context/AppContext'
 import { uploadDisputeEvidence } from '../lib/disputeEvidence'
 import { isSupabaseConfigured } from '../lib/supabase'
@@ -19,8 +18,7 @@ const STATUS_LABELS = {
 export default function Disputes() {
   const { isAuthenticated } = useAuth()
   const { disputes, loading, openDispute, addEvidence, refetch } = useDisputes(isAuthenticated)
-  const { bookings } = useBookings(isAuthenticated)
-  const { localProjects } = useApp()
+  const { localProjects, bookings } = useApp()
   const [searchParams, setSearchParams] = useSearchParams()
   const [selectedId, setSelectedId] = useState(null)
   const [showOpen, setShowOpen] = useState(false)

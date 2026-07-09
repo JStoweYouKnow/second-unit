@@ -414,3 +414,9 @@ export const artists = {
       body: JSON.stringify({ brandName, verified }),
     }),
 }
+
+// ---- Admin test helpers ----
+export const adminApi = {
+  ensureArtistPersona: () =>
+    request('/api/admin/ensure-artist-persona', { method: 'POST', body: '{}' }),
+}

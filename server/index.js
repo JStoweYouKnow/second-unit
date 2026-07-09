@@ -76,6 +76,10 @@ import {
   createConnectOnboardingLink,
 } from '../api/_lib/stripeConnect.js'
 import {
+  ensureAdminArtistPersona,
+  mapArtistPersonaToClient,
+} from '../api/_lib/adminArtistPersona.js'
+import {
   listReviewsForArtist,
   upsertReview,
   updateReviewVisibility,
@@ -367,6 +371,28 @@ app.get('/api/payments', async (req, res) => {
     return res.json(payments)
   } catch (err) {
     return res.status(500).json({ error: err.message })
+  }
+})
+
+// ---- Admin test persona (View as Artist payment flow) ----
+app.post('/api/admin/ensure-artist-persona', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db || supabase
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const { data: profile, error: profileError } = await database
+      .from('profiles')
+      .select('id, role, full_name, email')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (profileError) return res.status(500).json({ error: profileError.message })
+    if (!profile) return res.status(404).json({ error: 'Profile not found' })
+    const { artist, created } = await ensureAdminArtistPersona(database, profile)
+    res.json({ created, artist: mapArtistPersonaToClient(artist) })
+  } catch (err) {
+    console.error('[admin/ensure-artist-persona]', err?.message || err)
+    res.status(err.status || 500).json({ error: err.message || 'Failed to ensure artist persona' })
   }
 })
 

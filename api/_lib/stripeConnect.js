@@ -1,11 +1,13 @@
 import { stripe, FRONTEND_URL } from './stripe.js'
 import { getArtistIdForProfile } from './bookings.js'
+import { ensureAdminArtistPersona } from './adminArtistPersona.js'
 
 /**
  * Resolve the artists row for Connect onboarding (body artistId or profile link).
+ * Admins without an artists row get a test persona provisioned automatically.
  */
-export async function resolveArtistForConnect(db, userId, requestedArtistId) {
-  if (!db || !userId) return null
+export async function resolveArtistForConnect(db, user, requestedArtistId) {
+  if (!db || !user?.id) return null
 
   if (requestedArtistId) {
     const { data } = await db
@@ -13,11 +15,29 @@ export async function resolveArtistForConnect(db, userId, requestedArtistId) {
       .select('id, profile_id, stripe_account_id, display_name')
       .eq('id', requestedArtistId)
       .maybeSingle()
-    if (data && data.profile_id === userId) return data
+    if (data && data.profile_id === user.id) return data
   }
 
-  const artistId = await getArtistIdForProfile(db, userId)
-  if (!artistId) return null
+  let artistId = await getArtistIdForProfile(db, user.id)
+  if (!artistId) {
+    const { data: profile } = await db
+      .from('profiles')
+      .select('id, role, full_name, email')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (profile?.role === 'admin') {
+      const { artist } = await ensureAdminArtistPersona(db, profile)
+      return artist
+        ? {
+            id: artist.id,
+            profile_id: artist.profile_id,
+            stripe_account_id: artist.stripe_account_id,
+            display_name: artist.display_name,
+          }
+        : null
+    }
+    return null
+  }
 
   const { data } = await db
     .from('artists')
@@ -37,7 +57,7 @@ export async function ensureConnectAccount(db, { user, email, artistId }) {
     throw err
   }
 
-  const artist = await resolveArtistForConnect(db, user.id, artistId)
+  const artist = await resolveArtistForConnect(db, user, artistId)
   if (!artist?.id) {
     const err = new Error(
       'No artist profile linked to this account. Complete artist onboarding before connecting payouts.'

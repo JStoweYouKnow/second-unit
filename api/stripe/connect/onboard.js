@@ -17,7 +17,7 @@ export default async function handler(req, res) {
 
     // If no accountId, resolve from the signed-in artist's saved Connect id.
     if (!accountId && db) {
-      const artist = await resolveArtistForConnect(db, user.id, artistId)
+      const artist = await resolveArtistForConnect(db, user, artistId)
       accountId = artist?.stripe_account_id || null
     }
 

@@ -14,6 +14,7 @@ import { useConversations } from './hooks/useConversations'
 import { useMessageRealtime } from './hooks/useMessageRealtime'
 import { useContracts } from './hooks/useContracts'
 import { useBookings } from './hooks/useBookings'
+import { adminApi } from './lib/api'
 import NotificationPanel from './components/NotificationPanel'
 import PushNotificationSync from './components/PushNotificationSync'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -113,13 +114,43 @@ function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, profile, signOut, isMockMode, isAdmin, fetchProfile, adminViewAs, setAdminViewAs, effectiveRole, isAuthenticated } = useAuth()
-  const { artist } = useArtistProfile(profile?.id || user?.id)
+  const { artist, refetch: refetchArtist } = useArtistProfile(profile?.id || user?.id)
   const { applications: adminApplications } = useAdminApplications(isAdmin)
   const { invites: adminInvites } = useAdminInvites(isAdmin)
   const { disputes: adminDisputes } = useDisputes(isAdmin && !adminViewAs)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const [personaBusy, setPersonaBusy] = useState(false)
+  const [personaError, setPersonaError] = useState(null)
   const { favorites, toggleFavorite } = useFavorites(user?.id)
+
+  // When admin switches to Artist view, provision a linked artists row so Connect/payouts work.
+  useEffect(() => {
+    if (!isAdmin || adminViewAs !== 'artist' || !isAuthenticated) return
+    if (artist?.id) {
+      setPersonaError(null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      setPersonaBusy(true)
+      setPersonaError(null)
+      try {
+        await adminApi.ensureArtistPersona()
+        if (!cancelled) await refetchArtist?.()
+      } catch (err) {
+        if (!cancelled) setPersonaError(err.message || 'Could not create admin test artist persona')
+      } finally {
+        if (!cancelled) setPersonaBusy(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [isAdmin, adminViewAs, isAuthenticated, artist?.id, refetchArtist])
+
+  const handleAdminViewAs = (mode) => {
+    setPersonaError(null)
+    setAdminViewAs(mode)
+  }
   const {
     conversations: allMessages,
     sendMessage,
@@ -346,13 +377,16 @@ function AppShell() {
                       <button
                         key={label}
                         type="button"
-                        onClick={() => setAdminViewAs(mode)}
+                        onClick={() => handleAdminViewAs(mode)}
+                        disabled={personaBusy && mode === 'artist'}
                         style={{
                           flex: 1, padding: '5px 0', fontSize: 12, fontWeight: 600,
                           borderRadius: 0, border: '1px solid var(--border-strong)',
                           background: active ? 'var(--ink)' : 'transparent',
                           color: active ? 'var(--paper)' : 'var(--text-secondary)',
-                          cursor: 'pointer', transition: 'var(--transition)',
+                          cursor: personaBusy && mode === 'artist' ? 'wait' : 'pointer',
+                          transition: 'var(--transition)',
+                          opacity: personaBusy && mode === 'artist' ? 0.7 : 1,
                         }}
                       >
                         {label}
@@ -360,6 +394,18 @@ function AppShell() {
                     )
                   })}
                 </div>
+                {adminViewAs === 'artist' && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, padding: '4px 0 0' }}>
+                    {personaBusy
+                      ? 'Provisioning test artist persona…'
+                      : artist?.id
+                        ? 'Test artist ready — use Earnings for Connect, Bookings to confirm.'
+                        : 'Switching creates a linked artist profile for payment testing.'}
+                  </div>
+                )}
+                {personaError && (
+                  <div style={{ fontSize: 11, color: 'var(--danger)', lineHeight: 1.4, paddingTop: 4 }}>{personaError}</div>
+                )}
               </div>
             )}
           </nav>

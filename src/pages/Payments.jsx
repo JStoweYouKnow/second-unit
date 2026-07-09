@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { useArtistProfile } from '../hooks/useArtistProfile'
 import { usePayments } from '../hooks/usePayments'
 import { demoArtistPersona } from '../lib/roleView'
-import { stripeConnect, payments as paymentsApi } from '../lib/api'
+import { stripeConnect, payments as paymentsApi, adminApi } from '../lib/api'
 import {
   PLATFORM_FEE_PERCENT,
   platformFeeAmount,
@@ -93,21 +93,25 @@ function SetupModal({ profile, onClose, onDone }) {
 
 // ─── Artist Connect Modal ────────────────────────────────────────────────────
 
-function ConnectModal({ userEmail, artistId, onClose }) {
+function ConnectModal({ userEmail, artistId, onClose, ensureArtistId, allowMissingArtist }) {
   const [form, setForm] = useState({ firstName: '', lastName: '', dob: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
-  const canSubmit = form.firstName.trim() && form.lastName.trim() && artistId
+  const canSubmit = form.firstName.trim() && form.lastName.trim()
 
   async function handleConnect() {
-    if (!artistId) {
-      setError('Artist profile not found. Complete your profile before connecting payouts.')
-      return
-    }
     setBusy(true)
     setError(null)
     try {
-      const { accountId } = await stripeConnect.createAccount(userEmail, artistId)
+      let resolvedArtistId = artistId
+      if (!resolvedArtistId && ensureArtistId) {
+        resolvedArtistId = await ensureArtistId()
+      }
+      if (!resolvedArtistId) {
+        throw new Error('Artist profile not found. Complete your profile before connecting payouts.')
+      }
+
+      const { accountId } = await stripeConnect.createAccount(userEmail, resolvedArtistId)
       if (!accountId) throw new Error('Stripe did not return a Connect account id')
 
       const { url } = await stripeConnect.getOnboardingLink(accountId)
@@ -120,7 +124,6 @@ function ConnectModal({ userEmail, artistId, onClose }) {
         firstName: form.firstName,
         lastName: form.lastName,
       })
-      // Full navigation to Stripe-hosted onboarding.
       window.location.assign(url)
     } catch (err) {
       console.error('[ConnectModal]', err)
@@ -165,7 +168,7 @@ function ConnectModal({ userEmail, artistId, onClose }) {
         {error && (
           <p style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 12, lineHeight: 1.4 }}>{error}</p>
         )}
-        {!artistId && (
+        {!artistId && !allowMissingArtist && (
           <p style={{ fontSize: 13, color: 'var(--warning)', marginBottom: 12 }}>
             No artist profile is linked to this login. Sign in as an approved artist (or finish application approval) before connecting payouts.
           </p>
@@ -192,10 +195,11 @@ function ConnectModal({ userEmail, artistId, onClose }) {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function Payments() {
-  const { profile, user, isAuthenticated, effectiveRole } = useAuth()
+  const { profile, user, isAuthenticated, effectiveRole, isAdmin, adminViewAs } = useAuth()
   const { artist: myArtistRecord, refetch: refetchArtist } = useArtistProfile(profile?.id)
   // Same rule as Dashboard / App nav: admin "View as" drives the UI via effectiveRole.
   const isArtist = effectiveRole === 'artist'
+  const isAdminArtistTest = isAdmin && adminViewAs === 'artist'
   const me = demoArtistPersona(
     isArtist ? { ...profile, role: 'artist' } : profile,
     myArtistRecord
@@ -294,13 +298,19 @@ export default function Payments() {
     setConnectError(null)
     try {
       let accountId = connectLive?.accountId || myArtistRecord?.stripeAccountId
+      let artistId = myArtistRecord?.id
+      if (!artistId && isAdminArtistTest) {
+        const { artist } = await adminApi.ensureArtistPersona()
+        artistId = artist?.id
+        await refetchArtist?.()
+      }
       if (!accountId) {
-        if (!myArtistRecord?.id) {
+        if (!artistId) {
           throw new Error('No artist profile linked to this account. Sign in as an approved artist to connect payouts.')
         }
         const created = await stripeConnect.createAccount(
           user?.email || profile?.email || '',
-          myArtistRecord.id
+          artistId
         )
         accountId = created?.accountId
         await refetchArtist?.()
@@ -536,7 +546,13 @@ https://thecallsheet.ai
         <div className="page-header-row">
           <div>
             <h1>{isArtist ? 'Earnings' : 'Payments'}</h1>
-            <p>{isArtist ? 'Payouts and milestones for your work' : 'Track payments powered by Stripe'}</p>
+            <p>
+              {isArtist
+                ? (isAdminArtistTest
+                  ? 'Admin test artist — connect Stripe, then switch to Hirer to fund a milestone and back here to confirm release'
+                  : 'Payouts and milestones for your work')
+                : 'Track payments powered by Stripe'}
+            </p>
           </div>
           {!isArtist && !stripeStatus && (
             <button type="button" className="btn btn-primary" onClick={() => setShowSetup(true)}>
@@ -594,6 +610,23 @@ https://thecallsheet.ai
           </div>
         )}
       </div>
+
+      {isAdminArtistTest && (
+        <div style={{ marginBottom: 24, padding: '14px 18px', background: 'var(--accent-tint-05)', border: '1px solid var(--accent-tint-border)', borderRadius: 'var(--radius-md)', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          <strong style={{ color: 'var(--text)' }}>Admin payment test loop</strong>
+          <ol style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+            <li>Connect Stripe below (Continue to Stripe) until status is <em>Ready for payouts</em>.</li>
+            <li>Switch View as → <strong>Hirer</strong>, create a Project (or Booking) selecting your test artist, pay a milestone.</li>
+            <li>Switch View as → <strong>Artist</strong>, confirm the booking if needed, then after client approval check Released vs In escrow here.</li>
+          </ol>
+          {myArtistRecord?.id && (
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+              Test artist id: {myArtistRecord.id}
+              {myArtistRecord.displayName ? ` · ${myArtistRecord.displayName}` : ''}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stripe status banner */}
       {showHirerSetupBanner && (
@@ -974,6 +1007,13 @@ https://thecallsheet.ai
         <ConnectModal
           userEmail={user?.email || profile?.email || ''}
           artistId={myArtistRecord?.id}
+          allowMissingArtist={isAdminArtistTest}
+          ensureArtistId={async () => {
+            if (myArtistRecord?.id) return myArtistRecord.id
+            const { artist } = await adminApi.ensureArtistPersona()
+            await refetchArtist?.()
+            return artist?.id
+          }}
           onClose={() => setShowConnect(false)}
         />
       )}

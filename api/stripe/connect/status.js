@@ -87,9 +87,9 @@ export default async function handler(req, res) {
       })
     }
 
-    const account = await stripe.accounts.retrieve(accountId, {
-      expand: ['external_accounts'],
-    })
+    // Do not expand external_accounts — that requires Full Bank Account Information Read
+    // on restricted keys. payouts_enabled / details_submitted are enough for readiness.
+    const account = await stripe.accounts.retrieve(accountId)
 
     const detailsSubmitted = !!account.details_submitted
     const chargesEnabled = !!account.charges_enabled

@@ -509,16 +509,13 @@ app.get('/api/stripe/connect/status', async (req, res) => {
       })
     }
 
-    const account = await stripe.accounts.retrieve(accountId, {
-      expand: ['external_accounts'],
-    })
+    // Avoid expand external_accounts (needs Full Bank Account Information Read on RAKs).
+    const account = await stripe.accounts.retrieve(accountId)
     const detailsSubmitted = !!account.details_submitted
     const chargesEnabled = !!account.charges_enabled
     const payoutsEnabled = !!account.payouts_enabled
     const currentlyDue = account.requirements?.currently_due || []
-    const ext = account.external_accounts?.data || []
-    const bank = ext.find((e) => e.object === 'bank_account') || ext[0]
-    const bankLast4 = bank?.last4 ? String(bank.last4) : null
+    const bankLast4 = null
 
     let status = 'incomplete'
     if (payoutsEnabled && detailsSubmitted) status = 'ready'

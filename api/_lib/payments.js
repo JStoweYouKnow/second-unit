@@ -9,7 +9,11 @@ export function mapPaymentToClient(row) {
   const artistPayoutCents = row.artist_payout_amount != null
     ? Number(row.artist_payout_amount)
     : artistPayoutAmountCents(amountCents)
-  const payoutStatus = row.payout_status || 'pending'
+  // Explicitly "paid" without a Stripe transfer_id was a fake release — keep showing escrow.
+  let payoutStatus = row.payout_status || 'pending'
+  if (row.payout_status === 'paid' && !row.transfer_id) {
+    payoutStatus = 'pending'
+  }
   return {
     id: row.id,
     bookingId: row.booking_id,
@@ -21,6 +25,7 @@ export function mapPaymentToClient(row) {
     status: row.status === 'paid' ? 'paid' : row.status,
     // pending = funded/escrowed; paid = transferred to artist
     payoutStatus,
+    transferId: row.transfer_id ?? null,
     amount: Math.round(amountCents / 100),
     artistPayout: Math.round(artistPayoutCents / 100),
     description: row.description || 'Booking payment',

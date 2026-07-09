@@ -26,10 +26,6 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Only the hirer can complete this booking' })
   }
 
-  if (booking.status !== 'paid') {
-    return res.status(400).json({ error: 'Booking must be in paid status before it can be completed' })
-  }
-
   const { data: payment, error: paymentFetchError } = await db
     .from('payments')
     .select('*')
@@ -38,44 +34,88 @@ export default async function handler(req, res) {
     .maybeSingle()
 
   if (paymentFetchError) return res.status(500).json({ error: paymentFetchError.message })
-  if (!payment) return res.status(404).json({ error: 'No payment found for this booking' })
 
-  if (payment.payout_status === 'pending') {
-    if (stripe && payment.artist_stripe_account_id) {
-      const account = await stripe.accounts.retrieve(payment.artist_stripe_account_id).catch(() => null)
-      if (!account?.payouts_enabled) {
-        return res.status(400).json({
-          error: 'Artist has not completed Stripe onboarding and cannot receive payouts yet',
-        })
-      }
+  const needsTransfer =
+    !!payment &&
+    (payment.payout_status === 'pending' ||
+      (payment.payout_status === 'paid' && !payment.transfer_id))
 
-      let transfer
-      try {
-        transfer = await stripe.transfers.create({
-          amount: payment.artist_payout_amount,
-          currency: 'usd',
-          destination: payment.artist_stripe_account_id,
-          transfer_group: id,
-          metadata: { bookingId: id },
-        })
-      } catch (err) {
-        return res.status(500).json({ error: err.message })
-      }
+  // Allow retrying a missing Stripe transfer even if the booking was already marked completed.
+  if (booking.status === 'completed' && !needsTransfer) {
+    return res.json(mapBookingToClient(booking))
+  }
 
-      const { error: payoutUpdateError } = await db
-        .from('payments')
-        .update({ payout_status: 'paid', transfer_id: transfer.id })
-        .eq('id', payment.id)
+  if (booking.status !== 'paid' && booking.status !== 'completed') {
+    return res.status(400).json({ error: 'Booking must be in paid status before it can be completed' })
+  }
 
-      if (payoutUpdateError) return res.status(500).json({ error: payoutUpdateError.message })
-    } else {
-      const { error: payoutUpdateError } = await db
-        .from('payments')
-        .update({ payout_status: 'paid' })
-        .eq('id', payment.id)
+  if (!payment) {
+    return res.status(404).json({ error: 'No payment found for this booking' })
+  }
 
-      if (payoutUpdateError) return res.status(500).json({ error: payoutUpdateError.message })
+  if (needsTransfer) {
+    if (!stripe) {
+      return res.status(503).json({ error: 'Stripe is not configured — cannot transfer artist payout' })
     }
+
+    let destination = payment.artist_stripe_account_id
+    if (!destination) {
+      const { data: artist } = await db
+        .from('artists')
+        .select('stripe_account_id')
+        .eq('id', booking.artist_id)
+        .maybeSingle()
+      destination = artist?.stripe_account_id || null
+      if (destination) {
+        await db
+          .from('payments')
+          .update({ artist_stripe_account_id: destination })
+          .eq('id', payment.id)
+      }
+    }
+
+    if (!destination) {
+      return res.status(400).json({
+        error:
+          'Artist has no Stripe Connect account yet. Have the artist finish Connect onboarding, then complete again.',
+      })
+    }
+
+    const account = await stripe.accounts.retrieve(destination).catch(() => null)
+    if (!account?.payouts_enabled) {
+      return res.status(400).json({
+        error: 'Artist has not completed Stripe onboarding and cannot receive payouts yet',
+      })
+    }
+
+    const transferAmount = Number(payment.artist_payout_amount)
+    if (!Number.isFinite(transferAmount) || transferAmount < 1) {
+      return res.status(400).json({ error: 'Invalid artist payout amount for transfer' })
+    }
+
+    let transfer
+    try {
+      transfer = await stripe.transfers.create({
+        amount: transferAmount,
+        currency: 'usd',
+        destination,
+        transfer_group: id,
+        metadata: { bookingId: id, paymentId: payment.id },
+      })
+    } catch (err) {
+      return res.status(500).json({ error: err.message })
+    }
+
+    const { error: payoutUpdateError } = await db
+      .from('payments')
+      .update({
+        payout_status: 'paid',
+        transfer_id: transfer.id,
+        artist_stripe_account_id: destination,
+      })
+      .eq('id', payment.id)
+
+    if (payoutUpdateError) return res.status(500).json({ error: payoutUpdateError.message })
   }
 
   const { data: updatedBooking, error: updateError } = await db

@@ -13,6 +13,7 @@ export function ContractMilestonesPanel({
   onPay,
   onApprove,
   busyId = null,
+  payments = [],
 }) {
   const milestones = contract?.milestones || []
   if (!milestones.length) {
@@ -45,17 +46,26 @@ export function ContractMilestonesPanel({
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {milestones.map((m) => (
-          <MilestoneRow
-            key={m.id}
-            milestone={m}
-            all={milestones}
-            isArtist={isArtist}
-            busy={busyId === m.id}
-            onPay={() => onPay?.(contract, m)}
-            onApprove={() => onApprove?.(contract, m)}
-          />
-        ))}
+        {milestones.map((m) => {
+          const payment = payments.find((p) => p.milestoneId === m.id)
+          const needsTransferRetry =
+            m.status === 'released' &&
+            payment?.status === 'paid' &&
+            !payment?.transferId &&
+            payment?.payoutStatus !== 'refunded'
+          return (
+            <MilestoneRow
+              key={m.id}
+              milestone={m}
+              all={milestones}
+              isArtist={isArtist}
+              busy={busyId === m.id}
+              needsTransferRetry={needsTransferRetry}
+              onPay={() => onPay?.(contract, m)}
+              onApprove={() => onApprove?.(contract, m)}
+            />
+          )
+        })}
       </div>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 14, fontSize: 12, color: 'var(--text-muted)' }}>
@@ -70,9 +80,10 @@ export function ContractMilestonesPanel({
   )
 }
 
-function MilestoneRow({ milestone, all, isArtist, busy, onPay, onApprove }) {
+function MilestoneRow({ milestone, all, isArtist, busy, onPay, onApprove, needsTransferRetry }) {
   const payReady = !isArtist && canPayMilestone(milestone, all)
-  const approveReady = !isArtist && milestone.status === 'funded'
+  const approveReady =
+    !isArtist && (milestone.status === 'funded' || needsTransferRetry)
 
   return (
     <div
@@ -90,9 +101,9 @@ function MilestoneRow({ milestone, all, isArtist, busy, onPay, onApprove }) {
       <div style={{ flex: 1, minWidth: 200 }}>
         <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{milestone.title}</div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>{milestone.description}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: milestoneStatusColor(milestone.status) }}>
-          {milestone.status === 'released' ? <CheckCircle size={13} /> : <Clock size={13} />}
-          {milestoneStatusLabel(milestone.status)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: needsTransferRetry ? 'var(--warning, #b45309)' : milestoneStatusColor(milestone.status) }}>
+          {milestone.status === 'released' && !needsTransferRetry ? <CheckCircle size={13} /> : <Clock size={13} />}
+          {needsTransferRetry ? 'Release pending — Stripe transfer not sent' : milestoneStatusLabel(milestone.status)}
         </div>
       </div>
 
@@ -112,7 +123,7 @@ function MilestoneRow({ milestone, all, isArtist, busy, onPay, onApprove }) {
         {approveReady && (
           <button type="button" className="btn btn-success btn-sm" disabled={busy} onClick={onApprove}>
             {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-            Approve & release
+            {needsTransferRetry ? 'Retry Stripe transfer' : 'Approve & release'}
           </button>
         )}
       </div>

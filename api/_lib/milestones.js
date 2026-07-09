@@ -282,7 +282,8 @@ export async function releaseMilestonePayout(db, milestoneId, userId) {
     throw new Error('Only the hirer can approve milestone release')
   }
 
-  if (milestone.status !== 'funded') {
+  // funded = normal release; released without transfer_id = retry a fake release
+  if (milestone.status !== 'funded' && milestone.status !== 'released') {
     throw new Error('Milestone must be funded before it can be approved for release')
   }
 
@@ -296,28 +297,68 @@ export async function releaseMilestonePayout(db, milestoneId, userId) {
   if (paymentError) throw paymentError
   if (!payment) throw new Error('No payment found for this milestone')
 
-  if (payment.payout_status === 'pending') {
-    if (stripe && payment.artist_stripe_account_id) {
-      const account = await stripe.accounts.retrieve(payment.artist_stripe_account_id).catch(() => null)
-      if (!account?.payouts_enabled) {
-        throw new Error('Artist has not completed Stripe onboarding and cannot receive payouts yet')
-      }
+  const needsTransfer =
+    payment.payout_status === 'pending' ||
+    (payment.payout_status === 'paid' && !payment.transfer_id)
 
-      const transfer = await stripe.transfers.create({
-        amount: payment.artist_payout_amount,
-        currency: 'usd',
-        destination: payment.artist_stripe_account_id,
-        transfer_group: String(milestoneId),
-        metadata: { milestoneId, contractId: contract.id },
-      })
+  if (milestone.status === 'released' && !needsTransfer) {
+    return mapMilestoneToClient(milestone)
+  }
 
-      await db
-        .from('payments')
-        .update({ payout_status: 'paid', transfer_id: transfer.id })
-        .eq('id', payment.id)
-    } else {
-      await db.from('payments').update({ payout_status: 'paid' }).eq('id', payment.id)
+  if (needsTransfer) {
+    if (!stripe) {
+      throw new Error('Stripe is not configured — cannot transfer artist payout')
     }
+
+    // Prefer payment snapshot; fall back to current artist Connect account (admin may connect after funding).
+    let destination = payment.artist_stripe_account_id
+    if (!destination) {
+      const { data: artist } = await db
+        .from('artists')
+        .select('stripe_account_id')
+        .eq('id', contract.artist_id)
+        .maybeSingle()
+      destination = artist?.stripe_account_id || null
+      if (destination) {
+        await db
+          .from('payments')
+          .update({ artist_stripe_account_id: destination })
+          .eq('id', payment.id)
+      }
+    }
+
+    if (!destination) {
+      throw new Error(
+        'Artist has no Stripe Connect account yet. Have the artist finish Connect onboarding, then approve again.'
+      )
+    }
+
+    const account = await stripe.accounts.retrieve(destination).catch(() => null)
+    if (!account?.payouts_enabled) {
+      throw new Error('Artist has not completed Stripe onboarding and cannot receive payouts yet')
+    }
+
+    const transferAmount = Number(payment.artist_payout_amount)
+    if (!Number.isFinite(transferAmount) || transferAmount < 1) {
+      throw new Error('Invalid artist payout amount for transfer')
+    }
+
+    const transfer = await stripe.transfers.create({
+      amount: transferAmount,
+      currency: 'usd',
+      destination,
+      transfer_group: String(milestoneId),
+      metadata: { milestoneId, contractId: contract.id, paymentId: payment.id },
+    })
+
+    await db
+      .from('payments')
+      .update({
+        payout_status: 'paid',
+        transfer_id: transfer.id,
+        artist_stripe_account_id: destination,
+      })
+      .eq('id', payment.id)
   }
 
   const now = new Date().toISOString()

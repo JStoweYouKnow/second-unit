@@ -29,6 +29,8 @@ export function artistEarningsAmount(payment) {
 export function artistReleasedAmount(payment) {
   if (payment?.status !== 'paid') return 0
   if (payment?.payoutStatus && payment.payoutStatus !== 'paid') return 0
+  // Fake releases (paid without transferId) stay in escrow totals.
+  if (payment?.payoutStatus === 'paid' && payment?.transferId == null) return 0
   // Legacy rows without payoutStatus: treat paid status as released.
   if (payment?.payoutStatus == null) return artistEarningsAmount(payment)
   return artistEarningsAmount(payment)
@@ -37,7 +39,9 @@ export function artistReleasedAmount(payment) {
 /** Amount funded by the hirer but still held in escrow for the artist. */
 export function artistEscrowAmount(payment) {
   if (payment?.status !== 'paid') return 0
-  if (payment?.payoutStatus === 'paid' || payment?.payoutStatus === 'refunded') return 0
+  if (payment?.payoutStatus === 'refunded') return 0
+  // Real release requires a Stripe transfer id.
+  if (payment?.payoutStatus === 'paid' && payment?.transferId) return 0
   if (payment?.payoutStatus == null) return 0
   return artistEarningsAmount(payment)
 }

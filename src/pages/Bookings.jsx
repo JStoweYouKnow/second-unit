@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom'
 import { Calendar, Clock, Plus, CheckCircle, AlertCircle, X, Send, CreditCard, Loader2, Shield, ExternalLink } from '../components/icons'
 import { useArtists } from '../hooks/useData'
 import { useArtistProfile } from '../hooks/useArtistProfile'
+import { usePayments } from '../hooks/usePayments'
 import { bookings as bookingsApi, payments as paymentsApi } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
@@ -21,12 +22,20 @@ export default function Bookings() {
     isArtistProfile(profile) ||
     !!myArtistRecord?.id
   const { artists } = useArtists()
+  const { payments: paymentRows, refetch: refetchPayments } = usePayments(!!profile?.id)
   const {
     bookings,
     bookingsLoading,
     bookingsError,
     refetchBookings: refetch,
   } = useApp()
+
+  const paymentNeedsTransfer = (booking) => {
+    const payment = paymentRows.find((p) => String(p.bookingId) === String(booking.id))
+    if (!payment || payment.status !== 'paid') return false
+    if (payment.payoutStatus === 'refunded') return false
+    return !payment.transferId
+  }
 
   const canRespondToBooking = (b) =>
     b?.status === 'pending' &&
@@ -201,6 +210,7 @@ export default function Bookings() {
     try {
       await bookingsApi.complete(showComplete.id)
       await refetch()
+      await refetchPayments()
       setShowComplete(null)
     } catch (err) {
       setError(err.message || 'Failed to complete booking.')
@@ -406,6 +416,11 @@ export default function Bookings() {
                             </button>
                           )
                         )}
+                        {b.status === 'completed' && isEmployerOn(b) && !hasLinkedContract(b) && paymentNeedsTransfer(b) && (
+                          <button type="button" className="btn btn-success btn-sm" onClick={() => setShowComplete(b)}>
+                            <CheckCircle size={14} /> Retry Stripe transfer
+                          </button>
+                        )}
                         {b.status === 'paid' && isAssignedArtistOn(b) && (
                           <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 140, textAlign: 'right' }}>
                             {hasLinkedContract(b) ? (
@@ -580,13 +595,19 @@ export default function Bookings() {
         <div className="modal-overlay" role="presentation" onClick={() => setShowComplete(null)}>
           <div className="modal" role="dialog" aria-modal="true" aria-labelledby="complete-booking-title" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 id="complete-booking-title">Mark Project Complete</h2>
+              <h2 id="complete-booking-title">
+                {paymentNeedsTransfer(showComplete) && showComplete.status === 'completed'
+                  ? 'Retry Stripe transfer'
+                  : 'Mark Project Complete'}
+              </h2>
               <button type="button" className="btn-icon" onClick={() => setShowComplete(null)}><X size={18} /></button>
             </div>
 
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 700, marginBottom: 4 }}>
-                Complete project
+                {paymentNeedsTransfer(showComplete) && showComplete.status === 'completed'
+                  ? 'Send transfer'
+                  : 'Complete project'}
               </div>
               <div style={{ color: 'var(--text-muted)' }}>with {showComplete.artistName}</div>
             </div>
@@ -608,7 +629,11 @@ export default function Bookings() {
 
             <div style={{ padding: '14px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <Shield size={14} style={{ color: 'var(--warning)', marginTop: 1, flexShrink: 0 }} />
-              <span>Confirming completion closes the booking and releases the artist’s escrowed share (85%) to their Stripe account if still pending.</span>
+              <span>
+                {paymentNeedsTransfer(showComplete) && showComplete.status === 'completed'
+                  ? 'This payment was marked released without a Stripe transfer. Confirm to create the transfer to the artist’s Connect account now.'
+                  : 'Confirming completion closes the booking and releases the artist’s escrowed share (85%) to their Stripe account if still pending.'}
+              </span>
             </div>
 
             <button
@@ -620,7 +645,14 @@ export default function Bookings() {
             >
               {loading === showComplete.id
                 ? <Loader2 size={18} className="animate-spin" />
-                : <><CheckCircle size={18} /> Mark Project Complete</>}
+                : (
+                  <>
+                    <CheckCircle size={18} />
+                    {paymentNeedsTransfer(showComplete) && showComplete.status === 'completed'
+                      ? 'Retry Stripe transfer'
+                      : 'Mark Project Complete'}
+                  </>
+                )}
             </button>
           </div>
         </div>

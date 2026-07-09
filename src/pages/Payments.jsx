@@ -366,16 +366,18 @@ export default function Payments() {
   const monthPrefix = new Date().toISOString().slice(0, 7)
   const thisMonth = isArtist
     ? paidPayments
-        .filter((p) => p.date?.startsWith(monthPrefix) && p.payoutStatus === 'paid')
+        .filter((p) => p.date?.startsWith(monthPrefix) && p.payoutStatus === 'paid' && p.transferId)
         .reduce((s, p) => s + artistReleasedAmount(p), 0)
     : sumAmount(paidPayments.filter((p) => p.date?.startsWith(monthPrefix)))
   const platformFees = platformFeeAmount(
     paidPayments.reduce((s, p) => s + p.amount, 0),
   )
   const paidCount = isArtist
-    ? paidPayments.filter((p) => p.payoutStatus === 'paid' || p.payoutStatus == null).length
+    ? paidPayments.filter((p) => (p.payoutStatus === 'paid' && p.transferId) || p.payoutStatus == null).length
     : paidPayments.length
-  const escrowCount = paidPayments.filter((p) => p.payoutStatus === 'pending').length
+  const escrowCount = paidPayments.filter(
+    (p) => p.payoutStatus === 'pending' || (p.payoutStatus === 'paid' && !p.transferId)
+  ).length
 
   const statusStyles = {
     paid: { bg: 'var(--success-muted-bg)', color: 'var(--success)', icon: <CheckCircle size={14} />, label: 'Paid' },
@@ -389,8 +391,12 @@ export default function Payments() {
   function paymentRowStatus(p) {
     if (!isArtist) return statusStyles[p.status] || statusStyles.pending
     if (p.status !== 'paid') return statusStyles[p.status] || statusStyles.pending
-    if (p.payoutStatus === 'paid' || p.payoutStatus == null) return statusStyles.released
-    if (p.payoutStatus === 'pending') return statusStyles.escrow
+    // Real release requires a Stripe transfer id.
+    if (p.payoutStatus === 'paid' && p.transferId) return statusStyles.released
+    if (p.payoutStatus === 'pending' || (p.payoutStatus === 'paid' && !p.transferId)) {
+      return statusStyles.escrow
+    }
+    if (p.payoutStatus == null) return statusStyles.released
     return statusStyles[p.status] || statusStyles.pending
   }
 
@@ -888,7 +894,7 @@ https://thecallsheet.ai
                   <span>${artistEarningsAmount(showReceipt).toLocaleString()}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                  <span>{showReceipt.payoutStatus === 'paid' || showReceipt.payoutStatus == null ? 'Released to you' : 'Held in escrow'}</span>
+                  <span>{(showReceipt.payoutStatus === 'paid' && showReceipt.transferId) || showReceipt.payoutStatus == null ? 'Released to you' : 'Held in escrow'}</span>
                   <span>${paymentDisplayAmount(showReceipt, true).toLocaleString()}</span>
                 </div>
               </div>

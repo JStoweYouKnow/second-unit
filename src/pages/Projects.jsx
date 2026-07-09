@@ -4,6 +4,7 @@ import { FileText, Plus, Download, Eye, CheckCircle, Clock, Archive, X, PenTool,
 import { ContractMilestonesPanel } from '../components/ContractMilestonesPanel'
 import { useArtists } from '../hooks/useData'
 import { useArtistProfile } from '../hooks/useArtistProfile'
+import { usePayments } from '../hooks/usePayments'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
@@ -47,6 +48,7 @@ export default function Projects() {
   const { artist: myArtistRecord } = useArtistProfile(profile?.id)
   const me = demoArtistPersona(profile, myArtistRecord)
   const { artists } = useArtists()
+  const { payments: paymentRows, refetch: refetchPayments } = usePayments(!!profile?.id)
   const [showNew, setShowNew] = useState(false)
   const [showView, setShowView] = useState(null) // project to view
   const [showSign, setShowSign] = useState(null) // project to sign
@@ -127,6 +129,7 @@ export default function Projects() {
       const list = await refetchContracts()
       const refreshed = list?.find((p) => p.id === contract.id)
       if (refreshed) setShowView(refreshed)
+      await refetchPayments()
     } catch (err) {
       console.error(err)
       setMilestoneError(err.message || 'Could not approve milestone. Please try again.')
@@ -847,6 +850,7 @@ ${divider}
               contract={showView}
               isArtist={isArtist}
               busyId={milestoneBusy}
+              payments={paymentRows.filter((p) => p.contractId === showView.id)}
               onPay={handlePayMilestone}
               onApprove={handleApproveMilestone}
             />

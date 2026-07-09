@@ -179,21 +179,70 @@ function ConnectModal({ userEmail, artistId, onClose, onDone }) {
 export default function Payments() {
   const { profile, user, isAuthenticated } = useAuth()
   const isArtist = isArtistProfile(profile)
-  const { artist: myArtistRecord } = useArtistProfile(profile?.id)
+  const { artist: myArtistRecord, refetch: refetchArtist } = useArtistProfile(profile?.id)
   const me = demoArtistPersona(profile, myArtistRecord)
   const { payments: paymentPool, loading: paymentsLoading, error: paymentsError, refetch: refetchPayments } = usePayments(isAuthenticated)
 
   const [stripeStatus, setStripeStatus] = useState(() => loadLS('su_stripe_v1'))
-  const [connectStatus, setConnectStatus] = useState(() => loadLS('su_connect_v1'))
+  const [connectLive, setConnectLive] = useState(null)
+  const [connectLoading, setConnectLoading] = useState(false)
+  const [connectError, setConnectError] = useState(null)
+  const [connectBusy, setConnectBusy] = useState(false)
   const [confirmBusy, setConfirmBusy] = useState(false)
 
-  const stripeConnected = useMemo(() => {
-    if (connectStatus) return connectStatus
-    if (myArtistRecord?.stripeAccountId) {
-      return { accountId: myArtistRecord.stripeAccountId, bankLast4: '····' }
+  const refreshConnectStatus = async () => {
+    if (!isArtist) return
+    setConnectLoading(true)
+    setConnectError(null)
+    try {
+      const status = await stripeConnect.getStatus(myArtistRecord?.stripeAccountId)
+      setConnectLive(status)
+      if (status?.accountId) {
+        saveLS('su_connect_v1', {
+          accountId: status.accountId,
+          bankLast4: status.bankLast4 || '····',
+          status: status.status,
+          payoutsEnabled: status.payoutsEnabled,
+        })
+      }
+    } catch (err) {
+      setConnectError(err.message || 'Could not verify payout account status')
+      // Fall back to DB id only — never claim "ready" without Stripe confirmation.
+      if (myArtistRecord?.stripeAccountId) {
+        setConnectLive({
+          connected: true,
+          accountId: myArtistRecord.stripeAccountId,
+          detailsSubmitted: false,
+          chargesEnabled: false,
+          payoutsEnabled: false,
+          requirementsDue: [],
+          bankLast4: null,
+          status: 'incomplete',
+          message: 'Could not reach Stripe — finish or re-check onboarding.',
+        })
+      } else {
+        setConnectLive({
+          connected: false,
+          accountId: null,
+          status: 'not_connected',
+          payoutsEnabled: false,
+          detailsSubmitted: false,
+          chargesEnabled: false,
+          requirementsDue: [],
+          bankLast4: null,
+          message: 'Payout account not connected yet.',
+        })
+      }
+    } finally {
+      setConnectLoading(false)
     }
-    return null
-  }, [connectStatus, myArtistRecord?.stripeAccountId])
+  }
+
+  useEffect(() => {
+    if (!isAuthenticated || !isArtist) return
+    refreshConnectStatus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, isArtist, myArtistRecord?.stripeAccountId])
 
   const [showSetup, setShowSetup] = useState(false)
   const [showConnect, setShowConnect] = useState(false)
@@ -206,18 +255,36 @@ export default function Payments() {
   // Handle return from Stripe Connect onboarding
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (params.get('stripe_success')) {
-      const pending = loadLS('su_connect_pending_v1')
-      if (pending) {
-        const status = { ...pending, bankLast4: '····' }
-        setConnectStatus(status)
-        saveLS('su_connect_v1', status)
-        saveLS('su_connect_pending_v1', null)
-      }
+    if (params.get('stripe_success') || params.get('stripe_refresh')) {
+      saveLS('su_connect_pending_v1', null)
       refetchPayments()
+      refetchArtist?.()
+      refreshConnectStatus()
       window.history.replaceState({}, '', window.location.pathname)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refetchPayments])
+
+  const resumeOnboarding = async () => {
+    const accountId = connectLive?.accountId || myArtistRecord?.stripeAccountId
+    if (!accountId) {
+      setShowConnect(true)
+      return
+    }
+    setConnectBusy(true)
+    setConnectError(null)
+    try {
+      const { url } = await stripeConnect.getOnboardingLink(accountId)
+      window.location.href = url
+    } catch (err) {
+      setConnectError(err.message || 'Could not open Stripe onboarding')
+      setConnectBusy(false)
+    }
+  }
+
+  const connectState = connectLive?.status || (myArtistRecord?.stripeAccountId ? 'incomplete' : 'not_connected')
+  const connectReady = connectState === 'ready' && !!connectLive?.payoutsEnabled
+  const connectIncomplete = connectState === 'incomplete' || connectState === 'restricted'
 
   const filteredPayments = paymentPool.filter(p => {
     if (filter !== 'all' && p.status !== filter) return false
@@ -429,9 +496,18 @@ https://thecallsheet.ai
               <CreditCard size={16} /> Set up payments
             </button>
           )}
-          {isArtist && !stripeConnected && (
-            <button type="button" className="btn btn-primary" onClick={() => setShowConnect(true)}>
-              <UserPlus size={16} /> Connect payout account
+          {isArtist && !connectReady && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => (connectIncomplete ? resumeOnboarding() : setShowConnect(true))}
+              disabled={connectBusy || connectLoading}
+            >
+              {connectBusy || connectLoading
+                ? <><Loader2 size={16} className="animate-spin" /> Checking…</>
+                : connectIncomplete
+                  ? <><ExternalLink size={16} /> Finish payout setup</>
+                  : <><UserPlus size={16} /> Connect payout account</>}
             </button>
           )}
         </div>
@@ -497,9 +573,9 @@ https://thecallsheet.ai
               <CheckCircle size={20} style={{ color: 'var(--success)' }} />
             </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>Stripe payments active</div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>Ready to pay artists</div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                {stripeStatus.email} · card details collected at checkout · {PLATFORM_FEE_PERCENT}% platform fee
+                {stripeStatus.email} · you pay at checkout (this is not artist payout setup) · {PLATFORM_FEE_PERCENT}% platform fee
               </div>
             </div>
           </div>
@@ -509,39 +585,89 @@ https://thecallsheet.ai
         </div>
       )}
 
-      {isArtist && !stripeConnected && (
+      {isArtist && connectLoading && !connectLive && (
+        <div style={{ marginBottom: 24, padding: '16px 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Loader2 size={18} className="animate-spin" style={{ color: 'var(--accent)' }} />
+          <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>Checking Stripe Connect payout status…</div>
+        </div>
+      )}
+
+      {isArtist && connectError && (
+        <div className="auth-error" style={{ marginBottom: 16 }}>{connectError}</div>
+      )}
+
+      {isArtist && !connectLoading && connectState === 'not_connected' && (
         <div style={{ marginBottom: 24, padding: '20px 24px', background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
             <div style={{ padding: 10, borderRadius: 'var(--radius-sm)', background: 'var(--accent-tint-10)' }}>
               <Mail size={22} style={{ color: 'var(--accent)' }} />
             </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>You've been invited to set up payouts</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Connect your bank account via Stripe Connect to receive milestone payments automatically.</div>
+              <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>Payout account not connected</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                Connect Stripe to receive released earnings in your bank. Escrowed payments cannot be paid out until this is done.
+              </div>
             </div>
           </div>
           <button type="button" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={() => setShowConnect(true)}>
-            Set up payouts <ChevronRight size={16} />
+            Connect Stripe <ChevronRight size={16} />
           </button>
         </div>
       )}
 
-      {isArtist && stripeConnected && (
-        <div style={{ marginBottom: 24, padding: '16px 20px', background: 'linear-gradient(135deg, var(--success-muted-bg), var(--accent-tint-05))', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {isArtist && connectIncomplete && (
+        <div style={{ marginBottom: 24, padding: '16px 20px', background: 'rgba(245,197,66,0.08)', border: '1px solid rgba(245,197,66,0.35)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ padding: 8, borderRadius: 'var(--radius-sm)', background: 'rgba(245,197,66,0.15)' }}>
+              <Clock size={20} style={{ color: 'var(--warning)' }} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>
+                {connectState === 'restricted' ? 'Payouts not enabled yet' : 'Finish Stripe Connect setup'}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                {connectLive?.message || 'Your Stripe account exists, but onboarding is incomplete.'}
+                {connectLive?.accountId ? ` · ID: ${connectLive.accountId}` : ''}
+                {connectLive?.requirementsDue?.length
+                  ? ` · ${connectLive.requirementsDue.length} item(s) still required`
+                  : ''}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={refreshConnectStatus} disabled={connectLoading}>
+              {connectLoading ? <Loader2 size={14} className="animate-spin" /> : 'Refresh'}
+            </button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={resumeOnboarding} disabled={connectBusy}>
+              {connectBusy ? <Loader2 size={14} className="animate-spin" /> : <><ExternalLink size={14} /> Continue setup</>}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isArtist && connectReady && (
+        <div style={{ marginBottom: 24, padding: '16px 20px', background: 'linear-gradient(135deg, var(--success-muted-bg), var(--accent-tint-05))', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ padding: 8, borderRadius: 'var(--radius-sm)', background: 'var(--success-muted-bg)' }}>
               <CheckCircle size={20} style={{ color: 'var(--success)' }} />
             </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>Stripe Connect active</div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>Ready for payouts</div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                Bank account ···· {stripeConnected.bankLast4} · Payouts arrive 2–3 business days after approval · ID: {stripeConnected.accountId}
+                Stripe Connect verified · payouts enabled
+                {connectLive?.bankLast4 ? ` · bank ···· ${connectLive.bankLast4}` : ''}
+                {' · '}transfers after milestone approval · ID: {connectLive.accountId}
               </div>
             </div>
           </div>
-          <a href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm">
-            <ArrowUpRight size={14} /> Stripe dashboard
-          </a>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={refreshConnectStatus} disabled={connectLoading}>
+              {connectLoading ? <Loader2 size={14} className="animate-spin" /> : 'Refresh status'}
+            </button>
+            <a href="https://connect.stripe.com/express_login" target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm">
+              <ArrowUpRight size={14} /> Stripe Express
+            </a>
+          </div>
         </div>
       )}
 
@@ -666,7 +792,7 @@ https://thecallsheet.ai
                 { label: isArtist ? 'Payee' : 'Artist', value: isArtist ? (me?.name ?? showReceipt.artistName) : showReceipt.artistName },
                 { label: 'Date', value: showReceipt.date },
                 { label: 'Payment ID', value: showReceipt.id },
-                { label: 'Method', value: stripeStatus ? `Stripe · ${stripeStatus.email}` : (stripeConnected ? `Stripe Connect · ···· ${stripeConnected.bankLast4}` : '—') },
+                { label: 'Method', value: stripeStatus ? `Stripe · ${stripeStatus.email}` : (connectReady ? `Stripe Connect · ···· ${connectLive?.bankLast4 || '····'}` : '—') },
               ].map(item => (
                 <div key={item.label} style={{ padding: 12, background: 'var(--surface)', borderRadius: 'var(--radius-sm)' }}>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{item.label}</div>
@@ -802,7 +928,22 @@ https://thecallsheet.ai
           userEmail={user?.email || profile?.email || ''}
           artistId={myArtistRecord?.id}
           onClose={() => setShowConnect(false)}
-          onDone={(status) => { setConnectStatus(status); saveLS('su_connect_v1', status) }}
+          onDone={(status) => {
+            saveLS('su_connect_v1', status)
+            setConnectLive({
+              connected: true,
+              accountId: status.accountId,
+              bankLast4: status.bankLast4 || null,
+              detailsSubmitted: true,
+              chargesEnabled: true,
+              payoutsEnabled: true,
+              requirementsDue: [],
+              status: 'ready',
+              message: 'Payouts enabled — earnings can be transferred to your bank.',
+            })
+            refetchArtist?.()
+            refreshConnectStatus()
+          }}
         />
       )}
     </div>

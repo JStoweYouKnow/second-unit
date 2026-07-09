@@ -53,9 +53,20 @@ export const stripeConnect = {
 
   getStatus: async (accountId) => {
     if (!isSupabaseConfigured) {
-      return { charges_enabled: true, details_submitted: true }
+      return {
+        connected: true,
+        accountId: accountId || 'mock_stripe_acct',
+        detailsSubmitted: true,
+        chargesEnabled: true,
+        payoutsEnabled: true,
+        requirementsDue: [],
+        bankLast4: '0000',
+        status: 'ready',
+        message: 'Payouts enabled — earnings can be transferred to your bank.',
+      }
     }
-    return request(`/api/stripe/connect/status/${accountId}`)
+    // Live status is resolved server-side from the signed-in artist's account.
+    return request('/api/stripe/connect/status')
   },
 }
 

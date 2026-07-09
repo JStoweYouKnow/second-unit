@@ -411,6 +411,102 @@ app.post('/api/stripe/connect/onboard', async (req, res) => {
   }
 })
 
+app.get('/api/stripe/connect/status', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+
+  const database = db || supabase
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+
+  try {
+    const artistId = await getArtistIdForProfile(database, user.id)
+    if (!artistId) {
+      return res.json({
+        connected: false,
+        accountId: null,
+        detailsSubmitted: false,
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        requirementsDue: [],
+        bankLast4: null,
+        status: 'not_connected',
+        message: 'No artist profile linked to this account.',
+      })
+    }
+
+    const { data: artist, error } = await database
+      .from('artists')
+      .select('id, stripe_account_id')
+      .eq('id', artistId)
+      .maybeSingle()
+    if (error) return res.status(500).json({ error: error.message })
+
+    const accountId = artist?.stripe_account_id || null
+    if (!accountId) {
+      return res.json({
+        connected: false,
+        accountId: null,
+        detailsSubmitted: false,
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        requirementsDue: [],
+        bankLast4: null,
+        status: 'not_connected',
+        message: 'Payout account not connected yet.',
+      })
+    }
+
+    if (!stripe) {
+      return res.json({
+        connected: true,
+        accountId,
+        detailsSubmitted: false,
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        requirementsDue: [],
+        bankLast4: null,
+        status: 'incomplete',
+        message: 'Stripe is not configured on the server; cannot verify live status.',
+      })
+    }
+
+    const account = await stripe.accounts.retrieve(accountId, {
+      expand: ['external_accounts'],
+    })
+    const detailsSubmitted = !!account.details_submitted
+    const chargesEnabled = !!account.charges_enabled
+    const payoutsEnabled = !!account.payouts_enabled
+    const currentlyDue = account.requirements?.currently_due || []
+    const ext = account.external_accounts?.data || []
+    const bank = ext.find((e) => e.object === 'bank_account') || ext[0]
+    const bankLast4 = bank?.last4 ? String(bank.last4) : null
+
+    let status = 'incomplete'
+    if (payoutsEnabled && detailsSubmitted) status = 'ready'
+    else if (!payoutsEnabled && detailsSubmitted) status = 'restricted'
+
+    return res.json({
+      connected: true,
+      accountId,
+      detailsSubmitted,
+      chargesEnabled,
+      payoutsEnabled,
+      requirementsDue: currentlyDue,
+      bankLast4,
+      status,
+      message:
+        status === 'ready'
+          ? 'Payouts enabled — earnings can be transferred to your bank.'
+          : status === 'restricted'
+            ? 'Account connected but payouts are not enabled yet.'
+            : 'Finish Stripe onboarding to enable payouts.',
+    })
+  } catch (err) {
+    console.error('[stripe/connect/status]', err?.message || err)
+    res.status(500).json({ error: err.message || 'Failed to load Connect status' })
+  }
+})
+
 app.post('/api/payments/create-checkout', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return

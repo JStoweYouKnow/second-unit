@@ -72,6 +72,10 @@ import {
 import { buildIcalCalendar, ensureCalendarFeedToken, getProfileIdForFeedToken } from '../api/_lib/icalFeed.js'
 import { FRONTEND_URL } from '../api/_lib/stripe.js'
 import {
+  ensureConnectAccount,
+  createConnectOnboardingLink,
+} from '../api/_lib/stripeConnect.js'
+import {
   listReviewsForArtist,
   upsertReview,
   updateReviewVisibility,
@@ -368,46 +372,55 @@ app.get('/api/payments', async (req, res) => {
 
 // ---- Stripe Connect Routes ----
 app.post('/api/stripe/connect/create', async (req, res) => {
-  if (!stripe) return res.status(503).json({ error: 'Stripe not configured' })
-
   const user = await requireAuth(req, res)
   if (!user) return
 
+  const database = db || supabase
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+
   try {
-    const { email, artistId } = req.body
-    const account = await stripe.accounts.create({
-      type: 'express',
+    const { email, artistId } = req.body || {}
+    const result = await ensureConnectAccount(database, {
+      user,
       email: email || user.email,
-      capabilities: { transfers: { requested: true }, card_payments: { requested: true } },
+      artistId,
     })
-
-    const database = db || supabase
-    if (artistId && database) {
-      await database
-        .from('artists')
-        .update({ stripe_account_id: account.id, updated_at: new Date().toISOString() })
-        .eq('id', artistId)
-    }
-
-    res.json({ accountId: account.id })
+    res.json({ accountId: result.accountId, artistId: result.artistId, reused: result.reused })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('[stripe/connect/create]', err?.message || err)
+    res.status(err.status || 500).json({ error: err.message || 'Failed to create Connect account' })
   }
 })
 
 app.post('/api/stripe/connect/onboard', async (req, res) => {
-  if (!stripe) return res.status(503).json({ error: 'Stripe not configured' })
+  const user = await requireAuth(req, res)
+  if (!user) return
+
   try {
-    const { accountId } = req.body
-    const accountLink = await stripe.accountLinks.create({
-      account: accountId,
-      refresh_url: `${FRONTEND_URL}/payments?stripe_refresh=1`,
-      return_url: `${FRONTEND_URL}/payments?stripe_success=1`,
-      type: 'account_onboarding',
-    })
-    res.json({ url: accountLink.url })
+    let { accountId } = req.body || {}
+    if (!accountId) {
+      const database = db || supabase
+      if (database) {
+        const { data: artist } = await database
+          .from('artists')
+          .select('stripe_account_id')
+          .eq('profile_id', user.id)
+          .maybeSingle()
+        accountId = artist?.stripe_account_id || null
+      }
+    }
+    const url = await createConnectOnboardingLink(accountId)
+    res.json({ url })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('[stripe/connect/onboard]', err?.message || err)
+    const message = err.message || 'Failed to create Stripe onboarding link'
+    if (/signed up for Connect|Connect.*not.*enabled|responsible for negative/i.test(message)) {
+      return res.status(503).json({
+        error:
+          'Stripe Connect is not enabled on this Stripe account. Enable Connect in the Stripe Dashboard, then try again.',
+      })
+    }
+    res.status(err.status || 500).json({ error: message })
   }
 })
 

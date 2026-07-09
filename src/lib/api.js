@@ -33,7 +33,7 @@ async function request(path, options = {}) {
 export const stripeConnect = {
   createAccount: async (email, artistId) => {
     if (!isSupabaseConfigured) {
-      return { accountId: 'mock_stripe_acct' }
+      throw new Error('Connect requires a live backend. Configure Supabase and Stripe, then try again.')
     }
     return request('/api/stripe/connect/create', {
       method: 'POST',
@@ -43,7 +43,7 @@ export const stripeConnect = {
 
   getOnboardingLink: async (accountId) => {
     if (!isSupabaseConfigured) {
-      return { url: `${window.location.origin}/account?stripe_setup_success=true` }
+      throw new Error('Connect requires a live backend. Configure Supabase and Stripe, then try again.')
     }
     return request('/api/stripe/connect/onboard', {
       method: 'POST',
@@ -54,15 +54,15 @@ export const stripeConnect = {
   getStatus: async (accountId) => {
     if (!isSupabaseConfigured) {
       return {
-        connected: true,
-        accountId: accountId || 'mock_stripe_acct',
-        detailsSubmitted: true,
-        chargesEnabled: true,
-        payoutsEnabled: true,
+        connected: false,
+        accountId: accountId || null,
+        detailsSubmitted: false,
+        chargesEnabled: false,
+        payoutsEnabled: false,
         requirementsDue: [],
-        bankLast4: '0000',
-        status: 'ready',
-        message: 'Payouts enabled — earnings can be transferred to your bank.',
+        bankLast4: null,
+        status: 'not_connected',
+        message: 'Connect requires a live backend with Stripe configured.',
       }
     }
     // Live status is resolved server-side from the signed-in artist's account.

@@ -93,7 +93,7 @@ function SetupModal({ profile, onClose, onDone }) {
 
 // ─── Artist Connect Modal ────────────────────────────────────────────────────
 
-function ConnectModal({ userEmail, artistId, onClose, onDone }) {
+function ConnectModal({ userEmail, artistId, onClose }) {
   const [form, setForm] = useState({ firstName: '', lastName: '', dob: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -108,15 +108,23 @@ function ConnectModal({ userEmail, artistId, onClose, onDone }) {
     setError(null)
     try {
       const { accountId } = await stripeConnect.createAccount(userEmail, artistId)
+      if (!accountId) throw new Error('Stripe did not return a Connect account id')
+
       const { url } = await stripeConnect.getOnboardingLink(accountId)
-      // Store partial status so the return URL can complete it
-      saveLS('su_connect_pending_v1', { accountId, firstName: form.firstName, lastName: form.lastName })
-      window.location.href = url
-    } catch {
-      // Stripe not configured — fall back to mock activation
-      onDone({ firstName: form.firstName, lastName: form.lastName, bankLast4: '0000', accountId: `acct_mock_${Date.now()}` })
-      onClose()
-    } finally {
+      if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+        throw new Error('Stripe did not return a valid onboarding URL')
+      }
+
+      saveLS('su_connect_pending_v1', {
+        accountId,
+        firstName: form.firstName,
+        lastName: form.lastName,
+      })
+      // Full navigation to Stripe-hosted onboarding.
+      window.location.assign(url)
+    } catch (err) {
+      console.error('[ConnectModal]', err)
+      setError(err.message || 'Could not start Stripe Connect. Check that Stripe is configured and Connect is enabled.')
       setBusy(false)
     }
   }
@@ -126,7 +134,7 @@ function ConnectModal({ userEmail, artistId, onClose, onDone }) {
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Set up payouts</h2>
-          <button type="button" className="btn-icon" onClick={onClose}><X size={18} /></button>
+          <button type="button" className="btn-icon" onClick={onClose} disabled={busy}><X size={18} /></button>
         </div>
 
         <div style={{ padding: '14px 16px', background: 'var(--accent-tint-05)', border: '1px solid var(--accent-tint-border)', borderRadius: 'var(--radius-sm)', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -141,20 +149,27 @@ function ConnectModal({ userEmail, artistId, onClose, onDone }) {
           <div className="form-group">
             <label className="form-label">First name</label>
             <input className="form-input" placeholder="First" value={form.firstName}
-              onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} />
+              onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} disabled={busy} />
           </div>
           <div className="form-group">
             <label className="form-label">Last name</label>
             <input className="form-input" placeholder="Last" value={form.lastName}
-              onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} />
+              onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} disabled={busy} />
           </div>
         </div>
         <div className="form-group">
           <label className="form-label">Date of birth</label>
           <input className="form-input" type="date" value={form.dob}
-            onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} />
+            onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} disabled={busy} />
         </div>
-        {error && <p style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 12 }}>{error}</p>}
+        {error && (
+          <p style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 12, lineHeight: 1.4 }}>{error}</p>
+        )}
+        {!artistId && (
+          <p style={{ fontSize: 13, color: 'var(--warning)', marginBottom: 12 }}>
+            No artist profile is linked to this login. Sign in as an approved artist (or finish application approval) before connecting payouts.
+          </p>
+        )}
         <div style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 8 }}>
           <Lock size={14} style={{ color: 'var(--accent)', marginTop: 1, flexShrink: 0 }} />
           <span>Stripe handles identity verification and sends payouts to your connected bank account when clients pay.</span>
@@ -275,16 +290,28 @@ export default function Payments() {
   }, [refetchPayments])
 
   const resumeOnboarding = async () => {
-    const accountId = connectLive?.accountId || myArtistRecord?.stripeAccountId
-    if (!accountId) {
-      setShowConnect(true)
-      return
-    }
     setConnectBusy(true)
     setConnectError(null)
     try {
+      let accountId = connectLive?.accountId || myArtistRecord?.stripeAccountId
+      if (!accountId) {
+        if (!myArtistRecord?.id) {
+          throw new Error('No artist profile linked to this account. Sign in as an approved artist to connect payouts.')
+        }
+        const created = await stripeConnect.createAccount(
+          user?.email || profile?.email || '',
+          myArtistRecord.id
+        )
+        accountId = created?.accountId
+        await refetchArtist?.()
+      }
+      if (!accountId) throw new Error('Could not create or find a Stripe Connect account')
+
       const { url } = await stripeConnect.getOnboardingLink(accountId)
-      window.location.href = url
+      if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+        throw new Error('Stripe did not return a valid onboarding URL')
+      }
+      window.location.assign(url)
     } catch (err) {
       setConnectError(err.message || 'Could not open Stripe onboarding')
       setConnectBusy(false)
@@ -948,22 +975,6 @@ https://thecallsheet.ai
           userEmail={user?.email || profile?.email || ''}
           artistId={myArtistRecord?.id}
           onClose={() => setShowConnect(false)}
-          onDone={(status) => {
-            saveLS('su_connect_v1', status)
-            setConnectLive({
-              connected: true,
-              accountId: status.accountId,
-              bankLast4: status.bankLast4 || null,
-              detailsSubmitted: true,
-              chargesEnabled: true,
-              payoutsEnabled: true,
-              requirementsDue: [],
-              status: 'ready',
-              message: 'Payouts enabled — earnings can be transferred to your bank.',
-            })
-            refetchArtist?.()
-            refreshConnectStatus()
-          }}
         />
       )}
     </div>

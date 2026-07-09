@@ -285,6 +285,18 @@ export const contracts = {
       method: 'POST',
     }),
 
+  submitMilestoneDeliverable: (contractId, milestoneId, payload) =>
+    request(`/api/contracts/${contractId}/milestones/${milestoneId}/deliverable`, {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    }),
+
+  requestMilestoneRelease: (contractId, milestoneId, payload) =>
+    request(`/api/contracts/${contractId}/milestones/${milestoneId}/request-release`, {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    }),
+
   listMilestones: (contractId) => request(`/api/contracts/${contractId}/milestones`),
 }
 

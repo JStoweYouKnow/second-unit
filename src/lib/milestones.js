@@ -40,18 +40,19 @@ export function canPayMilestone(milestone, allMilestones) {
   return previous?.status === 'released'
 }
 
-export function milestoneStatusLabel(status) {
+export function milestoneStatusLabel(status, { releaseRequested = false } = {}) {
   const map = {
     awaiting_payment: 'Awaiting payment',
-    funded: 'Funded — pending approval',
+    funded: releaseRequested ? 'Release requested' : 'Funded — pending approval',
     released: 'Released to artist',
     cancelled: 'Cancelled',
   }
   return map[status] || status
 }
 
-export function milestoneStatusColor(status) {
+export function milestoneStatusColor(status, { releaseRequested = false } = {}) {
   if (status === 'released') return 'var(--success)'
+  if (status === 'funded' && releaseRequested) return 'var(--accent)'
   if (status === 'funded') return 'var(--warning)'
   if (status === 'awaiting_payment') return 'var(--text-muted)'
   return 'var(--text-secondary)'

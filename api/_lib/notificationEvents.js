@@ -205,7 +205,7 @@ export async function notifyMilestoneFunded(db, { contract, milestone, artistPro
   if (!artistProfileId) return null
   const profile = await emailProfile(db, artistProfileId)
   const title = `Milestone funded: ${milestone.title}`
-  const body = `${contract.title} — ${milestone.title} has been paid. Deliver work and await client approval for payout release.`
+  const body = `${contract.title} — ${milestone.title} has been paid. Submit deliverables (optional) and request release when ready for client approval.`
 
   return notifyUser(
     db,
@@ -260,6 +260,48 @@ export async function notifyMilestoneReleased(db, { contract, milestone, artistP
               body,
               ctaLabel: 'View Earnings',
               ctaUrl: `${FRONTEND_URL}/payments`,
+            }),
+            prefs: profile.notification_prefs,
+            category: 'payment',
+          },
+        }
+      : {}
+  )
+}
+
+export async function notifyMilestoneReleaseRequested(db, { contract, milestone, employerId }) {
+  if (!employerId) return null
+  const profile = await emailProfile(db, employerId)
+  const title = `Release requested: ${milestone.title}`
+  const hasDeliverable = !!(
+    milestone.deliverable_note ||
+    milestone.deliverable_url ||
+    milestone.deliverable_storage_path ||
+    milestone.deliverable_name
+  )
+  const body = hasDeliverable
+    ? `${contract.title} — the artist submitted work and asked you to approve "${milestone.title}" for payout.`
+    : `${contract.title} — the artist asked you to approve "${milestone.title}" for payout.`
+
+  return notifyUser(
+    db,
+    employerId,
+    {
+      type: 'payment',
+      title,
+      body,
+      link: `/projects?contract_id=${contract.id}`,
+    },
+    profile
+      ? {
+          email: {
+            to: profile.email,
+            subject: title,
+            html: emailLayout({
+              title,
+              body,
+              ctaLabel: 'Review Milestone',
+              ctaUrl: `${FRONTEND_URL}/projects?contract_id=${contract.id}`,
             }),
             prefs: profile.notification_prefs,
             category: 'payment',

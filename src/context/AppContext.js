@@ -14,6 +14,8 @@ const defaultAppContext = {
   signContractAsArtist: async () => null,
   payMilestone: async () => null,
   approveMilestone: async () => null,
+  submitMilestoneDeliverable: async () => null,
+  requestMilestoneRelease: async () => null,
   refetchContracts: () => {},
   bookings: [],
   bookingsLoading: false,

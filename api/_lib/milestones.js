@@ -6,6 +6,7 @@ import {
 import {
   notifyMilestoneFunded,
   notifyMilestoneReleased,
+  notifyMilestoneReleaseRequested,
 } from './notificationEvents.js'
 import { platformFeeAmountCents, artistPayoutAmountCents } from './fees.js'
 import { createArtistTransfer, resolveArtistDestination } from './artistTransfer.js'
@@ -32,6 +33,12 @@ export function splitMilestoneAmounts(totalValue, customAmounts = null) {
 
 export function mapMilestoneToClient(row) {
   if (!row) return null
+  const hasDeliverable = !!(
+    row.deliverable_note ||
+    row.deliverable_url ||
+    row.deliverable_storage_path ||
+    row.deliverable_name
+  )
   return {
     id: row.id,
     contractId: row.contract_id,
@@ -43,6 +50,14 @@ export function mapMilestoneToClient(row) {
     paymentId: row.payment_id ?? null,
     approvedAt: row.approved_at ?? null,
     releasedAt: row.released_at ?? null,
+    deliverableNote: row.deliverable_note ?? null,
+    deliverableUrl: row.deliverable_url ?? null,
+    deliverableStoragePath: row.deliverable_storage_path ?? null,
+    deliverableName: row.deliverable_name ?? null,
+    deliverableMime: row.deliverable_mime ?? null,
+    deliverableSubmittedAt: row.deliverable_submitted_at ?? null,
+    releaseRequestedAt: row.release_requested_at ?? null,
+    hasDeliverable,
   }
 }
 
@@ -368,4 +383,157 @@ export async function releaseMilestonePayout(db, milestoneId, userId) {
   })
 
   return mapMilestoneToClient(updatedMilestone)
+}
+
+function normalizeOptionalUrl(url) {
+  if (url == null || url === '') return null
+  const trimmed = String(url).trim()
+  if (!trimmed) return null
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('Deliverable link must be http or https')
+    }
+    return parsed.toString()
+  } catch (err) {
+    if (err.message?.includes('Deliverable link')) throw err
+    throw new Error('Invalid deliverable link URL')
+  }
+}
+
+/**
+ * Artist submits optional deliverable metadata for a milestone.
+ * File upload is optional — note and/or external URL are enough.
+ * Does not require requesting release; can be updated while funded.
+ */
+export async function submitMilestoneDeliverable(db, milestoneId, userId, payload = {}) {
+  const { milestone, contract } = await getMilestoneWithContract(db, milestoneId)
+
+  const artistId = await getArtistIdForProfile(db, userId)
+  if (!artistId || contract.artist_id !== artistId) {
+    throw new Error('Only the assigned artist can submit deliverables')
+  }
+
+  if (milestone.status !== 'funded' && milestone.status !== 'awaiting_payment') {
+    throw new Error('Deliverables can only be submitted for open milestones')
+  }
+
+  const note = payload.note != null ? String(payload.note).trim().slice(0, 2000) : null
+  const url = normalizeOptionalUrl(payload.url)
+  const storagePath = payload.storagePath ? String(payload.storagePath).trim() : null
+  const name = payload.name ? String(payload.name).trim().slice(0, 200) : null
+  const mime = payload.mime ? String(payload.mime).trim().slice(0, 120) : null
+
+  const hasContent = !!(note || url || storagePath || name)
+  if (!hasContent && !payload.clear) {
+    throw new Error('Add a note, link, or file before submitting')
+  }
+
+  const now = new Date().toISOString()
+  const updates = payload.clear
+    ? {
+        deliverable_note: null,
+        deliverable_url: null,
+        deliverable_storage_path: null,
+        deliverable_name: null,
+        deliverable_mime: null,
+        deliverable_submitted_at: null,
+        updated_at: now,
+      }
+    : {
+        deliverable_note: note || null,
+        deliverable_url: url,
+        deliverable_storage_path: storagePath || milestone.deliverable_storage_path || null,
+        deliverable_name: name || milestone.deliverable_name || null,
+        deliverable_mime: mime || milestone.deliverable_mime || null,
+        deliverable_submitted_at: now,
+        updated_at: now,
+      }
+
+  // If a new file path is provided, use it; if only note/url update, keep existing file unless cleared.
+  if (!payload.clear && storagePath) {
+    updates.deliverable_storage_path = storagePath
+    updates.deliverable_name = name || storagePath.split('/').pop() || 'deliverable'
+    updates.deliverable_mime = mime
+  }
+
+  const { data: updated, error } = await db
+    .from('contract_milestones')
+    .update(updates)
+    .eq('id', milestoneId)
+    .select()
+    .single()
+
+  if (error) {
+    if (/deliverable_|column .* does not exist/i.test(error.message || '')) {
+      throw new Error('Deliverables are not enabled yet — run the milestone-deliverables migration')
+    }
+    throw error
+  }
+
+  return mapMilestoneToClient(updated)
+}
+
+/**
+ * Artist requests that the hirer approve & release a funded milestone.
+ * Deliverable attachment is optional.
+ */
+export async function requestMilestoneRelease(db, milestoneId, userId, payload = {}) {
+  const { milestone, contract } = await getMilestoneWithContract(db, milestoneId)
+
+  const artistId = await getArtistIdForProfile(db, userId)
+  if (!artistId || contract.artist_id !== artistId) {
+    throw new Error('Only the assigned artist can request release')
+  }
+
+  if (milestone.status !== 'funded') {
+    throw new Error('Milestone must be funded before release can be requested')
+  }
+
+  // Optionally attach/update deliverable in the same request.
+  const hasDeliverablePayload =
+    payload.note != null ||
+    payload.url != null ||
+    payload.storagePath != null ||
+    payload.name != null
+
+  let current = milestone
+  if (hasDeliverablePayload) {
+    const submitted = await submitMilestoneDeliverable(db, milestoneId, userId, payload)
+    // Re-fetch row for release_requested fields
+    const refreshed = await getMilestoneWithContract(db, milestoneId)
+    current = refreshed.milestone
+    void submitted
+  }
+
+  if (current.release_requested_at) {
+    return mapMilestoneToClient(current)
+  }
+
+  const now = new Date().toISOString()
+  const { data: updated, error } = await db
+    .from('contract_milestones')
+    .update({
+      release_requested_at: now,
+      release_requested_by: userId,
+      updated_at: now,
+    })
+    .eq('id', milestoneId)
+    .select()
+    .single()
+
+  if (error) {
+    if (/release_requested_|column .* does not exist/i.test(error.message || '')) {
+      throw new Error('Release requests are not enabled yet — run the milestone-deliverables migration')
+    }
+    throw error
+  }
+
+  await notifyMilestoneReleaseRequested(db, {
+    contract,
+    milestone: updated,
+    employerId: contract.employer_id,
+  })
+
+  return mapMilestoneToClient(updated)
 }

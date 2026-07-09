@@ -38,6 +38,8 @@ export default function Projects() {
     signContractAsArtist,
     payMilestone,
     approveMilestone,
+    submitMilestoneDeliverable,
+    requestMilestoneRelease,
     refetchContracts,
     refetchBookings,
   } = useApp()
@@ -133,6 +135,42 @@ export default function Projects() {
     } catch (err) {
       console.error(err)
       setMilestoneError(err.message || 'Could not approve milestone. Please try again.')
+    } finally {
+      setMilestoneBusy(null)
+    }
+  }
+
+  const refreshContractView = async (contractId) => {
+    const list = await refetchContracts()
+    const refreshed = list?.find((p) => p.id === contractId)
+    if (refreshed) setShowView(refreshed)
+  }
+
+  const handleSubmitDeliverable = async (contract, milestone, payload) => {
+    setMilestoneError('')
+    setMilestoneBusy(milestone.id)
+    try {
+      await submitMilestoneDeliverable(contract.id, milestone.id, payload)
+      await refreshContractView(contract.id)
+    } catch (err) {
+      console.error(err)
+      setMilestoneError(err.message || 'Could not save deliverable.')
+      throw err
+    } finally {
+      setMilestoneBusy(null)
+    }
+  }
+
+  const handleRequestRelease = async (contract, milestone, payload) => {
+    setMilestoneError('')
+    setMilestoneBusy(milestone.id)
+    try {
+      await requestMilestoneRelease(contract.id, milestone.id, payload)
+      await refreshContractView(contract.id)
+    } catch (err) {
+      console.error(err)
+      setMilestoneError(err.message || 'Could not request release.')
+      throw err
     } finally {
       setMilestoneBusy(null)
     }
@@ -853,6 +891,8 @@ ${divider}
               payments={paymentRows.filter((p) => p.contractId === showView.id)}
               onPay={handlePayMilestone}
               onApprove={handleApproveMilestone}
+              onSubmitDeliverable={handleSubmitDeliverable}
+              onRequestRelease={handleRequestRelease}
             />
             {milestoneError && (
               <div className="auth-error" style={{ marginBottom: 16 }}>{milestoneError}</div>

@@ -99,6 +99,8 @@ import {
   userCanAccessMilestoneContract,
   completeMilestonePayment,
   releaseMilestonePayout,
+  submitMilestoneDeliverable,
+  requestMilestoneRelease,
   getMilestoneWithContract,
   canPayMilestone,
   mapMilestoneToClient,
@@ -1063,6 +1065,53 @@ app.post('/api/contracts/:id/milestones/:milestoneId/approve', async (req, res) 
     res.json(released)
   } catch (err) {
     res.status(err.message.includes('hirer') ? 403 : 400).json({ error: err.message })
+  }
+})
+
+app.post('/api/contracts/:id/milestones/:milestoneId/deliverable', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db || supabase
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const { milestone } = await getMilestoneWithContract(database, req.params.milestoneId)
+    if (milestone.contract_id !== req.params.id) return res.status(400).json({ error: 'Milestone mismatch' })
+    const updated = await submitMilestoneDeliverable(database, req.params.milestoneId, user.id, {
+      note: req.body?.note,
+      url: req.body?.url,
+      storagePath: req.body?.storagePath,
+      name: req.body?.name,
+      mime: req.body?.mime,
+      clear: !!req.body?.clear,
+    })
+    res.json(updated)
+  } catch (err) {
+    const status =
+      err.message === 'Only the assigned artist can submit deliverables' || err.message === 'Forbidden' ? 403 : 400
+    res.status(status).json({ error: err.message })
+  }
+})
+
+app.post('/api/contracts/:id/milestones/:milestoneId/request-release', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db || supabase
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const { milestone } = await getMilestoneWithContract(database, req.params.milestoneId)
+    if (milestone.contract_id !== req.params.id) return res.status(400).json({ error: 'Milestone mismatch' })
+    const updated = await requestMilestoneRelease(database, req.params.milestoneId, user.id, {
+      note: req.body?.note,
+      url: req.body?.url,
+      storagePath: req.body?.storagePath,
+      name: req.body?.name,
+      mime: req.body?.mime,
+    })
+    res.json(updated)
+  } catch (err) {
+    const status =
+      err.message === 'Only the assigned artist can request release' || err.message === 'Forbidden' ? 403 : 400
+    res.status(status).json({ error: err.message })
   }
 })
 

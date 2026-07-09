@@ -177,6 +177,8 @@ function AppShell() {
     refetch: refetchContracts,
     payMilestone,
     approveMilestone,
+    submitMilestoneDeliverable,
+    requestMilestoneRelease,
   } = useContracts(isAuthenticated)
   const {
     bookings,
@@ -250,6 +252,8 @@ function AppShell() {
     signContractAsArtist,
     payMilestone,
     approveMilestone,
+    submitMilestoneDeliverable,
+    requestMilestoneRelease,
     refetchContracts,
     bookings,
     bookingsLoading,

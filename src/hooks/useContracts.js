@@ -248,6 +248,67 @@ export function useContracts(enabled = true) {
     return released
   }, [refetch])
 
+  const submitMilestoneDeliverable = useCallback(async (contractId, milestoneId, payload) => {
+    if (!isSupabaseConfigured) {
+      let updated = null
+      const next = updateMockContract(contractId, (c) => {
+        const milestones = (c.milestones || []).map((m) => {
+          if (m.id !== milestoneId) return m
+          updated = {
+            ...m,
+            deliverableNote: payload?.note ?? m.deliverableNote ?? null,
+            deliverableUrl: payload?.url ?? m.deliverableUrl ?? null,
+            deliverableStoragePath: payload?.storagePath ?? m.deliverableStoragePath ?? null,
+            deliverableName: payload?.name ?? m.deliverableName ?? null,
+            deliverableMime: payload?.mime ?? m.deliverableMime ?? null,
+            deliverableSubmittedAt: new Date().toISOString(),
+            hasDeliverable: true,
+          }
+          return updated
+        })
+        return { ...c, milestones }
+      })
+      setContracts(next)
+      return updated
+    }
+
+    const result = await contractsApi.submitMilestoneDeliverable(contractId, milestoneId, payload)
+    await refetch()
+    return result
+  }, [refetch])
+
+  const requestMilestoneRelease = useCallback(async (contractId, milestoneId, payload) => {
+    if (!isSupabaseConfigured) {
+      let updated = null
+      const next = updateMockContract(contractId, (c) => {
+        const milestones = (c.milestones || []).map((m) => {
+          if (m.id !== milestoneId) return m
+          updated = {
+            ...m,
+            deliverableNote: payload?.note ?? m.deliverableNote ?? null,
+            deliverableUrl: payload?.url ?? m.deliverableUrl ?? null,
+            deliverableStoragePath: payload?.storagePath ?? m.deliverableStoragePath ?? null,
+            deliverableName: payload?.name ?? m.deliverableName ?? null,
+            deliverableMime: payload?.mime ?? m.deliverableMime ?? null,
+            deliverableSubmittedAt: payload?.note || payload?.url || payload?.storagePath
+              ? new Date().toISOString()
+              : m.deliverableSubmittedAt,
+            hasDeliverable: !!(payload?.note || payload?.url || payload?.storagePath || m.hasDeliverable),
+            releaseRequestedAt: new Date().toISOString(),
+          }
+          return updated
+        })
+        return { ...c, milestones }
+      })
+      setContracts(next)
+      return updated
+    }
+
+    const result = await contractsApi.requestMilestoneRelease(contractId, milestoneId, payload)
+    await refetch()
+    return result
+  }, [refetch])
+
   return {
     contracts,
     loading,
@@ -258,5 +319,7 @@ export function useContracts(enabled = true) {
     signContractAsArtist,
     payMilestone,
     approveMilestone,
+    submitMilestoneDeliverable,
+    requestMilestoneRelease,
   }
 }

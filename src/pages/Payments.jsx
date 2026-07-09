@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
   CreditCard, CheckCircle, Clock, ArrowUpRight, DollarSign, TrendingUp,
   Download, X, Search, ArrowDownRight, Receipt, Shield, FileText,
@@ -177,10 +177,17 @@ function ConnectModal({ userEmail, artistId, onClose, onDone }) {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function Payments() {
-  const { profile, user, isAuthenticated } = useAuth()
-  const isArtist = isArtistProfile(profile)
+  const { profile, user, isAuthenticated, effectiveRole } = useAuth()
   const { artist: myArtistRecord, refetch: refetchArtist } = useArtistProfile(profile?.id)
-  const me = demoArtistPersona(profile, myArtistRecord)
+  // Match App nav: Earnings when effectiveRole/artist record says artist (not only profile.role).
+  const isArtist =
+    effectiveRole === 'artist' ||
+    isArtistProfile(profile) ||
+    !!myArtistRecord?.id
+  const me = demoArtistPersona(
+    isArtistProfile(profile) ? profile : (isArtist ? { ...profile, role: 'artist' } : profile),
+    myArtistRecord
+  )
   const { payments: paymentPool, loading: paymentsLoading, error: paymentsError, refetch: refetchPayments } = usePayments(isAuthenticated)
 
   const [stripeStatus, setStripeStatus] = useState(() => loadLS('su_stripe_v1'))
@@ -239,10 +246,13 @@ export default function Payments() {
   }
 
   useEffect(() => {
-    if (!isAuthenticated || !isArtist) return
+    if (!isAuthenticated || !isArtist) {
+      setConnectLive(null)
+      return
+    }
     refreshConnectStatus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, isArtist, myArtistRecord?.stripeAccountId])
+  }, [isAuthenticated, isArtist, myArtistRecord?.id, myArtistRecord?.stripeAccountId])
 
   const [showSetup, setShowSetup] = useState(false)
   const [showConnect, setShowConnect] = useState(false)
@@ -282,9 +292,17 @@ export default function Payments() {
     }
   }
 
-  const connectState = connectLive?.status || (myArtistRecord?.stripeAccountId ? 'incomplete' : 'not_connected')
+  // Prefer live Stripe status; while loading, still show a clear card from DB.
+  const connectState =
+    connectLive?.status ||
+    (connectLoading
+      ? 'checking'
+      : myArtistRecord?.stripeAccountId
+        ? 'incomplete'
+        : 'not_connected')
   const connectReady = connectState === 'ready' && !!connectLive?.payoutsEnabled
   const connectIncomplete = connectState === 'incomplete' || connectState === 'restricted'
+  const showArtistConnectCard = isArtist
 
   const filteredPayments = paymentPool.filter(p => {
     if (filter !== 'all' && p.status !== filter) return false
@@ -585,18 +603,18 @@ https://thecallsheet.ai
         </div>
       )}
 
-      {isArtist && connectLoading && !connectLive && (
+      {showArtistConnectCard && (connectLoading || connectState === 'checking') && !connectLive && (
         <div style={{ marginBottom: 24, padding: '16px 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 12 }}>
           <Loader2 size={18} className="animate-spin" style={{ color: 'var(--accent)' }} />
           <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>Checking Stripe Connect payout status…</div>
         </div>
       )}
 
-      {isArtist && connectError && (
+      {showArtistConnectCard && connectError && (
         <div className="auth-error" style={{ marginBottom: 16 }}>{connectError}</div>
       )}
 
-      {isArtist && !connectLoading && connectState === 'not_connected' && (
+      {showArtistConnectCard && connectState === 'not_connected' && (
         <div style={{ marginBottom: 24, padding: '20px 24px', background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
             <div style={{ padding: 10, borderRadius: 'var(--radius-sm)', background: 'var(--accent-tint-10)' }}>
@@ -615,7 +633,7 @@ https://thecallsheet.ai
         </div>
       )}
 
-      {isArtist && connectIncomplete && (
+      {showArtistConnectCard && connectIncomplete && (
         <div style={{ marginBottom: 24, padding: '16px 20px', background: 'rgba(245,197,66,0.08)', border: '1px solid rgba(245,197,66,0.35)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ padding: 8, borderRadius: 'var(--radius-sm)', background: 'rgba(245,197,66,0.15)' }}>
@@ -627,7 +645,7 @@ https://thecallsheet.ai
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
                 {connectLive?.message || 'Your Stripe account exists, but onboarding is incomplete.'}
-                {connectLive?.accountId ? ` · ID: ${connectLive.accountId}` : ''}
+                {connectLive?.accountId ? ` · ID: ${connectLive.accountId}` : myArtistRecord?.stripeAccountId ? ` · ID: ${myArtistRecord.stripeAccountId}` : ''}
                 {connectLive?.requirementsDue?.length
                   ? ` · ${connectLive.requirementsDue.length} item(s) still required`
                   : ''}
@@ -645,7 +663,7 @@ https://thecallsheet.ai
         </div>
       )}
 
-      {isArtist && connectReady && (
+      {showArtistConnectCard && connectReady && (
         <div style={{ marginBottom: 24, padding: '16px 20px', background: 'linear-gradient(135deg, var(--success-muted-bg), var(--accent-tint-05))', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ padding: 8, borderRadius: 'var(--radius-sm)', background: 'var(--success-muted-bg)' }}>

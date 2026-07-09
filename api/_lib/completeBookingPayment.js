@@ -2,11 +2,10 @@ import { platformFeeAmountCents, artistPayoutAmountCents } from './fees.js'
 
 /**
  * Mark a booking paid and record a payment row (idempotent).
- * Stores the 15/85 fee split at payment (project initiation).
- * When Stripe Connect is active, application_fee + destination charge apply at checkout.
- * Used by Stripe webhooks and mock checkout.
+ * Charges are collected from the hirer onto the platform account.
+ * Artist payout stays pending until the booking is completed (or a milestone is released).
  */
-export async function completeBookingPayment(db, bookingId, { paymentIntentId = null, splitAtPayment = false } = {}) {
+export async function completeBookingPayment(db, bookingId, { paymentIntentId = null, splitAtPayment: _splitAtPayment = false } = {}) {
   if (!db || !bookingId) {
     return { error: 'Database or booking id missing' }
   }
@@ -66,7 +65,8 @@ export async function completeBookingPayment(db, bookingId, { paymentIntentId = 
       artist_stripe_account_id: artist?.stripe_account_id ?? null,
       platform_fee_amount: platformFeeAmountCents(amountCents),
       artist_payout_amount: artistPayoutAmountCents(amountCents),
-      payout_status: splitAtPayment ? 'paid' : 'pending',
+      // Always hold artist share until explicit release — never pay out at checkout.
+      payout_status: 'pending',
     })
     .select()
     .single()

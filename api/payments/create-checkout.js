@@ -59,7 +59,7 @@ export default async function handler(req, res) {
     const session = await createProjectCheckoutSession(stripe, {
       amountDollars: amount,
       productName: description || `Booking with ${artistName}`,
-      productDescription: `Project payment — 15% platform fee deducted at checkout`,
+      productDescription: `Project payment held in escrow — artist payout releases after work is approved`,
       successUrl: `${FRONTEND_URL}/bookings?payment_success=1&booking_id=${bookingId || ''}`,
       cancelUrl: `${FRONTEND_URL}/bookings?payment_cancelled=1`,
       metadata: { bookingId: bookingId || '' },

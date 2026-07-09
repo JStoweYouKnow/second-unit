@@ -1,74 +1,17 @@
-import { platformFeeAmountCents, PLATFORM_FEE_PERCENT } from './fees.js'
-
-/**
- * Whether the connected account can receive destination charges + application fees.
- */
-export async function canUseDestinationCharge(stripe, accountId) {
-  if (!stripe || !accountId) return false
-  try {
-    const account = await stripe.accounts.retrieve(accountId)
-    return Boolean(account.charges_enabled && account.details_submitted)
-  } catch {
-    return false
-  }
-}
+import { PLATFORM_FEE_PERCENT } from './fees.js'
 
 function toAmountCents(amountDollars) {
   const cents = Math.round(Number(amountDollars) * 100)
   if (!Number.isFinite(cents) || cents < 50) {
-    throw new Error('Milestone amount must be at least $0.50 to checkout with Stripe')
+    throw new Error('Payment amount must be at least $0.50 to checkout with Stripe')
   }
   return cents
 }
 
-async function createCheckoutSession(stripe, {
-  amountCents,
-  productName,
-  productDescription,
-  successUrl,
-  cancelUrl,
-  metadata,
-  artistStripeAccountId,
-  useDestination,
-}) {
-  const paymentIntentData = {
-    metadata: { ...metadata, feeAtPayment: useDestination ? '1' : '0' },
-  }
-
-  if (useDestination && artistStripeAccountId) {
-    paymentIntentData.application_fee_amount = platformFeeAmountCents(amountCents)
-    paymentIntentData.transfer_data = { destination: artistStripeAccountId }
-  }
-
-  const feeNote = useDestination
-    ? ` Includes $${(platformFeeAmountCents(amountCents) / 100).toFixed(2)} platform fee (${PLATFORM_FEE_PERCENT}%) deducted at payment.`
-    : ''
-
-  return stripe.checkout.sessions.create({
-    mode: 'payment',
-    line_items: [{
-      price_data: {
-        currency: 'usd',
-        product_data: {
-          name: String(productName || 'Milestone payment').slice(0, 120),
-          description: String((productDescription || '') + feeNote).slice(0, 500) || undefined,
-        },
-        unit_amount: amountCents,
-      },
-      quantity: 1,
-    }],
-    payment_intent_data: paymentIntentData,
-    metadata: { ...metadata, feeAtPayment: useDestination ? '1' : '0' },
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-  })
-}
-
 /**
- * Build Stripe Checkout for project / milestone payment.
- * When the artist has Connect enabled, applies the platform fee at payment
- * via application_fee_amount + transfer_data. Falls back to platform-only
- * checkout if destination charges are unavailable or rejected by Stripe.
+ * Build Stripe Checkout that charges the hirer on the platform account only.
+ * Artist Connect accounts are never charged and never receive funds at checkout —
+ * payouts are transferred later when a milestone is approved (or a booking is completed).
  */
 export async function createProjectCheckoutSession(stripe, {
   amountDollars,
@@ -77,51 +20,48 @@ export async function createProjectCheckoutSession(stripe, {
   successUrl,
   cancelUrl,
   metadata,
-  artistStripeAccountId,
+  // Kept for call-site compatibility; intentionally unused — no destination charges.
+  artistStripeAccountId: _artistStripeAccountId,
 }) {
   if (!stripe) throw new Error('Stripe is not configured')
   if (!successUrl || !cancelUrl) throw new Error('Checkout return URLs are required')
 
   const amountCents = toAmountCents(amountDollars)
-  const useDestination = await canUseDestinationCharge(stripe, artistStripeAccountId)
+  const feeNote = ` ${PLATFORM_FEE_PERCENT}% platform fee is retained by The Callsheet; the artist share is released after milestone approval.`
 
-  try {
-    return await createCheckoutSession(stripe, {
-      amountCents,
-      productName,
-      productDescription,
-      successUrl,
-      cancelUrl,
-      metadata,
-      artistStripeAccountId,
-      useDestination,
-    })
-  } catch (err) {
-    // Destination / Connect misconfiguration should not block the hirer from paying.
-    if (useDestination) {
-      console.error('[checkout] destination charge failed, retrying platform-only:', err?.message || err)
-      return createCheckoutSession(stripe, {
-        amountCents,
-        productName,
-        productDescription,
-        successUrl,
-        cancelUrl,
-        metadata,
-        artistStripeAccountId: null,
-        useDestination: false,
-      })
-    }
-    throw err
-  }
+  return stripe.checkout.sessions.create({
+    mode: 'payment',
+    line_items: [{
+      price_data: {
+        currency: 'usd',
+        product_data: {
+          name: String(productName || 'Project payment').slice(0, 120),
+          description: String((productDescription || '') + feeNote).slice(0, 500) || undefined,
+        },
+        unit_amount: amountCents,
+      },
+      quantity: 1,
+    }],
+    // Platform-only charge: no transfer_data / application_fee_amount.
+    // Funds stay on the platform until releaseMilestonePayout / booking complete.
+    payment_intent_data: {
+      metadata: { ...metadata, feeAtPayment: '0', escrow: '1' },
+    },
+    metadata: { ...metadata, feeAtPayment: '0', escrow: '1' },
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+  })
 }
 
-export async function paymentSplitAtInitiation(stripe, paymentIntentId, metadata = {}) {
-  if (metadata.feeAtPayment === '1') return true
-  if (!stripe || !paymentIntentId) return false
-  try {
-    const pi = await stripe.paymentIntents.retrieve(paymentIntentId)
-    return Boolean(pi.application_fee_amount && pi.transfer_data?.destination)
-  } catch {
-    return false
-  }
+/**
+ * @deprecated Destination charges are no longer used. Always returns false so
+ * artist payouts remain pending until milestone approval / booking completion.
+ */
+export async function paymentSplitAtInitiation(_stripe, _paymentIntentId, _metadata = {}) {
+  return false
+}
+
+/** @deprecated Use platform-only checkout; destination charges are disabled. */
+export async function canUseDestinationCharge() {
+  return false
 }

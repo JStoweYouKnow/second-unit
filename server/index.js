@@ -21,7 +21,7 @@ import {
 } from '../api/_lib/bookings.js'
 import { listPaymentsForUser } from '../api/_lib/payments.js'
 import { completeBookingPayment } from '../api/_lib/completeBookingPayment.js'
-import { createProjectCheckoutSession, paymentSplitAtInitiation } from '../api/_lib/checkout.js'
+import { createProjectCheckoutSession } from '../api/_lib/checkout.js'
 import {
   listConversationsForUser,
   getOrCreateConversation,
@@ -441,7 +441,7 @@ app.post('/api/payments/create-checkout', async (req, res) => {
     const session = await createProjectCheckoutSession(stripe, {
       amountDollars: amount,
       productName: description || `Booking with ${artistName}`,
-      productDescription: 'Project payment — 15% platform fee deducted at checkout',
+      productDescription: 'Project payment held in escrow — artist payout releases after work is approved',
       successUrl: `${FRONTEND_URL}/bookings?payment_success=1&booking_id=${bookingId || ''}`,
       cancelUrl: `${FRONTEND_URL}/bookings?payment_cancelled=1`,
       metadata: { bookingId: bookingId || '' },
@@ -658,11 +658,11 @@ async function handleWebhook(req, res) {
     database &&
     (event.type === 'payment_intent.succeeded' || event.type === 'checkout.session.completed')
   ) {
-    const splitAtPayment = await paymentSplitAtInitiation(stripe, paymentIntentId, meta)
+    // Always escrow on the platform — artist payouts happen on milestone approval / booking complete.
     if (milestoneId) {
-      await completeMilestonePayment(database, milestoneId, { paymentIntentId, splitAtPayment })
+      await completeMilestonePayment(database, milestoneId, { paymentIntentId })
     } else if (bookingId) {
-      await completeBookingPayment(database, bookingId, { paymentIntentId, splitAtPayment })
+      await completeBookingPayment(database, bookingId, { paymentIntentId })
     }
   } else if (bookingId) {
     const booking = bookingsStore.find(b => b.id === bookingId)
@@ -863,7 +863,7 @@ app.post('/api/contracts/:id/milestones/:milestoneId/pay', async (req, res) => {
     const session = await createProjectCheckoutSession(stripe, {
       amountDollars,
       productName: `${contract.title} — ${milestone.title}`,
-      productDescription: `Milestone payment to ${artist?.display_name || 'artist'} — platform fee deducted at payment`,
+      productDescription: `Milestone payment held in escrow for ${artist?.display_name || 'artist'} — artist payout releases after approval`,
       successUrl: `${FRONTEND_URL}/projects?milestone_paid=1&contract_id=${contractId}`,
       cancelUrl: `${FRONTEND_URL}/projects?milestone_cancelled=1&contract_id=${contractId}`,
       metadata: { contractId, milestoneId },

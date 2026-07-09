@@ -78,7 +78,7 @@ export default async function handler(req, res) {
     const session = await createProjectCheckoutSession(stripe, {
       amountDollars,
       productName: `${contract.title} — ${milestone.title}`,
-      productDescription: `Milestone payment to ${artist?.display_name || 'artist'} — platform fee deducted at payment`,
+      productDescription: `Milestone payment held in escrow for ${artist?.display_name || 'artist'} — artist payout releases after approval`,
       successUrl: `${FRONTEND_URL}/projects?milestone_paid=1&contract_id=${contractId}`,
       cancelUrl: `${FRONTEND_URL}/projects?milestone_cancelled=1&contract_id=${contractId}`,
       metadata: { contractId, milestoneId },

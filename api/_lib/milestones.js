@@ -185,7 +185,7 @@ export async function userCanAccessMilestoneContract(db, userId, contract) {
   return artistId != null && contract.artist_id === artistId
 }
 
-export async function completeMilestonePayment(db, milestoneId, { paymentIntentId = null, splitAtPayment = false } = {}) {
+export async function completeMilestonePayment(db, milestoneId, { paymentIntentId = null, splitAtPayment: _splitAtPayment = false } = {}) {
   const { milestone, contract } = await getMilestoneWithContract(db, milestoneId)
 
   if (milestone.status !== 'awaiting_payment') {
@@ -233,7 +233,8 @@ export async function completeMilestonePayment(db, milestoneId, { paymentIntentI
       artist_stripe_account_id: artist?.stripe_account_id ?? null,
       platform_fee_amount: platformFeeAmountCents(amountCents),
       artist_payout_amount: artistPayoutAmountCents(amountCents),
-      payout_status: splitAtPayment ? 'paid' : 'pending',
+      // Hirer paid the platform; artist payout waits for Approve & release.
+      payout_status: 'pending',
     })
     .select()
     .single()

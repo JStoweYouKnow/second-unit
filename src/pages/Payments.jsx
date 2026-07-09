@@ -60,7 +60,7 @@ function SetupModal({ profile, onClose, onDone }) {
             </div>
             <div style={{ padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <Shield size={14} style={{ color: 'var(--success)', marginTop: 1, flexShrink: 0 }} />
-              <span>Payments are processed via Stripe Checkout. The {PLATFORM_FEE_PERCENT}% platform fee is deducted when you pay to start a project or milestone.</span>
+              <span>Only your card is charged via Stripe Checkout. Funds are held in escrow; the artist is paid after you approve each milestone. The {PLATFORM_FEE_PERCENT}% platform fee is retained by The Callsheet.</span>
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
@@ -289,7 +289,7 @@ Description: ${payment.description}
 Artist: ${payment.artistName}
 
 Subtotal:      $${payment.amount.toLocaleString()}
-Platform Fee:  $${platformFeeAmount(payment.amount).toLocaleString()} (${PLATFORM_FEE_PERCENT}% — deducted at payment)
+Platform Fee:  $${platformFeeAmount(payment.amount).toLocaleString()} (${PLATFORM_FEE_PERCENT}% — retained by platform)
 Artist Payout: $${artistEarningsAmount(payment).toLocaleString()}
 ───────────────────────────────────────
 Total Charged: $${payment.amount.toLocaleString()}
@@ -368,7 +368,7 @@ ${payment.description}
 Service provider (artist): ${payment.artistName}
 
   Line subtotal                         $${payment.amount.toLocaleString()}
-  Platform fee (${PLATFORM_FEE_PERCENT}%, deducted at payment)  $${platformFee.toLocaleString()}
+  Platform fee (${PLATFORM_FEE_PERCENT}%, retained by platform)  $${platformFee.toLocaleString()}
   Artist net payout                     $${artistShare.toLocaleString()}
 ───────────────────────────────────────
   Total paid by client                  $${tot.toLocaleString()}
@@ -715,7 +715,7 @@ https://thecallsheet.ai
                 <span>Milestone amount</span><span>${selectedPayment.amount.toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, color: 'var(--text-muted)' }}>
-                <span>Platform fee ({PLATFORM_FEE_PERCENT}%, deducted at payment)</span><span>${platformFeeAmount(selectedPayment.amount).toLocaleString()}</span>
+                <span>Platform fee ({PLATFORM_FEE_PERCENT}%, retained by platform)</span><span>${platformFeeAmount(selectedPayment.amount).toLocaleString()}</span>
               </div>
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14 }}>
                 <span>Total charge</span>

@@ -599,7 +599,7 @@ export default function Account() {
                     <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 14 }}>
                       {isApprovedArtist
                         ? 'No monthly subscription during beta. Payouts are processed via Stripe Connect when clients pay for your work.'
-                        : 'No monthly subscription during beta. A 15% platform fee is deducted when a project payment begins (at checkout or first milestone).'}
+                        : 'No monthly subscription during beta. Hirers are charged at checkout; artists receive payouts after milestone approval. A 15% platform fee is retained by The Callsheet.'}
                     </p>
                   </div>
                   <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>$0<span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-muted)' }}>/mo</span></div>

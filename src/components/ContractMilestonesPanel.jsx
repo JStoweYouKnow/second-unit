@@ -62,8 +62,8 @@ export function ContractMilestonesPanel({
         <Shield size={14} style={{ flexShrink: 0, marginTop: 1 }} />
         <span>
           {isArtist
-            ? 'Clients pay each milestone at project start. Payouts are sent to your connected Stripe account when work is approved.'
-            : `Pay milestones in order to start each phase. The ${PLATFORM_FEE_PERCENT}% platform fee is deducted at payment; the artist receives ${100 - PLATFORM_FEE_PERCENT}%.`}
+            ? 'Clients pay each milestone into escrow. Your Stripe payout is sent only after the client approves that phase.'
+            : `Only your account is charged. Funds are held in escrow until you approve each milestone; the artist then receives ${100 - PLATFORM_FEE_PERCENT}% and The Callsheet retains the ${PLATFORM_FEE_PERCENT}% fee.`}
         </span>
       </div>
     </div>

@@ -495,7 +495,7 @@ export default function Bookings() {
                     </span>
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    15% platform fee is deducted when you pay to start the project. The artist receives 85% of the agreed fee (via Stripe Connect when onboarded).
+                    15% platform fee is retained when you pay. The artist receives 85% only after work is approved (via Stripe Connect when onboarded).
                   </div>
                 </div>
               )}
@@ -544,7 +544,7 @@ export default function Bookings() {
 
             <div style={{ padding: '14px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <Shield size={14} style={{ color: 'var(--warning)', marginTop: 1, flexShrink: 0 }} />
-              <span>Confirming completion closes the booking. If the artist share was held in escrow, it will be released now; otherwise it was already sent at checkout.</span>
+              <span>Confirming completion closes the booking and releases the artist’s escrowed share (85%) to their Stripe account if still pending.</span>
             </div>
 
             <button
@@ -594,7 +594,7 @@ export default function Bookings() {
                 <span>${Math.round(bookingSubtotal(showPay) * 0.85).toLocaleString()}</span>
               </div>
               <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
-                Fee is deducted at checkout when the project begins. If the artist has not finished Stripe Connect, their share is held until onboarding is complete.
+                Fee is collected from you at checkout. The artist’s 85% share stays in escrow until you approve work / mark the project complete.
               </div>
             </div>
 

@@ -2,7 +2,6 @@ import Stripe from 'stripe'
 import { db } from '../_lib/db.js'
 import { completeBookingPayment } from '../_lib/completeBookingPayment.js'
 import { completeMilestonePayment } from '../_lib/milestones.js'
-import { paymentSplitAtInitiation } from '../_lib/checkout.js'
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null
 
@@ -48,11 +47,11 @@ export default async function handler(req, res) {
     db &&
     (event.type === 'payment_intent.succeeded' || event.type === 'checkout.session.completed')
   ) {
-    const splitAtPayment = await paymentSplitAtInitiation(stripe, paymentIntentId, meta)
+    // Always escrow on the platform — artist payouts happen on milestone approval / booking complete.
     if (milestoneId) {
-      await completeMilestonePayment(db, milestoneId, { paymentIntentId, splitAtPayment })
+      await completeMilestonePayment(db, milestoneId, { paymentIntentId })
     } else if (bookingId) {
-      await completeBookingPayment(db, bookingId, { paymentIntentId, splitAtPayment })
+      await completeBookingPayment(db, bookingId, { paymentIntentId })
     }
   }
 

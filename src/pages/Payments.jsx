@@ -7,7 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useArtistProfile } from '../hooks/useArtistProfile'
 import { usePayments } from '../hooks/usePayments'
-import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
+import { demoArtistPersona } from '../lib/roleView'
 import { stripeConnect, payments as paymentsApi } from '../lib/api'
 import {
   PLATFORM_FEE_PERCENT,
@@ -179,13 +179,10 @@ function ConnectModal({ userEmail, artistId, onClose, onDone }) {
 export default function Payments() {
   const { profile, user, isAuthenticated, effectiveRole } = useAuth()
   const { artist: myArtistRecord, refetch: refetchArtist } = useArtistProfile(profile?.id)
-  // Match App nav: Earnings when effectiveRole/artist record says artist (not only profile.role).
-  const isArtist =
-    effectiveRole === 'artist' ||
-    isArtistProfile(profile) ||
-    !!myArtistRecord?.id
+  // Same rule as Dashboard / App nav: admin "View as" drives the UI via effectiveRole.
+  const isArtist = effectiveRole === 'artist'
   const me = demoArtistPersona(
-    isArtistProfile(profile) ? profile : (isArtist ? { ...profile, role: 'artist' } : profile),
+    isArtist ? { ...profile, role: 'artist' } : profile,
     myArtistRecord
   )
   const { payments: paymentPool, loading: paymentsLoading, error: paymentsError, refetch: refetchPayments } = usePayments(isAuthenticated)
@@ -248,6 +245,8 @@ export default function Payments() {
   useEffect(() => {
     if (!isAuthenticated || !isArtist) {
       setConnectLive(null)
+      setConnectError(null)
+      setConnectLoading(false)
       return
     }
     refreshConnectStatus()
@@ -303,6 +302,9 @@ export default function Payments() {
   const connectReady = connectState === 'ready' && !!connectLive?.payoutsEnabled
   const connectIncomplete = connectState === 'incomplete' || connectState === 'restricted'
   const showArtistConnectCard = isArtist
+  // Hirer checkout banner only in hirer/admin view — never while View as Artist.
+  const showHirerPayBanner = !isArtist && !!stripeStatus
+  const showHirerSetupBanner = !isArtist && !stripeStatus
 
   const filteredPayments = paymentPool.filter(p => {
     if (filter !== 'all' && p.status !== filter) return false
@@ -567,7 +569,7 @@ https://thecallsheet.ai
       </div>
 
       {/* Stripe status banner */}
-      {!isArtist && !stripeStatus && (
+      {showHirerSetupBanner && (
         <div style={{ marginBottom: 24, padding: '20px 24px', background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
             <div style={{ padding: 10, borderRadius: 'var(--radius-sm)', background: 'var(--accent-tint-10)' }}>
@@ -584,7 +586,7 @@ https://thecallsheet.ai
         </div>
       )}
 
-      {!isArtist && stripeStatus && (
+      {showHirerPayBanner && (
         <div style={{ marginBottom: 24, padding: '16px 20px', background: 'linear-gradient(135deg, var(--success-muted-bg), var(--accent-tint-05))', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ padding: 8, borderRadius: 'var(--radius-sm)', background: 'var(--success-muted-bg)' }}>

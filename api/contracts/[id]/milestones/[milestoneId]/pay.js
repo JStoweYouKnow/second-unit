@@ -1,15 +1,15 @@
-import { stripe, FRONTEND_URL } from '../../../_lib/stripe.js'
-import { requireAuth } from '../../../_lib/auth.js'
-import { rateLimit, getClientIp } from '../../../_lib/ratelimit.js'
-import { db } from '../../../_lib/db.js'
+import { stripe, FRONTEND_URL } from '../../../../_lib/stripe.js'
+import { requireAuth } from '../../../../_lib/auth.js'
+import { rateLimit, getClientIp } from '../../../../_lib/ratelimit.js'
+import { db } from '../../../../_lib/db.js'
 import {
   completeMilestonePayment,
   getMilestoneWithContract,
   canPayMilestone,
   listMilestonesForContract,
   mapMilestoneToClient,
-} from '../../../_lib/milestones.js'
-import { createProjectCheckoutSession } from '../../../_lib/checkout.js'
+} from '../../../../_lib/milestones.js'
+import { createProjectCheckoutSession } from '../../../../_lib/checkout.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })

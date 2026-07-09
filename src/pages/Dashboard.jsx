@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { demoArtistPersona } from '../lib/roleView'
 import { buildMonthlySeries, buildMonthlyCounts, parseRowDate } from '../lib/analytics'
-import { artistPayoutAmount } from '../lib/fees'
+import { artistReleasedAmount } from '../lib/fees'
 import ArtistAvailabilityEditor from '../components/ArtistAvailabilityEditor'
 
 // Simple bar chart component (pure CSS)
@@ -116,11 +116,11 @@ export default function Dashboard() {
 
   // Analytics from real booking/payment data
   const artistIncomeData = useMemo(() => {
-    const paid = myPayments.filter((p) => p.status === 'paid')
+    const paid = myPayments.filter((p) => p.status === 'paid' && (p.payoutStatus === 'paid' || p.payoutStatus == null))
     return buildMonthlySeries(
       paid,
       rangeMonths,
-      (p) => artistPayoutAmount(p.amount),
+      (p) => artistReleasedAmount(p),
       parseRowDate
     )
   }, [myPayments, rangeMonths])
@@ -177,9 +177,10 @@ export default function Dashboard() {
 
 
   const paidTotal = useMemo(() => {
-    const filtered = myPayments.filter((p) => p.status === 'paid').slice(0, rangeMonths * 2)
-    return filtered.reduce((s, p) => s + artistPayoutAmount(p.amount), 0)
-  }, [myPayments, rangeMonths])
+    return myPayments
+      .filter((p) => p.status === 'paid' && (p.payoutStatus === 'paid' || p.payoutStatus == null))
+      .reduce((s, p) => s + artistReleasedAmount(p), 0)
+  }, [myPayments])
 
   const upcomingGigs = useMemo(() => {
     return myBookings.filter((b) => b.status === 'confirmed' || b.status === 'pending').length
@@ -246,7 +247,7 @@ export default function Dashboard() {
 
         <div className="stats-grid slide-up" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           <div className="stat-card">
-            <span className="stat-label"><DollarSign size={14} /> Paid (demo)</span>
+            <span className="stat-label"><DollarSign size={14} /> Released</span>
             <span className="stat-value" style={{ color: 'var(--success)' }}>${paidTotal.toLocaleString()}</span>
             <span className="stat-change">All-time earnings</span>
           </div>

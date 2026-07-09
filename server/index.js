@@ -22,6 +22,7 @@ import {
 import { listPaymentsForUser } from '../api/_lib/payments.js'
 import { completeBookingPayment } from '../api/_lib/completeBookingPayment.js'
 import { createProjectCheckoutSession } from '../api/_lib/checkout.js'
+import { confirmCheckoutSession } from '../api/_lib/confirmCheckout.js'
 import {
   listConversationsForUser,
   getOrCreateConversation,
@@ -330,6 +331,23 @@ app.get('/api/bookings', async (req, res) => {
   }
 
   res.json(bookingsStore.filter((b) => b.employerId === user.id))
+})
+
+app.post('/api/payments/confirm-checkout', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db || supabase
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  const sessionId = req.body?.sessionId
+  if (!sessionId) return res.status(400).json({ error: 'sessionId is required' })
+  try {
+    const result = await confirmCheckoutSession(database, sessionId, user.id)
+    res.json({ ok: true, ...result })
+  } catch (err) {
+    console.error('[confirm-checkout]', err?.message || err)
+    const msg = err.message || 'Failed to confirm checkout'
+    res.status(/authorized|not found|required|not paid/i.test(msg) ? 400 : 500).json({ error: msg })
+  }
 })
 
 app.get('/api/payments', async (req, res) => {

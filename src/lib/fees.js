@@ -25,6 +25,23 @@ export function artistEarningsAmount(payment) {
   return artistPayoutAmount(payment?.amount ?? 0)
 }
 
+/** Amount already released to the artist (Stripe transfer completed). */
+export function artistReleasedAmount(payment) {
+  if (payment?.status !== 'paid') return 0
+  if (payment?.payoutStatus && payment.payoutStatus !== 'paid') return 0
+  // Legacy rows without payoutStatus: treat paid status as released.
+  if (payment?.payoutStatus == null) return artistEarningsAmount(payment)
+  return artistEarningsAmount(payment)
+}
+
+/** Amount funded by the hirer but still held in escrow for the artist. */
+export function artistEscrowAmount(payment) {
+  if (payment?.status !== 'paid') return 0
+  if (payment?.payoutStatus === 'paid' || payment?.payoutStatus === 'refunded') return 0
+  if (payment?.payoutStatus == null) return 0
+  return artistEarningsAmount(payment)
+}
+
 /** Role-aware amount for lists, stats, and receipts — hirers see gross; artists see earnings only. */
 export function paymentDisplayAmount(payment, isArtist) {
   if (isArtist) return artistEarningsAmount(payment)

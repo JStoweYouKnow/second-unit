@@ -98,6 +98,12 @@ export const payments = {
     }
     return request('/api/payments')
   },
+
+  confirmCheckout: (sessionId) =>
+    request('/api/payments/confirm-checkout', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId }),
+    }),
 }
 
 // ---- Bookings ----

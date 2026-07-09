@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
 import { bookingSubtotal, bookingScheduleCaption } from '../lib/pricing'
 import { PLATFORM_FEE_PERCENT } from '../lib/fees'
+import { isSupabaseConfigured } from '../lib/supabase'
 
 export default function Bookings() {
   const { profile, isAuthenticated } = useAuth()
@@ -38,10 +39,26 @@ export default function Bookings() {
   // Handle return from Stripe Checkout (or mock payment)
   useEffect(() => {
     const success = searchParams.get('payment_success')
-    if (success) {
-      refetch()
-      setSearchParams({}, { replace: true })
-    }
+    const sessionId = searchParams.get('session_id')
+    if (!success && !sessionId) return
+
+    let cancelled = false
+    ;(async () => {
+      if (sessionId && isSupabaseConfigured) {
+        try {
+          await paymentsApi.confirmCheckout(sessionId)
+        } catch (err) {
+          console.error('[confirm-checkout]', err)
+          if (!cancelled) setError(err.message || 'Payment confirmation failed.')
+        }
+      }
+      if (!cancelled) {
+        await refetch()
+        setSearchParams({}, { replace: true })
+      }
+    })()
+
+    return () => { cancelled = true }
   }, [searchParams, refetch, setSearchParams])
 
   const roleBookings = useMemo(() => {

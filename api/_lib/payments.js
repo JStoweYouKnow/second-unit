@@ -9,13 +9,18 @@ export function mapPaymentToClient(row) {
   const artistPayoutCents = row.artist_payout_amount != null
     ? Number(row.artist_payout_amount)
     : artistPayoutAmountCents(amountCents)
+  const payoutStatus = row.payout_status || 'pending'
   return {
     id: row.id,
     bookingId: row.booking_id,
+    contractId: row.contract_id ?? null,
+    milestoneId: row.milestone_id ?? null,
     date: row.paid_at
       ? new Date(row.paid_at).toISOString().slice(0, 10)
       : new Date(row.created_at).toISOString().slice(0, 10),
     status: row.status === 'paid' ? 'paid' : row.status,
+    // pending = funded/escrowed; paid = transferred to artist
+    payoutStatus,
     amount: Math.round(amountCents / 100),
     artistPayout: Math.round(artistPayoutCents / 100),
     description: row.description || 'Booking payment',

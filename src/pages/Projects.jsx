@@ -7,7 +7,7 @@ import { useArtistProfile } from '../hooks/useArtistProfile'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
-import { contracts as contractsApi } from '../lib/api'
+import { contracts as contractsApi, payments as paymentsApi } from '../lib/api'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { uploadContractAttachment, downloadContractAttachment } from '../lib/contractAttachments'
 import { splitMilestoneAmounts, DEFAULT_MILESTONE_TITLES } from '../lib/milestones'
@@ -62,13 +62,30 @@ export default function Projects() {
   useEffect(() => {
     const paid = searchParams.get('milestone_paid')
     const contractId = searchParams.get('contract_id')
-    if (!contractId) return
+    const sessionId = searchParams.get('session_id')
+    if (!contractId && !sessionId) return
 
-    refetchContracts().then((list) => {
+    let cancelled = false
+    ;(async () => {
+      if (sessionId && isSupabaseConfigured) {
+        try {
+          await paymentsApi.confirmCheckout(sessionId)
+        } catch (err) {
+          console.error('[confirm-checkout]', err)
+          if (!cancelled) {
+            setMilestoneError(err.message || 'Payment confirmation failed. If you were charged, refresh in a moment.')
+          }
+        }
+      }
+
+      const list = await refetchContracts()
+      if (cancelled) return
       const c = (list || localProjects).find((p) => String(p.id) === contractId)
       if (c) setShowView(c)
-      if (paid) setSearchParams({}, { replace: true })
-    })
+      if (paid || sessionId) setSearchParams({}, { replace: true })
+    })()
+
+    return () => { cancelled = true }
   }, [searchParams])
 
   const handlePayMilestone = async (contract, milestone) => {

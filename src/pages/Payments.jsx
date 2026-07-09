@@ -13,6 +13,8 @@ import {
   PLATFORM_FEE_PERCENT,
   platformFeeAmount,
   artistEarningsAmount,
+  artistReleasedAmount,
+  artistEscrowAmount,
   paymentDisplayAmount,
 } from '../lib/fees'
 
@@ -226,22 +228,46 @@ export default function Payments() {
   const sumAmount = (payments) =>
     payments.reduce((s, p) => s + paymentDisplayAmount(p, isArtist), 0)
 
-  const total = sumAmount(paymentPool.filter(p => p.status === 'paid'))
-  const pending = sumAmount(paymentPool.filter(p => p.status === 'pending' || p.status === 'upcoming'))
+  const paidPayments = paymentPool.filter((p) => p.status === 'paid')
+  const releasedTotal = isArtist
+    ? paidPayments.reduce((s, p) => s + artistReleasedAmount(p), 0)
+    : sumAmount(paidPayments)
+  const escrowTotal = isArtist
+    ? paidPayments.reduce((s, p) => s + artistEscrowAmount(p), 0)
+    : 0
+  const pending = isArtist
+    ? escrowTotal
+    : sumAmount(paymentPool.filter((p) => p.status === 'pending' || p.status === 'upcoming'))
+  const total = releasedTotal
   const monthPrefix = new Date().toISOString().slice(0, 7)
-  const thisMonth = sumAmount(
-    paymentPool.filter(p => p.status === 'paid' && p.date?.startsWith(monthPrefix)),
-  )
+  const thisMonth = isArtist
+    ? paidPayments
+        .filter((p) => p.date?.startsWith(monthPrefix) && p.payoutStatus === 'paid')
+        .reduce((s, p) => s + artistReleasedAmount(p), 0)
+    : sumAmount(paidPayments.filter((p) => p.date?.startsWith(monthPrefix)))
   const platformFees = platformFeeAmount(
-    paymentPool.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0),
+    paidPayments.reduce((s, p) => s + p.amount, 0),
   )
-  const paidCount = paymentPool.filter(p => p.status === 'paid').length
+  const paidCount = isArtist
+    ? paidPayments.filter((p) => p.payoutStatus === 'paid' || p.payoutStatus == null).length
+    : paidPayments.length
+  const escrowCount = paidPayments.filter((p) => p.payoutStatus === 'pending').length
 
   const statusStyles = {
     paid: { bg: 'var(--success-muted-bg)', color: 'var(--success)', icon: <CheckCircle size={14} />, label: 'Paid' },
     pending: { bg: 'rgba(245,197,66,0.1)', color: 'var(--warning)', icon: <Clock size={14} />, label: 'Pending' },
     upcoming: { bg: 'var(--accent-tint-10)', color: 'var(--accent)', icon: <Clock size={14} />, label: 'Scheduled' },
     refunded: { bg: 'rgba(255,77,106,0.1)', color: 'var(--danger)', icon: <ArrowDownRight size={14} />, label: 'Refunded' },
+    escrow: { bg: 'rgba(245,197,66,0.1)', color: 'var(--warning)', icon: <Clock size={14} />, label: 'In escrow' },
+    released: { bg: 'var(--success-muted-bg)', color: 'var(--success)', icon: <CheckCircle size={14} />, label: 'Released' },
+  }
+
+  function paymentRowStatus(p) {
+    if (!isArtist) return statusStyles[p.status] || statusStyles.pending
+    if (p.status !== 'paid') return statusStyles[p.status] || statusStyles.pending
+    if (p.payoutStatus === 'paid' || p.payoutStatus == null) return statusStyles.released
+    if (p.payoutStatus === 'pending') return statusStyles.escrow
+    return statusStyles[p.status] || statusStyles.pending
   }
 
   const handleDownloadReceipt = (payment) => {
@@ -414,14 +440,18 @@ https://thecallsheet.ai
       {/* Stats */}
       <div className="stats-grid slide-up" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div className="stat-card">
-          <span className="stat-label"><DollarSign size={14} /> {isArtist ? 'Paid to you' : 'Total paid'}</span>
+          <span className="stat-label"><DollarSign size={14} /> {isArtist ? 'Released to you' : 'Total paid'}</span>
           <span className="stat-value" style={{ color: 'var(--success)' }}>${total.toLocaleString()}</span>
           <span className="stat-change"><ArrowUpRight size={12} /> {paidCount} {isArtist ? 'payouts' : 'payments'}</span>
         </div>
         <div className="stat-card">
-          <span className="stat-label"><Clock size={14} /> {isArtist ? 'Incoming' : 'Outstanding'}</span>
+          <span className="stat-label"><Clock size={14} /> {isArtist ? 'In escrow' : 'Outstanding'}</span>
           <span className="stat-value" style={{ color: 'var(--warning)' }}>${pending.toLocaleString()}</span>
-          <span className="stat-change">{paymentPool.filter(p => p.status !== 'paid').length} pending</span>
+          <span className="stat-change">
+            {isArtist
+              ? `${escrowCount} awaiting client approval`
+              : `${paymentPool.filter(p => p.status !== 'paid').length} pending`}
+          </span>
         </div>
         <div className="stat-card">
           <span className="stat-label"><TrendingUp size={14} /> This month</span>
@@ -431,7 +461,7 @@ https://thecallsheet.ai
           <div className="stat-card">
             <span className="stat-label"><CheckCircle size={14} /> Completed</span>
             <span className="stat-value">{paidCount}</span>
-            <span className="stat-change">Paid milestones &amp; bookings</span>
+            <span className="stat-change">Released milestones &amp; bookings</span>
           </div>
         ) : (
           <div className="stat-card">
@@ -559,11 +589,15 @@ https://thecallsheet.ai
           </div>
         ) : filteredPayments.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
-            {paymentPool.length === 0 ? 'No payments yet. Complete a booking checkout to see records here.' : 'No payments match your filters.'}
+            {paymentPool.length === 0
+              ? (isArtist
+                ? 'No earnings yet. You’ll see escrowed and released payouts here after clients fund milestones.'
+                : 'No payments yet. Complete a booking or milestone checkout to see records here.')
+              : 'No payments match your filters.'}
           </div>
         ) : (
           filteredPayments.map(p => {
-            const s = statusStyles[p.status] || statusStyles.pending
+            const s = paymentRowStatus(p)
             return (
               <div key={p.id} className="slide-up" style={{
                 display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) 1fr 1fr 1fr minmax(200px, auto)',
@@ -643,8 +677,12 @@ https://thecallsheet.ai
 
             {isArtist ? (
               <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 24, fontSize: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Your share (85%)</span>
+                  <span>${artistEarningsAmount(showReceipt).toLocaleString()}</span>
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                  <span>Paid to you</span>
+                  <span>{showReceipt.payoutStatus === 'paid' || showReceipt.payoutStatus == null ? 'Released to you' : 'Held in escrow'}</span>
                   <span>${paymentDisplayAmount(showReceipt, true).toLocaleString()}</span>
                 </div>
               </div>

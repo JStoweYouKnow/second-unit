@@ -29,6 +29,12 @@ export async function createProjectCheckoutSession(stripe, {
   const amountCents = toAmountCents(amountDollars)
   const feeNote = ` ${PLATFORM_FEE_PERCENT}% platform fee is retained by The Callsheet; the artist share is released after milestone approval.`
 
+  // Append Stripe's session id so the app can confirm payment on return
+  // even if the webhook is delayed or misconfigured.
+  const successWithSession = successUrl.includes('{CHECKOUT_SESSION_ID}')
+    ? successUrl
+    : `${successUrl}${successUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`
+
   return stripe.checkout.sessions.create({
     mode: 'payment',
     line_items: [{
@@ -48,7 +54,7 @@ export async function createProjectCheckoutSession(stripe, {
       metadata: { ...metadata, feeAtPayment: '0', escrow: '1' },
     },
     metadata: { ...metadata, feeAtPayment: '0', escrow: '1' },
-    success_url: successUrl,
+    success_url: successWithSession,
     cancel_url: cancelUrl,
   })
 }

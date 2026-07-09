@@ -1,7 +1,7 @@
-import { stripe } from '../../_lib/stripe.js'
 import { db } from '../../_lib/db.js'
 import { requireAuth } from '../../_lib/auth.js'
 import { mapBookingToClient } from '../../_lib/bookings.js'
+import { createArtistTransfer, resolveArtistDestination } from '../../_lib/artistTransfer.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -54,68 +54,36 @@ export default async function handler(req, res) {
   }
 
   if (needsTransfer) {
-    if (!stripe) {
-      return res.status(503).json({ error: 'Stripe is not configured — cannot transfer artist payout' })
-    }
-
-    let destination = payment.artist_stripe_account_id
-    if (!destination) {
-      const { data: artist } = await db
-        .from('artists')
-        .select('stripe_account_id')
-        .eq('id', booking.artist_id)
-        .maybeSingle()
-      destination = artist?.stripe_account_id || null
-      if (destination) {
-        await db
-          .from('payments')
-          .update({ artist_stripe_account_id: destination })
-          .eq('id', payment.id)
-      }
-    }
-
-    if (!destination) {
-      return res.status(400).json({
-        error:
-          'Artist has no Stripe Connect account yet. Have the artist finish Connect onboarding, then complete again.',
-      })
-    }
-
-    const account = await stripe.accounts.retrieve(destination).catch(() => null)
-    if (!account?.payouts_enabled) {
-      return res.status(400).json({
-        error: 'Artist has not completed Stripe onboarding and cannot receive payouts yet',
-      })
-    }
-
-    const transferAmount = Number(payment.artist_payout_amount)
-    if (!Number.isFinite(transferAmount) || transferAmount < 1) {
-      return res.status(400).json({ error: 'Invalid artist payout amount for transfer' })
-    }
-
-    let transfer
     try {
-      transfer = await stripe.transfers.create({
-        amount: transferAmount,
-        currency: 'usd',
+      const destination = await resolveArtistDestination(db, payment, booking.artist_id)
+      if (!destination) {
+        return res.status(400).json({
+          error:
+            'Artist has no Stripe Connect account yet. Have the artist finish Connect onboarding, then complete again.',
+        })
+      }
+
+      const transfer = await createArtistTransfer({
+        payment,
         destination,
-        transfer_group: id,
-        metadata: { bookingId: id, paymentId: payment.id },
+        transferGroup: id,
+        metadata: { bookingId: id },
       })
+
+      const { error: payoutUpdateError } = await db
+        .from('payments')
+        .update({
+          payout_status: 'paid',
+          transfer_id: transfer.id,
+          artist_stripe_account_id: destination,
+        })
+        .eq('id', payment.id)
+
+      if (payoutUpdateError) return res.status(500).json({ error: payoutUpdateError.message })
     } catch (err) {
-      return res.status(500).json({ error: err.message })
+      const status = /not configured/i.test(err.message) ? 503 : 400
+      return res.status(status).json({ error: err.message })
     }
-
-    const { error: payoutUpdateError } = await db
-      .from('payments')
-      .update({
-        payout_status: 'paid',
-        transfer_id: transfer.id,
-        artist_stripe_account_id: destination,
-      })
-      .eq('id', payment.id)
-
-    if (payoutUpdateError) return res.status(500).json({ error: payoutUpdateError.message })
   }
 
   const { data: updatedBooking, error: updateError } = await db

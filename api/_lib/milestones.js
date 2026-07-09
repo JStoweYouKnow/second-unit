@@ -8,7 +8,7 @@ import {
   notifyMilestoneReleased,
 } from './notificationEvents.js'
 import { platformFeeAmountCents, artistPayoutAmountCents } from './fees.js'
-import { stripe } from './stripe.js'
+import { createArtistTransfer, resolveArtistDestination } from './artistTransfer.js'
 
 export const DEFAULT_MILESTONE_TITLES = [
   { title: 'On contract execution', description: 'Initial payment upon signed agreement' },
@@ -306,49 +306,18 @@ export async function releaseMilestonePayout(db, milestoneId, userId) {
   }
 
   if (needsTransfer) {
-    if (!stripe) {
-      throw new Error('Stripe is not configured — cannot transfer artist payout')
-    }
-
-    // Prefer payment snapshot; fall back to current artist Connect account (admin may connect after funding).
-    let destination = payment.artist_stripe_account_id
-    if (!destination) {
-      const { data: artist } = await db
-        .from('artists')
-        .select('stripe_account_id')
-        .eq('id', contract.artist_id)
-        .maybeSingle()
-      destination = artist?.stripe_account_id || null
-      if (destination) {
-        await db
-          .from('payments')
-          .update({ artist_stripe_account_id: destination })
-          .eq('id', payment.id)
-      }
-    }
-
+    const destination = await resolveArtistDestination(db, payment, contract.artist_id)
     if (!destination) {
       throw new Error(
         'Artist has no Stripe Connect account yet. Have the artist finish Connect onboarding, then approve again.'
       )
     }
 
-    const account = await stripe.accounts.retrieve(destination).catch(() => null)
-    if (!account?.payouts_enabled) {
-      throw new Error('Artist has not completed Stripe onboarding and cannot receive payouts yet')
-    }
-
-    const transferAmount = Number(payment.artist_payout_amount)
-    if (!Number.isFinite(transferAmount) || transferAmount < 1) {
-      throw new Error('Invalid artist payout amount for transfer')
-    }
-
-    const transfer = await stripe.transfers.create({
-      amount: transferAmount,
-      currency: 'usd',
+    const transfer = await createArtistTransfer({
+      payment,
       destination,
-      transfer_group: String(milestoneId),
-      metadata: { milestoneId, contractId: contract.id, paymentId: payment.id },
+      transferGroup: milestoneId,
+      metadata: { milestoneId, contractId: contract.id },
     })
 
     await db

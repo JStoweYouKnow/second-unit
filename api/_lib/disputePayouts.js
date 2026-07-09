@@ -78,7 +78,7 @@ async function stripeRefund(payment, amountCents) {
 }
 
 async function stripeTransfer(payment, amountCents) {
-  if (payment.payout_status === 'paid') {
+  if (payment.payout_status === 'paid' && payment.transfer_id) {
     return { skipped: true, reason: 'already_released' }
   }
   const transferAmount = amountCents ?? payment.artist_payout_amount
@@ -89,22 +89,21 @@ async function stripeTransfer(payment, amountCents) {
     return { skipped: true, reason: 'no_stripe_connect' }
   }
 
-  const account = await stripe.accounts.retrieve(payment.artist_stripe_account_id).catch(() => null)
-  if (!account?.payouts_enabled) {
-    return { skipped: true, reason: 'artist_not_onboarded' }
+  const { createArtistTransfer } = await import('./artistTransfer.js')
+  try {
+    const transfer = await createArtistTransfer({
+      payment: { ...payment, artist_payout_amount: transferAmount },
+      destination: payment.artist_stripe_account_id,
+      transferGroup: payment.id,
+      metadata: { paymentId: payment.id, disputePayout: 'true' },
+    })
+    return { transferId: transfer.id, amountCents: transferAmount }
+  } catch (err) {
+    if (/not completed Stripe onboarding/i.test(err.message)) {
+      return { skipped: true, reason: 'artist_not_onboarded' }
+    }
+    throw err
   }
-
-  const transfer = await stripe.transfers.create({
-    amount: transferAmount,
-    currency: 'usd',
-    destination: payment.artist_stripe_account_id,
-    transfer_group: String(payment.id),
-    metadata: {
-      paymentId: payment.id,
-      disputePayout: 'true',
-    },
-  })
-  return { transferId: transfer.id, amountCents: transferAmount }
 }
 
 /**

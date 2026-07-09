@@ -370,7 +370,7 @@ export default function Bookings() {
                             <span style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'right' }}>
                               Awaiting artist confirmation
                             </span>
-                            {profile?.id && String(b.employerId) === String(profile.id) && (
+                            {isEmployerOn(b) && (
                               <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleCancelRequest(b.id)}>
                                 Cancel request
                               </button>

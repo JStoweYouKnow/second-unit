@@ -152,6 +152,43 @@ export async function ensureBookingForContract(db, contractRow) {
   const rate = Math.max(Math.round(agreedTotal / Math.max(durationHours, 1)), 1)
   const notes = `Created from project: ${contractRow.title}`
 
+  // Reuse an orphan pending booking (legacy insert without contract_id) instead of duplicating.
+  const { data: orphans } = await db
+    .from('bookings')
+    .select('*')
+    .eq('employer_id', contractRow.employer_id)
+    .eq('artist_id', contractRow.artist_id)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  const orphan = (orphans || []).find((b) => {
+    if (b.contract_id && b.contract_id !== contractRow.id) return false
+    const sameNotes = (b.notes || '') === notes || (b.notes || '').includes(contractRow.title || '')
+    const sameDate =
+      !startDate ||
+      (typeof b.date === 'string' ? b.date.slice(0, 10) : b.date) === startDate
+    return sameNotes || (sameDate && (b.booking_type === 'Project Work' || !b.contract_id))
+  })
+
+  if (orphan) {
+    const patch = { updated_at: new Date().toISOString() }
+    if (!orphan.contract_id) patch.contract_id = contractRow.id
+    const { data: linkedOrphan, error: orphanErr } = await db
+      .from('bookings')
+      .update(patch)
+      .eq('id', orphan.id)
+      .select()
+      .single()
+    if (!orphanErr && linkedOrphan) {
+      await db
+        .from('contracts')
+        .update({ booking_id: linkedOrphan.id, updated_at: new Date().toISOString() })
+        .eq('id', contractRow.id)
+      return mapBookingToClient(linkedOrphan)
+    }
+  }
+
   const bookingInsert = {
     employer_id: contractRow.employer_id,
     artist_id: contractRow.artist_id,

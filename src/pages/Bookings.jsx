@@ -6,7 +6,7 @@ import { useArtistProfile } from '../hooks/useArtistProfile'
 import { bookings as bookingsApi, payments as paymentsApi } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
-import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
+import { isArtistProfile } from '../lib/roleView'
 import { bookingSubtotal, bookingScheduleCaption } from '../lib/pricing'
 import { PLATFORM_FEE_PERCENT } from '../lib/fees'
 import { isSupabaseConfigured } from '../lib/supabase'
@@ -14,9 +14,12 @@ import { isSupabaseConfigured } from '../lib/supabase'
 export default function Bookings() {
   const { profile, effectiveRole } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
-  const isArtist = effectiveRole === 'artist' || isArtistProfile(profile)
   const { artist: myArtistRecord, loading: artistLoading } = useArtistProfile(profile?.id)
-  const myArtist = demoArtistPersona(profile, myArtistRecord)
+  // Treat as artist if role says so OR they have an artists row (needed for Confirm buttons).
+  const isArtist =
+    effectiveRole === 'artist' ||
+    isArtistProfile(profile) ||
+    !!myArtistRecord?.id
   const { artists } = useArtists()
   const {
     bookings,
@@ -24,6 +27,17 @@ export default function Bookings() {
     bookingsError,
     refetchBookings: refetch,
   } = useApp()
+
+  const canRespondToBooking = (b) =>
+    b?.status === 'pending' &&
+    myArtistRecord?.id != null &&
+    String(b.artistId) === String(myArtistRecord.id)
+
+  const isAssignedArtistOn = (b) =>
+    myArtistRecord?.id != null && String(b.artistId) === String(myArtistRecord.id)
+
+  const isEmployerOn = (b) =>
+    profile?.id != null && String(b.employerId) === String(profile.id)
   const [tab, setTab] = useState('upcoming')
   const [showNew, setShowNew] = useState(false)
   const [showPay, setShowPay] = useState(null)
@@ -67,16 +81,20 @@ export default function Bookings() {
   }, [searchParams, refetch, setSearchParams])
 
   const roleBookings = useMemo(() => {
-    // API already scopes to this user. Only narrow further once we have artists.id —
-    // never filter by profiles.id (that hid every booking for artists).
-    if (!isArtist) return bookings
-    if (!myArtist?.id) return bookings
-    return bookings.filter((b) => String(b.artistId) === String(myArtist.id))
-  }, [isArtist, myArtist, bookings])
+    // API already returns bookings where this user is employer OR assigned artist.
+    // Don't hide employer-created bookings just because the user also has an artists row.
+    return bookings
+  }, [bookings])
 
   const filtered = tab === 'upcoming'
     ? roleBookings.filter(b => b.status === 'confirmed' || b.status === 'pending' || b.status === 'paid')
     : roleBookings
+
+  const bookingTitle = (b) => {
+    if (canRespondToBooking(b)) return 'Client booking'
+    if (myArtistRecord?.id && String(b.artistId) === String(myArtistRecord.id)) return 'Client booking'
+    return b.artistName || 'Booking'
+  }
 
   const handleCreateBooking = async (e) => {
     e.preventDefault()
@@ -152,6 +170,20 @@ export default function Bookings() {
       await refetch()
     } catch (err) {
       setError(err.message || 'Failed to decline booking.')
+      console.error(err)
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const handleCancelRequest = async (id) => {
+    setError(null)
+    setLoading(id)
+    try {
+      await bookingsApi.respond(id, 'cancel')
+      await refetch()
+    } catch (err) {
+      setError(err.message || 'Failed to cancel booking request.')
       console.error(err)
     } finally {
       setLoading(null)
@@ -287,11 +319,11 @@ export default function Bookings() {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                     <div className="avatar avatar-sm">
-                      {isArtist
+                      {canRespondToBooking(b) || (myArtistRecord?.id && String(b.artistId) === String(myArtistRecord.id))
                         ? (b.type || 'BK').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() || 'BK'
-                        : b.artistName.split(' ').map(n => n[0]).join('')}
+                        : (b.artistName || 'BK').split(' ').map(n => n[0]).join('').slice(0, 2)}
                     </div>
-                    <h3 style={{ fontSize: 16 }}>{isArtist ? 'Client booking' : b.artistName}</h3>
+                    <h3 style={{ fontSize: 16 }}>{bookingTitle(b)}</h3>
                     <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: s.bg, color: s.color, display: 'flex', alignItems: 'center', gap: 4 }}>
                       {s.icon} {s.label}
                     </span>
@@ -323,7 +355,7 @@ export default function Bookings() {
                       <Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent)' }} />
                     ) : (
                       <>
-                        {b.status === 'pending' && isArtist && (
+                        {canRespondToBooking(b) && (
                           <div style={{ display: 'flex', gap: 8 }}>
                             <button type="button" className="btn btn-success btn-sm" onClick={() => handleConfirm(b.id)}>
                               <CheckCircle size={14} /> Confirm
@@ -333,13 +365,20 @@ export default function Bookings() {
                             </button>
                           </div>
                         )}
-                        {b.status === 'pending' && !isArtist && (
-                          <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 140, textAlign: 'right' }}>
-                            Awaiting artist confirmation
-                          </span>
+                        {b.status === 'pending' && !canRespondToBooking(b) && (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, maxWidth: 180 }}>
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'right' }}>
+                              Awaiting artist confirmation
+                            </span>
+                            {profile?.id && String(b.employerId) === String(profile.id) && (
+                              <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleCancelRequest(b.id)}>
+                                Cancel request
+                              </button>
+                            )}
+                          </div>
                         )}
 
-                        {b.status === 'confirmed' && !isArtist && (
+                        {b.status === 'confirmed' && isEmployerOn(b) && (
                           hasLinkedContract(b) ? (
                             <Link to={contractHref(b)} className="btn btn-primary btn-sm">
                               <ExternalLink size={14} /> {contractActionLabel(b, false)}
@@ -350,13 +389,13 @@ export default function Bookings() {
                             </button>
                           )
                         )}
-                        {b.status === 'confirmed' && isArtist && (
+                        {b.status === 'confirmed' && isAssignedArtistOn(b) && (
                           <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 140, textAlign: 'right' }}>
                             {hasLinkedContract(b) ? 'Contract ready — awaiting signatures / payment' : 'Awaiting client payment'}
                           </span>
                         )}
 
-                        {b.status === 'paid' && !isArtist && (
+                        {b.status === 'paid' && isEmployerOn(b) && (
                           hasLinkedContract(b) ? (
                             <Link to={contractHref(b)} className="btn btn-secondary btn-sm">
                               <ExternalLink size={14} /> {contractActionLabel(b, false)}
@@ -367,7 +406,7 @@ export default function Bookings() {
                             </button>
                           )
                         )}
-                        {b.status === 'paid' && isArtist && (
+                        {b.status === 'paid' && isAssignedArtistOn(b) && (
                           <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 140, textAlign: 'right' }}>
                             {hasLinkedContract(b) ? (
                               <Link to={contractHref(b)} style={{ color: 'var(--accent)' }}>

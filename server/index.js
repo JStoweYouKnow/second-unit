@@ -495,8 +495,8 @@ app.patch('/api/bookings/:id/respond', async (req, res) => {
 
   const { id } = req.params
   const { action } = req.body
-  if (!['confirm', 'decline'].includes(action)) {
-    return res.status(400).json({ error: 'action must be "confirm" or "decline"' })
+  if (!['confirm', 'decline', 'cancel'].includes(action)) {
+    return res.status(400).json({ error: 'action must be "confirm", "decline", or "cancel"' })
   }
 
   const database = db || supabase
@@ -511,8 +511,14 @@ app.patch('/api/bookings/:id/respond', async (req, res) => {
     if (!booking) return res.status(404).json({ error: 'Booking not found' })
 
     const artistId = await getArtistIdForProfile(database, user.id)
-    const isArtist = artistId != null && booking.artist_id === artistId
-    if (!isArtist) {
+    const isAssignedArtist = artistId != null && booking.artist_id === artistId
+    const isEmployer = booking.employer_id === user.id
+
+    if (action === 'cancel') {
+      if (!isEmployer) {
+        return res.status(403).json({ error: 'Only the client can cancel this booking request' })
+      }
+    } else if (!isAssignedArtist) {
       return res.status(403).json({ error: 'Only the artist can confirm or decline this booking' })
     }
     if (booking.status !== 'pending') {

@@ -16,8 +16,8 @@ export default async function handler(req, res) {
   const { id } = req.query
   const { action } = req.body
 
-  if (!['confirm', 'decline'].includes(action)) {
-    return res.status(400).json({ error: 'action must be "confirm" or "decline"' })
+  if (!['confirm', 'decline', 'cancel'].includes(action)) {
+    return res.status(400).json({ error: 'action must be "confirm", "decline", or "cancel"' })
   }
 
   const { data: booking, error: fetchError } = await db
@@ -30,9 +30,14 @@ export default async function handler(req, res) {
   if (!booking) return res.status(404).json({ error: 'Booking not found' })
 
   const artistId = await getArtistIdForProfile(db, user.id)
-  const isArtist = artistId != null && booking.artist_id === artistId
+  const isAssignedArtist = artistId != null && booking.artist_id === artistId
+  const isEmployer = booking.employer_id === user.id
 
-  if (!isArtist) {
+  if (action === 'cancel') {
+    if (!isEmployer) {
+      return res.status(403).json({ error: 'Only the client can cancel this booking request' })
+    }
+  } else if (!isAssignedArtist) {
     return res.status(403).json({ error: 'Only the artist can confirm or decline this booking' })
   }
 
@@ -40,10 +45,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Booking is no longer pending' })
   }
 
+  const nextStatus = action === 'confirm' ? 'confirmed' : 'cancelled'
   const { data, error } = await db
     .from('bookings')
     .update({
-      status: action === 'confirm' ? 'confirmed' : 'cancelled',
+      status: nextStatus,
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)

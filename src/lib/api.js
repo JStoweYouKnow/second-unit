@@ -132,9 +132,11 @@ export const bookings = {
     if (!isSupabaseConfigured) {
       const saved = localStorage.getItem('mock_bookings')
       let list = saved ? JSON.parse(saved) : []
+      const nextStatus =
+        action === 'confirm' ? 'confirmed' : 'cancelled'
       list = list.map(b => {
         if (String(b.id) === String(bookingId)) {
-          return { ...b, status: action === 'confirm' ? 'confirmed' : 'cancelled' }
+          return { ...b, status: nextStatus }
         }
         return b
       })

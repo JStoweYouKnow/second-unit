@@ -16,6 +16,7 @@ import {
   isApprovedApplicant,
   PENDING_APPLY_KEY,
 } from '../hooks/useArtistApplication'
+import { artistApplications } from '../lib/api'
 import { useArtistProfile } from '../hooks/useArtistProfile'
 import {
   useArtistInvite,
@@ -142,14 +143,55 @@ export default function ArtistApply() {
     setError('')
     setLoading(true)
 
-    const activeToken = getStoredInviteToken()
+    const activeToken = getStoredInviteToken() || inviteToken
 
     try {
       let profileId = profile?.id || user?.id
       let email = form.email.trim()
 
+      // Private invite + not signed in: server path creates account, writes application,
+      // and consumes invite without depending on Supabase confirmation email SMTP.
+      if (!loggedIn && activeToken && !isMockMode) {
+        sessionStorage.setItem(PENDING_APPLY_KEY, JSON.stringify(form))
+        sessionStorage.setItem(INVITE_SESSION_KEY, activeToken)
+
+        const result = await artistApplications.applyWithInvite({
+          inviteToken: activeToken,
+          email: form.email.trim(),
+          password: form.password,
+          form: {
+            fullName: form.fullName,
+            roleTitle: form.roleTitle,
+            bio: form.bio,
+            location: form.location,
+            hourlyRate: form.hourlyRate,
+            dailyRate: form.dailyRate,
+            projectFlatRate: form.projectFlatRate,
+            skills: form.skills,
+            brands: form.brands,
+            website: form.website,
+            twitter: form.twitter,
+            instagram: form.instagram,
+            linkedin: form.linkedin,
+            videoLinks: form.videoLinks,
+          },
+        })
+
+        sessionStorage.removeItem(PENDING_APPLY_KEY)
+        clearStoredInviteToken()
+        setSubmitted(true)
+        setLoading(false)
+        if (result?.message) {
+          // keep success screen; message is in the submitted UI copy
+        }
+        return
+      }
+
       if (!loggedIn) {
-        const { error: signUpError } = await signUp({
+        sessionStorage.setItem(PENDING_APPLY_KEY, JSON.stringify(form))
+        if (activeToken) sessionStorage.setItem(INVITE_SESSION_KEY, activeToken)
+
+        const { data: signUpData, error: signUpError } = await signUp({
           email: form.email.trim(),
           password: form.password,
           fullName: form.fullName.trim(),
@@ -157,7 +199,15 @@ export default function ArtistApply() {
         })
 
         if (signUpError) {
-          setError(signUpError.message)
+          const msg = signUpError.message || ''
+          const emailSendFailed = /confirmation email|error sending/i.test(msg)
+          // User often exists even when SMTP fails — keep pending form and show next steps
+          if (emailSendFailed && (signUpData?.user || sessionStorage.getItem(PENDING_APPLY_KEY))) {
+            setSubmitted(true)
+            setLoading(false)
+            return
+          }
+          setError(msg)
           setLoading(false)
           return
         }
@@ -167,8 +217,6 @@ export default function ArtistApply() {
           email = form.email.trim()
           await fetchProfile?.('mock-user-001')
         } else {
-          sessionStorage.setItem(PENDING_APPLY_KEY, JSON.stringify(form))
-          if (activeToken) sessionStorage.setItem(INVITE_SESSION_KEY, activeToken)
           setSubmitted(true)
           setLoading(false)
           return
@@ -214,8 +262,8 @@ export default function ArtistApply() {
               <>Your artist application is under review. We'll notify you once a decision is made.</>
             ) : (
               <>
-                We sent a confirmation link to <strong>{form.email}</strong>.<br />
-                After you confirm your email and sign in, your application will be submitted automatically for review.
+                Your application for <strong>{form.email}</strong> is under review.<br />
+                Sign in with the password you chose to check status. The invite is marked used once submitted.
               </>
             )}
           </p>

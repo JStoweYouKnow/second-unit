@@ -12,6 +12,7 @@ import { z } from 'zod'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { validateInviteToken } from '../api/_lib/validateInvite.js'
+import { applyWithArtistInvite } from '../api/_lib/inviteApply.js'
 import { db, dbUsesServiceRole } from '../api/_lib/db.js'
 import { requireAuth } from '../api/_lib/auth.js'
 import {
@@ -853,6 +854,29 @@ app.get('/api/health', (req, res) => {
 app.get('/api/invites/validate', async (req, res) => {
   const result = await validateInviteToken(db, req.query.token)
   res.json(result)
+})
+
+app.post('/api/artist-applications/apply', async (req, res) => {
+  const database = db
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const { inviteToken, email, password, form } = req.body || {}
+    const result = await applyWithArtistInvite(database, {
+      inviteToken,
+      email,
+      password,
+      form: form || {},
+    })
+    res.json({
+      ok: true,
+      ...result,
+      message: 'Application submitted. Sign in with your email and password to check status.',
+    })
+  } catch (err) {
+    const msg = err.message || 'Application failed'
+    const status = /invite|reserved|expired|already used|approved|Password|email|name/i.test(msg) ? 400 : 500
+    res.status(status).json({ error: msg })
+  }
 })
 
 app.get('/api/conversations', async (req, res) => {

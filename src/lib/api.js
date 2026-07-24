@@ -427,6 +427,15 @@ export const artists = {
     }),
 }
 
+/** Private-invite apply — server creates account + pending application (no confirmation email). */
+export const artistApplications = {
+  applyWithInvite: ({ inviteToken, email, password, form }) =>
+    request('/api/artist-applications/apply', {
+      method: 'POST',
+      body: JSON.stringify({ inviteToken, email, password, form }),
+    }),
+}
+
 // ---- Admin test helpers ----
 export const adminApi = {
   ensureArtistPersona: () =>

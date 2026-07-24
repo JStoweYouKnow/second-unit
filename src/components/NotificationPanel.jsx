@@ -12,9 +12,11 @@ const typeIcons = {
 }
 
 const typeColors = {
-  message: 'var(--accent)',
+  message: 'var(--text-primary)',
   booking: 'var(--warning)',
   payment: 'var(--success)',
+  contract: 'var(--text-secondary)',
+  system: 'var(--text-muted)',
 }
 
 function timeAgo(dateStr) {
@@ -85,7 +87,7 @@ export default function NotificationPanel() {
                     className={`notif-item ${notif.read ? '' : 'unread'}`}
                     onClick={() => handleClick(notif)}
                   >
-                    <div className="notif-item-icon" style={{ color, background: `${color}15` }}>
+                    <div className="notif-item-icon" style={{ color }}>
                       <Icon size={16} />
                     </div>
                     <div className="notif-item-content">

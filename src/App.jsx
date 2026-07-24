@@ -415,8 +415,8 @@ function AppShell() {
           </nav>
           <div className="sidebar-footer">
             <div className="nav-section" style={{ marginBottom: 0 }}>
-              <div className="nav-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                Account
+              <div className="nav-label nav-label--with-action">
+                <span>Account</span>
                 <NotificationPanel />
               </div>
               <div

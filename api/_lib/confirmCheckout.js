@@ -2,6 +2,14 @@ import { stripe } from './stripe.js'
 import { completeMilestonePayment } from './milestones.js'
 import { completeBookingPayment } from './completeBookingPayment.js'
 
+/** Reject unpaid / incomplete Checkout sessions before writing payment rows. */
+export function assertCheckoutSessionPayable(session) {
+  if (!session) throw new Error('Checkout session not found')
+  if (session.payment_status !== 'paid' && session.status !== 'complete') {
+    throw new Error('Checkout is not paid yet')
+  }
+}
+
 /**
  * After Stripe Checkout redirects back, confirm the session and record the payment.
  * Idempotent — safe if the webhook already processed the same payment.
@@ -12,11 +20,7 @@ export async function confirmCheckoutSession(db, sessionId, userId) {
   if (!stripe) throw new Error('Stripe is not configured')
 
   const session = await stripe.checkout.sessions.retrieve(sessionId)
-  if (!session) throw new Error('Checkout session not found')
-
-  if (session.payment_status !== 'paid' && session.status !== 'complete') {
-    throw new Error('Checkout is not paid yet')
-  }
+  assertCheckoutSessionPayable(session)
 
   const meta = session.metadata || {}
   const milestoneId = meta.milestoneId || null

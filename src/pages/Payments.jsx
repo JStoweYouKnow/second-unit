@@ -4,6 +4,7 @@ import {
   Download, X, Search, ArrowDownRight, Receipt, Shield, FileText,
   Mail, Lock, ChevronRight, UserPlus, ExternalLink, Loader2,
 } from '../components/icons'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useArtistProfile } from '../hooks/useArtistProfile'
 import { usePayments } from '../hooks/usePayments'
@@ -581,6 +582,39 @@ https://thecallsheet.ai
           )}
         </div>
       </div>
+
+      {!isArtist && profile && (!profile.company_name || !profile.tax_onboarding_completed_at) && (
+        <div
+          className="slide-up"
+          style={{
+            marginBottom: 24,
+            padding: '14px 18px',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border)',
+            background: 'var(--surface)',
+            fontSize: 14,
+            display: 'flex',
+            gap: 12,
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <FileText size={16} style={{ marginTop: 2, flexShrink: 0, color: 'var(--text-muted)' }} />
+            <div>
+              <strong>Hirer business profile</strong>
+              <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                Optional before first paid jobs: add company details and upload W-9 / 1099 agreements in Account.
+                Card checkout still works without this.
+              </p>
+            </div>
+          </div>
+          <Link to="/account" className="btn btn-secondary" style={{ flexShrink: 0 }}>
+            Complete in Account
+          </Link>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="stats-grid slide-up" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>

@@ -3,7 +3,13 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { profileApi, billing, calendar } from '../lib/api'
-import { User, Mail, Shield, Bell, CreditCard, Camera } from '../components/icons'
+import { User, Mail, Shield, Bell, CreditCard, Camera, FileText, Trash2 } from '../components/icons'
+import {
+  uploadTaxDocument,
+  listTaxDocuments,
+  getTaxDocumentSignedUrl,
+  deleteTaxDocument,
+} from '../lib/taxDocuments'
 import { ArtistFormFields } from '../components/ArtistFormFields'
 import ThemeToggle from '../components/ThemeToggle'
 import { MfaSettings } from '../components/MfaSettings'
@@ -27,6 +33,15 @@ export default function Account() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const [fullName, setFullName] = useState('')
+  const [companyName, setCompanyName] = useState('')
+  const [businessType, setBusinessType] = useState('')
+  const [billingLine1, setBillingLine1] = useState('')
+  const [billingCity, setBillingCity] = useState('')
+  const [billingRegion, setBillingRegion] = useState('')
+  const [billingPostal, setBillingPostal] = useState('')
+  const [taxDocs, setTaxDocs] = useState([])
+  const [taxBusy, setTaxBusy] = useState(false)
+  const [taxDocType, setTaxDocType] = useState('w9')
   const [artistForm, setArtistForm] = useState(emptyArtistForm())
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -50,7 +65,20 @@ export default function Account() {
 
   useEffect(() => {
     if (profile?.full_name) setFullName(profile.full_name)
-  }, [profile?.full_name])
+    setCompanyName(profile?.company_name || '')
+    setBusinessType(profile?.business_type || '')
+    setBillingLine1(profile?.billing_address_line1 || '')
+    setBillingCity(profile?.billing_city || '')
+    setBillingRegion(profile?.billing_region || '')
+    setBillingPostal(profile?.billing_postal || '')
+  }, [profile])
+
+  useEffect(() => {
+    if (!profile?.id || profile?.role === 'artist') return
+    listTaxDocuments(profile.id)
+      .then(setTaxDocs)
+      .catch(() => setTaxDocs([]))
+  }, [profile?.id, profile?.role])
 
   useEffect(() => {
     if (artist) {
@@ -265,9 +293,28 @@ export default function Account() {
       await fetchProfile?.(profile.id)
     } else if (profile?.id) {
       if (isSupabaseConfigured) {
+        const patch = {
+          full_name: fullName.trim(),
+          updated_at: new Date().toISOString(),
+        }
+        if (profile.role !== 'artist') {
+          Object.assign(patch, {
+            company_name: companyName.trim() || null,
+            business_type: businessType.trim() || null,
+            billing_address_line1: billingLine1.trim() || null,
+            billing_city: billingCity.trim() || null,
+            billing_region: billingRegion.trim() || null,
+            billing_postal: billingPostal.trim() || null,
+            billing_country: 'US',
+            tax_onboarding_completed_at:
+              companyName.trim() && taxDocs.length
+                ? profile.tax_onboarding_completed_at || new Date().toISOString()
+                : profile.tax_onboarding_completed_at || null,
+          })
+        }
         const { error: profileError } = await supabase
           .from('profiles')
-          .update({ full_name: fullName.trim(), updated_at: new Date().toISOString() })
+          .update(patch)
           .eq('id', profile.id)
 
         if (profileError) {
@@ -371,6 +418,131 @@ export default function Account() {
                   </div>
                 </div>
               </div>
+
+              {profile?.role !== 'artist' && (
+                <>
+                  <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
+                  <h3 style={{ marginBottom: 8 }}>Business & tax</h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20 }}>
+                    Optional for first payments. Store company details and upload W-9 / 1099 agreements for your records.
+                    The Callsheet does not file taxes for you.
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                    <div className="form-group">
+                      <label className="form-label">Company / legal entity</label>
+                      <input className="filter-select" style={{ width: '100%' }} value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Acme Productions LLC" />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Business type</label>
+                      <select className="filter-select" style={{ width: '100%' }} value={businessType} onChange={(e) => setBusinessType(e.target.value)}>
+                        <option value="">Select…</option>
+                        <option value="individual">Individual / sole prop</option>
+                        <option value="llc">LLC</option>
+                        <option value="corporation">Corporation</option>
+                        <option value="partnership">Partnership</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                      <label className="form-label">Billing address</label>
+                      <input className="filter-select" style={{ width: '100%' }} value={billingLine1} onChange={(e) => setBillingLine1(e.target.value)} placeholder="Street address" />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">City</label>
+                      <input className="filter-select" style={{ width: '100%' }} value={billingCity} onChange={(e) => setBillingCity(e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">State / region</label>
+                      <input className="filter-select" style={{ width: '100%' }} value={billingRegion} onChange={(e) => setBillingRegion(e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Postal code</label>
+                      <input className="filter-select" style={{ width: '100%' }} value={billingPostal} onChange={(e) => setBillingPostal(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 24 }}>
+                    <label className="form-label">Tax documents (W-9, 1099 agreement, etc.)</label>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+                      <select className="filter-select" value={taxDocType} onChange={(e) => setTaxDocType(e.target.value)} style={{ width: 180 }}>
+                        <option value="w9">W-9</option>
+                        <option value="1099_agreement">1099 agreement</option>
+                        <option value="other">Other</option>
+                      </select>
+                      <label className="btn btn-secondary" style={{ margin: 0, cursor: taxBusy ? 'wait' : 'pointer' }}>
+                        <FileText size={16} /> {taxBusy ? 'Uploading…' : 'Upload file'}
+                        <input
+                          type="file"
+                          hidden
+                          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                          disabled={taxBusy}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            e.target.value = ''
+                            if (!file || !profile?.id) return
+                            setTaxBusy(true)
+                            setError('')
+                            try {
+                              const row = await uploadTaxDocument(profile.id, file, { docType: taxDocType })
+                              setTaxDocs((prev) => [row, ...prev])
+                            } catch (err) {
+                              setError(err.message || 'Upload failed — run employer-tax-vault.sql in Supabase if missing')
+                            } finally {
+                              setTaxBusy(false)
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                    {taxDocs.length === 0 ? (
+                      <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No tax documents uploaded yet.</p>
+                    ) : (
+                      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {taxDocs.map((doc) => (
+                          <li key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}>
+                            <FileText size={16} style={{ flexShrink: 0 }} />
+                            <span style={{ flex: 1 }}>
+                              <strong>{doc.file_name}</strong>
+                              <span style={{ color: 'var(--text-muted)' }}> · {doc.doc_type}</span>
+                            </span>
+                            <button
+                              type="button"
+                              className="btn-icon"
+                              title="Download"
+                              onClick={async () => {
+                                try {
+                                  const url = await getTaxDocumentSignedUrl(doc.storage_path)
+                                  if (url) window.open(url, '_blank', 'noopener')
+                                } catch (err) {
+                                  setError(err.message)
+                                }
+                              }}
+                            >
+                              <FileText size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-icon"
+                              title="Delete"
+                              onClick={async () => {
+                                if (!confirm('Delete this tax document?')) return
+                                try {
+                                  await deleteTaxDocument(profile.id, doc)
+                                  setTaxDocs((prev) => prev.filter((d) => d.id !== doc.id))
+                                } catch (err) {
+                                  setError(err.message)
+                                }
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </>
+              )}
 
               {isApprovedArtist && (
                 <>

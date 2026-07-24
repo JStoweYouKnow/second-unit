@@ -71,16 +71,35 @@ npm run dev
 
 ## 🚢 Deployment
 
+### Dual runtime (important)
+
+| Host | Role |
+|------|------|
+| **Vercel** | **Production** — static frontend + `/api/*` serverless functions |
+| **Express** (`server/index.js`) | **Local / optional** — same `api/_lib/*` logic + Socket.io; not required for money flows |
+
+Keep env parity: the same Stripe + Supabase secrets must exist on Vercel Production. If you still run Express on Railway, mirror those vars there too.
+
+```bash
+npm run check:env          # verify local required vars (no secret values printed)
+vercel env pull .env.local --environment=production --yes
+# then set FRONTEND_URL=http://localhost:5173 for local Express redirects
+```
+
+`FRONTEND_URL`:
+- Vercel Production → `https://www.thecallsheet.ai`
+- Local Express → `http://localhost:5173`
+
 ### Vercel (recommended — frontend + serverless API)
 The project includes a `vercel.json` config. API routes live under `/api/*` as Vercel Functions.
 
 1. Connect your repo to Vercel.
 2. Set environment variables in the Vercel dashboard:
    - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-   - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `FRONTEND_URL`
+   - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `FRONTEND_URL=https://www.thecallsheet.ai`
    - `RESEND_API_KEY`, `EMAIL_FROM` (optional, for email alerts)
    - `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_CALENDAR_REDIRECT_URI` (optional)
-3. Run SQL migrations in Supabase (see `supabase/*.sql`), including `dispute-payouts-migration.sql` and `portfolio-storage.sql`.
+3. Run SQL migrations in order (`supabase/MIGRATIONS.md`), including `contract-signature-audit.sql` and `employer-tax-vault.sql`.
 4. Deploy.
 
 ### Local full-stack (optional)

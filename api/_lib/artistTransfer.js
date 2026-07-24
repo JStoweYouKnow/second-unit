@@ -14,6 +14,40 @@ export async function chargeIdForPaymentIntent(paymentIntentId) {
 }
 
 /**
+ * Pure helper for tests / debugging — builds Stripe Transfer create params.
+ */
+export function buildArtistTransferParams({
+  payment,
+  destination,
+  transferGroup,
+  metadata = {},
+  chargeId = null,
+}) {
+  const transferAmount = Number(payment.artist_payout_amount)
+  if (!Number.isFinite(transferAmount) || transferAmount < 1) {
+    throw new Error('Invalid artist payout amount for transfer')
+  }
+  if (!destination) {
+    throw new Error(
+      'Artist has no Stripe Connect account yet. Have the artist finish Connect onboarding, then try again.'
+    )
+  }
+
+  const params = {
+    amount: transferAmount,
+    currency: 'usd',
+    destination,
+    transfer_group: transferGroup ? String(transferGroup) : String(payment.id),
+    metadata: {
+      paymentId: payment.id,
+      ...metadata,
+    },
+  }
+  if (chargeId) params.source_transaction = chargeId
+  return params
+}
+
+/**
  * Create a Connect transfer for an escrowed payment.
  * Prefers source_transaction (the hirer charge) so release works while
  * funds are still pending on the platform balance.
@@ -38,26 +72,14 @@ export async function createArtistTransfer({
     throw new Error('Artist has not completed Stripe onboarding and cannot receive payouts yet')
   }
 
-  const transferAmount = Number(payment.artist_payout_amount)
-  if (!Number.isFinite(transferAmount) || transferAmount < 1) {
-    throw new Error('Invalid artist payout amount for transfer')
-  }
-
-  const params = {
-    amount: transferAmount,
-    currency: 'usd',
-    destination,
-    transfer_group: transferGroup ? String(transferGroup) : String(payment.id),
-    metadata: {
-      paymentId: payment.id,
-      ...metadata,
-    },
-  }
-
   const chargeId = await chargeIdForPaymentIntent(payment.stripe_payment_intent_id)
-  if (chargeId) {
-    params.source_transaction = chargeId
-  }
+  const params = buildArtistTransferParams({
+    payment,
+    destination,
+    transferGroup,
+    metadata,
+    chargeId,
+  })
 
   try {
     return await stripe.transfers.create(params)

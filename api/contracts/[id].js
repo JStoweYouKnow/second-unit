@@ -42,6 +42,7 @@ export default async function handler(req, res) {
       const signed = await signContract(db, id, user.id, {
         name: validated.name,
         ip: getClientIp(req),
+        userAgent: req.headers['user-agent'] || null,
       })
       return res.json(signed)
     } catch (err) {

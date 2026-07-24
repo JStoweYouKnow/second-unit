@@ -45,7 +45,12 @@ export default function Terms() {
 
         <h2 style={{ fontSize: 24, marginTop: 32, marginBottom: 16 }}>6. Agreements and Electronic Signatures</h2>
         <p style={{ marginBottom: 16 }}>
-          Projects may use The Callsheet standard agreement, custom typed terms, and/or an uploaded PDF or Word attachment. Typed electronic signatures on the platform indicate intent to agree to the terms shown. Parties remain responsible for ensuring agreements meet their legal and tax needs (including any 1099 or contractor documentation they upload).
+          Projects may use The Callsheet standard agreement, custom typed terms, and/or an uploaded PDF or Word attachment.
+          Signing is a typed electronic signature (name + confirmation checkbox) that records timestamp, signer account,
+          IP address when available, user agent, and a hash of the agreement content at sign time. This is intended to
+          evidence intent under ESIGN/UETA-style frameworks; it is not third-party identity-proofed signing (e.g. DocuSign).
+          Parties remain responsible for ensuring agreements meet their legal and tax needs. Hirers may store W-9 / 1099
+          agreements in Account → Business &amp; tax; The Callsheet does not file taxes on your behalf.
         </p>
 
         <h2 style={{ fontSize: 24, marginTop: 32, marginBottom: 16 }}>7. Disputes and Mediation</h2>

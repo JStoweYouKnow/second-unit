@@ -1,14 +1,33 @@
 # Supabase SQL migration ledger
 
 Apply these in order on a fresh project (or apply only files not yet run).  
-There is no automated migrator in this repo yet — treat this file as the source of truth.
+Source of truth for order: this file + `api/_lib/migrationManifest.js`.
+
+After each file, record it:
+
+```bash
+npm run record:migration -- <filename.sql>
+```
+
+Verify against the database:
+
+```bash
+npm run verify:migrations -- --required-only   # money-ready set
+npm run verify:migrations                      # includes product features
+```
+
+## Tracking (run first)
+
+| Order | File | Purpose |
+|------:|------|---------|
+| 0 | `schema-migrations.sql` | `public.schema_migrations` ledger |
 
 ## Core (required)
 
 | Order | File | Purpose |
 |------:|------|---------|
 | 1 | `schema.sql` | Base tables, RLS, `handle_new_user` |
-| 2 | `seed.sql` | Optional demo seed (dev only) |
+| 2 | `seed.sql` | Optional demo seed (dev only) — do not record as required |
 | 3 | `admin-setup.sql` | Admin helpers / `is_admin` |
 | 4 | `artist-applications.sql` | Artist applications |
 | 5 | `artist-invites.sql` | Invite-only apply |
@@ -26,21 +45,23 @@ There is no automated migrator in this repo yet — treat this file as the sourc
 | 12 | `disputes.sql` | Dispute cases |
 | 13 | `dispute-payouts-migration.sql` | Dispute refund/release payouts |
 | 14 | `milestone-deliverables.sql` | Deliverables + release requests + storage |
+| 15 | `contract-signature-audit.sql` | Typed e-sign audit events + document hash |
 
 ## Product features (recommended)
 
 | Order | File | Purpose |
 |------:|------|---------|
-| 15 | `notifications.sql` | In-app notifications |
-| 16 | `realtime-messages.sql` | Message realtime |
-| 17 | `message-read-receipts.sql` | Read receipts |
-| 18 | `push-subscriptions.sql` | Web push |
-| 19 | `google-calendar-sync.sql` | Calendar OAuth sync |
-| 20 | `calendar-connections-rls.sql` | RLS on calendar token tables |
-| 21 | `reviews-visibility.sql` | Review visibility |
-| 22 | `review-responses.sql` | Artist review responses |
-| 23 | `brand-verification.sql` | Verified client credits |
-| 24 | `portfolio-storage.sql` | Portfolio media bucket |
+| 16 | `notifications.sql` | In-app notifications |
+| 17 | `realtime-messages.sql` | Message realtime |
+| 18 | `message-read-receipts.sql` | Read receipts |
+| 19 | `push-subscriptions.sql` | Web push |
+| 20 | `google-calendar-sync.sql` | Calendar OAuth sync |
+| 21 | `calendar-connections-rls.sql` | RLS on calendar token tables |
+| 22 | `reviews-visibility.sql` | Review visibility |
+| 23 | `review-responses.sql` | Artist review responses |
+| 24 | `brand-verification.sql` | Verified client credits |
+| 25 | `portfolio-storage.sql` | Portfolio media bucket |
+| 26 | `employer-tax-vault.sql` | Hirer company fields + tax doc vault |
 
 ## Ad-hoc fixes (run only if needed)
 
@@ -50,7 +71,8 @@ There is no automated migrator in this repo yet — treat this file as the sourc
 
 ## Checklist before taking real money
 
-- [ ] All **Payments & contracts** files applied
+- [ ] `schema-migrations.sql` applied
+- [ ] All **Payments & contracts** files applied and recorded (`npm run verify:migrations -- --required-only`)
 - [ ] `milestone-deliverables.sql` applied (if using deliverables / release request)
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` set on Vercel + Railway/API host
 - [ ] `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` set (live keys for production)

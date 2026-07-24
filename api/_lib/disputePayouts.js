@@ -47,12 +47,20 @@ async function markPaymentRefunded(db, paymentId, { refundId, amountCents }) {
     .eq('id', paymentId)
 }
 
+/** Fail closed — never persist "released" without a real Stripe transfer id. */
+export function assertReleaseHasTransferId(transferId) {
+  if (!transferId || typeof transferId !== 'string') {
+    throw new Error('Cannot mark payment released without a Stripe transfer_id')
+  }
+}
+
 async function markPaymentReleased(db, paymentId, transferId) {
+  assertReleaseHasTransferId(transferId)
   await db
     .from('payments')
     .update({
       payout_status: 'paid',
-      transfer_id: transferId ?? null,
+      transfer_id: transferId,
     })
     .eq('id', paymentId)
 }
@@ -154,11 +162,8 @@ export async function executeDisputePayouts(db, disputeRow, { outcome, splitEmpl
       try {
         const result = await stripeTransfer(payment)
         if (result.skipped) {
+          // Never mark released without a real Stripe transfer_id.
           errors.push(`Payment ${payment.id}: ${result.reason}`)
-          if (result.reason === 'no_stripe_connect') {
-            await markPaymentReleased(db, payment.id, null)
-            actions.push({ paymentId: payment.id, type: 'release_mock' })
-          }
         } else {
           await markPaymentReleased(db, payment.id, result.transferId)
           actions.push({ paymentId: payment.id, type: 'transfer', transferId: result.transferId })
@@ -191,11 +196,13 @@ export async function executeDisputePayouts(db, disputeRow, { outcome, splitEmpl
           errors.push(`Partial refund: ${refund.reason}`)
         }
       }
+      let artistTransferred = false
       if (artistCents > 0 && payment.payout_status !== 'paid') {
         const transfer = await stripeTransfer(payment, artistCents)
         if (!transfer.skipped) {
           await markPaymentReleased(db, payment.id, transfer.transferId)
           actions.push({ paymentId: payment.id, type: 'partial_transfer', transferId: transfer.transferId, amountCents: artistCents })
+          artistTransferred = true
         } else {
           errors.push(`Partial transfer: ${transfer.reason}`)
         }
@@ -205,7 +212,8 @@ export async function executeDisputePayouts(db, disputeRow, { outcome, splitEmpl
           .from('payments')
           .update({
             refunded_amount: employerCents,
-            payout_status: artistCents > 0 ? 'paid' : 'refunded',
+            // Only mark paid when a real transfer happened; otherwise refunded/pending.
+            payout_status: artistTransferred ? 'paid' : 'refunded',
           })
           .eq('id', payment.id)
       }

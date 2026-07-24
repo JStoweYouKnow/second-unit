@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import { getArtistIdForProfile } from './bookings.js'
 import {
   ensureContractMilestones,
@@ -6,6 +7,39 @@ import {
 } from './milestones.js'
 import { notifyContractSigned } from './notificationEvents.js'
 import { buildAgreementTerms } from './agreementTemplate.js'
+
+/** SHA-256 of the agreement snapshot at sign time (terms + attachment identity + value). */
+export function buildContractDocumentHash(row) {
+  const payload = JSON.stringify({
+    id: row.id,
+    title: row.title ?? '',
+    terms: row.terms ?? '',
+    total_value: row.total_value ?? 0,
+    attachment: row.attachment_storage_path || row.attachment_url || '',
+    attachment_name: row.attachment_name || '',
+    start_date: row.start_date ?? null,
+    end_date: row.end_date ?? null,
+  })
+  return createHash('sha256').update(payload).digest('hex')
+}
+
+export function buildTypedSignatureRecord({
+  name,
+  userId,
+  ip = null,
+  userAgent = null,
+  documentHash,
+}) {
+  return {
+    name,
+    date: new Date().toISOString(),
+    ip: ip || null,
+    userAgent: userAgent ? String(userAgent).slice(0, 500) : null,
+    userId: userId || null,
+    documentHash,
+    method: 'typed_esign',
+  }
+}
 
 function mapStatusToClient(status) {
   return status
@@ -34,6 +68,9 @@ export function mapContractToClient(row) {
     hasAttachment: !!(row.attachment_storage_path || row.attachment_url),
     signedByEmployer: !!row.signed_by_employer,
     signedByArtist: !!row.signed_by_artist,
+    signedByEmployerAt: row.signed_by_employer_at ?? row.employer_signature?.date ?? null,
+    signedByArtistAt: row.signed_by_artist_at ?? row.artist_signature?.date ?? null,
+    documentHash: row.document_hash ?? null,
     employerSignature: row.employer_signature ?? null,
     artistSignature: row.artist_signature ?? null,
     bookingId: row.booking_id ?? null,
@@ -102,10 +139,10 @@ export async function userCanAccessContract(db, userId, row) {
 
 function isMissingColumnError(err) {
   const msg = err?.message || ''
-  return /column .* does not exist|Could not find the .* column|employer_signature|artist_signature/i.test(msg)
+  return /column .* does not exist|Could not find the .* column|employer_signature|artist_signature|signed_by_employer_at|signed_by_artist_at|document_hash/i.test(msg)
 }
 
-export async function signContract(db, contractId, userId, { name, ip = null }) {
+export async function signContract(db, contractId, userId, { name, ip = null, userAgent = null }) {
   const trimmedName = typeof name === 'string' ? name.trim() : ''
   if (!trimmedName) throw new Error('Signature name is required')
 
@@ -136,18 +173,31 @@ export async function signContract(db, contractId, userId, { name, ip = null }) 
     return { ...mapContractToClient(row), milestones }
   }
 
-  const signature = { name: trimmedName, date: new Date().toISOString(), ip }
+  const documentHash = buildContractDocumentHash(row)
+  const signedAt = new Date().toISOString()
+  const signature = buildTypedSignatureRecord({
+    name: trimmedName,
+    userId,
+    ip,
+    userAgent,
+    documentHash,
+  })
+  // Keep date aligned with column timestamps
+  signature.date = signedAt
 
   const patch = {
-    updated_at: new Date().toISOString(),
+    updated_at: signedAt,
+    document_hash: documentHash,
   }
 
   if (signingAsArtist) {
     patch.signed_by_artist = true
     patch.artist_signature = signature
+    patch.signed_by_artist_at = signedAt
   } else {
     patch.signed_by_employer = true
     patch.employer_signature = signature
+    patch.signed_by_employer_at = signedAt
   }
 
   const signedByEmployer = signingAsArtist ? !!row.signed_by_employer : true
@@ -166,11 +216,14 @@ export async function signContract(db, contractId, userId, { name, ip = null }) 
     `)
     .single()
 
-  // Older DBs may lack employer_signature / artist_signature jsonb columns.
+  // Older DBs may lack audit / jsonb signature columns — strip and retry.
   if (updateError && isMissingColumnError(updateError)) {
     const {
       employer_signature: _es,
       artist_signature: _as,
+      signed_by_employer_at: _ea,
+      signed_by_artist_at: _aa,
+      document_hash: _dh,
       ...legacyPatch
     } = patch
     ;({ data: updated, error: updateError } = await db
@@ -185,6 +238,22 @@ export async function signContract(db, contractId, userId, { name, ip = null }) 
   }
 
   if (updateError) throw updateError
+
+  const { error: auditErr } = await db.from('contract_signature_events').insert({
+    contract_id: contractId,
+    signer_user_id: userId,
+    party: signingAsArtist ? 'artist' : 'employer',
+    signature_name: trimmedName,
+    signed_at: signedAt,
+    ip: ip || null,
+    user_agent: userAgent ? String(userAgent).slice(0, 500) : null,
+    document_hash: documentHash,
+    method: 'typed_esign',
+  })
+  if (auditErr) {
+    // Table may not exist until migration is applied — signing still succeeds.
+    console.warn('[contracts] signature event log skipped:', auditErr.message)
+  }
 
   const { data: artistRow } = await db
     .from('artists')

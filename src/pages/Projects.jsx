@@ -553,15 +553,21 @@ ${divider}
 Client Signature:
 ${contract.employerSignature
   ? `  Name: ${contract.employerSignature.name}
-  Date: ${new Date(contract.employerSignature.date).toLocaleDateString()}
-  Status: ✅ Signed electronically`
+  Date: ${new Date(contract.employerSignature.date).toLocaleString()}
+  Method: typed e-sign (ESIGN/UETA intent)
+  Document hash: ${contract.employerSignature.documentHash || contract.documentHash || 'n/a'}
+  IP: ${contract.employerSignature.ip || 'n/a'}
+  Status: Signed electronically`
   : '  ⏳ Awaiting signature'}
 
 Artist Signature:
 ${contract.artistSignature
   ? `  Name: ${contract.artistSignature.name}
-  Date: ${new Date(contract.artistSignature.date).toLocaleDateString()}
-  Status: ✅ Signed electronically`
+  Date: ${new Date(contract.artistSignature.date).toLocaleString()}
+  Method: typed e-sign (ESIGN/UETA intent)
+  Document hash: ${contract.artistSignature.documentHash || contract.documentHash || 'n/a'}
+  IP: ${contract.artistSignature.ip || 'n/a'}
+  Status: Signed electronically`
   : '  ⏳ Awaiting signature'}
 
 ${divider}
@@ -1093,7 +1099,7 @@ ${divider}
             </div>
 
             <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
-              <Shield size={12} style={{ marginRight: 4 }} /> Your signature is encrypted and timestamped for legal compliance.
+              <Shield size={12} style={{ marginRight: 4 }} /> Typed e-sign records your name, time, IP, and a hash of the agreement terms (not DocuSign-grade identity proofing).
             </div>
           </div>
         </div>

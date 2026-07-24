@@ -13,7 +13,10 @@
     "preview": "node ./node_modules/vite/bin/vite.js preview",
     "start": "node server/index.js",
     "backfill:contracts": "node scripts/backfill-booking-contracts.mjs",
-    "smoke:stripe": "node scripts/test-stripe-payment-flow.mjs"
+    "smoke:stripe": "node scripts/test-stripe-payment-flow.mjs",
+    "verify:migrations": "node scripts/verify-migrations.mjs",
+    "record:migration": "node scripts/record-migration.mjs",
+    "check:env": "node scripts/check-env-parity.mjs"
   },
   "dependencies": {
     "@sentry/node": "^10.67.0",

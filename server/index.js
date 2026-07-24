@@ -1,4 +1,6 @@
-import 'dotenv/config'
+import dotenv from 'dotenv'
+dotenv.config({ path: '.env.local' })
+dotenv.config() // .env fills any gaps; does not override .env.local
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
@@ -7,11 +9,10 @@ import { createServer } from 'http'
 import { Server } from 'socket.io'
 import Stripe from 'stripe'
 import { z } from 'zod'
-import { createClient } from '@supabase/supabase-js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { validateInviteToken } from '../api/_lib/validateInvite.js'
-import { db } from '../api/_lib/db.js'
+import { db, dbUsesServiceRole } from '../api/_lib/db.js'
 import { requireAuth } from '../api/_lib/auth.js'
 import {
   mapBookingToClient,
@@ -71,7 +72,7 @@ import {
 } from '../api/_lib/googleCalendar.js'
 import { buildIcalCalendar, ensureCalendarFeedToken, getProfileIdForFeedToken } from '../api/_lib/icalFeed.js'
 import { FRONTEND_URL, rejectIfStripeMissing, STRIPE_MODE } from '../api/_lib/stripe.js'
-import { dbUsesServiceRole } from '../api/_lib/db.js'
+import { getClientIp } from '../api/_lib/ratelimit.js'
 import { allowMockPayments, isVercelProduction } from '../api/_lib/env.js'
 import { captureException, initSentry } from '../api/_lib/sentry.js'
 import {
@@ -125,11 +126,7 @@ const limiter = rateLimit({
 })
 app.use('/api/', limiter) // Apply rate limiting to all API routes
 
-// ---- Supabase Setup (Item 5) ----
-const supabaseUrl = process.env.VITE_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
-const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null
-
+// ---- Supabase: use shared fail-closed client from api/_lib/db.js (no anon fallback in production) ----
 // ---- Stripe Setup ----
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null
 
@@ -203,7 +200,7 @@ io.on('connection', (socket) => {
       const senderId = onlineUsers.get(socket.id)
       if (!senderId) return
 
-      const database = db || supabase
+      const database = db
 
       if (database) {
         const message = {
@@ -289,7 +286,7 @@ app.post('/api/bookings', async (req, res) => {
 
   try {
     const validatedData = BookingSchema.parse(req.body)
-    const database = db || supabase
+    const database = db
 
     if (database) {
       const row = mapBookingToDb(validatedData, user.id)
@@ -333,7 +330,7 @@ app.get('/api/bookings', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
 
-  const database = db || supabase
+  const database = db
   if (database) {
     try {
       await backfillMissingBookingsForUser(database, user.id)
@@ -350,7 +347,7 @@ app.get('/api/bookings', async (req, res) => {
 app.post('/api/payments/confirm-checkout', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   const sessionId = req.body?.sessionId
   if (!sessionId) return res.status(400).json({ error: 'sessionId is required' })
@@ -368,7 +365,7 @@ app.get('/api/payments', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
 
-  const database = db || supabase
+  const database = db
   if (!database) return res.json([])
 
   try {
@@ -383,7 +380,7 @@ app.get('/api/payments', async (req, res) => {
 app.post('/api/admin/ensure-artist-persona', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const { data: profile, error: profileError } = await database
@@ -406,7 +403,7 @@ app.post('/api/stripe/connect/create', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
 
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
 
   try {
@@ -430,7 +427,7 @@ app.post('/api/stripe/connect/onboard', async (req, res) => {
   try {
     let { accountId } = req.body || {}
     if (!accountId) {
-      const database = db || supabase
+      const database = db
       if (database) {
         const { data: artist } = await database
           .from('artists')
@@ -459,7 +456,7 @@ app.get('/api/stripe/connect/status', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
 
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
 
   try {
@@ -553,7 +550,7 @@ app.post('/api/payments/create-checkout', async (req, res) => {
   if (!user) return
 
   const { amount, artistName, description, bookingId } = req.body
-  const database = db || supabase
+  const database = db
 
   if (bookingId && database) {
     const { data: booking } = await database
@@ -630,7 +627,7 @@ app.patch('/api/bookings/:id/respond', async (req, res) => {
     return res.status(400).json({ error: 'action must be "confirm", "decline", or "cancel"' })
   }
 
-  const database = db || supabase
+  const database = db
   if (database) {
     const { data: booking, error: fetchError } = await database
       .from('bookings')
@@ -721,7 +718,7 @@ app.post('/api/bookings/:id/complete', async (req, res) => {
   if (!user) return
 
   const { id } = req.params
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
 
   const { data: booking, error: fetchError } = await database
@@ -818,7 +815,7 @@ async function handleWebhook(req, res) {
       ? (typeof obj.payment_intent === 'string' ? obj.payment_intent : obj.payment_intent?.id)
       : obj.id
 
-  const database = db || supabase
+  const database = db
   if (
     database &&
     (event.type === 'payment_intent.succeeded' || event.type === 'checkout.session.completed')
@@ -839,12 +836,12 @@ async function handleWebhook(req, res) {
 
 app.get('/api/health', (req, res) => {
   const mockPayments = allowMockPayments()
-  const readyForMoney = !!stripe && !!(db || supabase) && dbUsesServiceRole && !mockPayments
+  const readyForMoney = !!stripe && !!db && dbUsesServiceRole && !mockPayments
   res.json({
-    status: readyForMoney || (!isVercelProduction() && !!(db || supabase)) ? 'ok' : 'degraded',
+    status: readyForMoney || (!isVercelProduction() && !!db) ? 'ok' : 'degraded',
     stripe: !!stripe,
     stripeMode: STRIPE_MODE,
-    supabase: !!(db || supabase),
+    supabase: !!db,
     serviceRole: dbUsesServiceRole,
     mockPayments,
     production: isVercelProduction(),
@@ -854,14 +851,14 @@ app.get('/api/health', (req, res) => {
 })
 
 app.get('/api/invites/validate', async (req, res) => {
-  const result = await validateInviteToken(supabase, req.query.token)
+  const result = await validateInviteToken(db, req.query.token)
   res.json(result)
 })
 
 app.get('/api/conversations', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const conversations = await listConversationsForUser(database, user.id)
@@ -874,7 +871,7 @@ app.get('/api/conversations', async (req, res) => {
 app.post('/api/conversations', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     if (req.body?.conversationId && req.body?.text) {
@@ -907,7 +904,7 @@ app.post('/api/conversations', async (req, res) => {
 app.patch('/api/conversations/:id/read', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const conversation = await markConversationRead(database, req.params.id, user.id)
@@ -920,7 +917,7 @@ app.patch('/api/conversations/:id/read', async (req, res) => {
 app.get('/api/contracts', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     await backfillMissingBookingsForUser(database, user.id)
@@ -933,7 +930,7 @@ app.get('/api/contracts', async (req, res) => {
 app.post('/api/contracts', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const row = mapContractToDb(req.body, user.id)
@@ -960,7 +957,7 @@ app.post('/api/contracts', async (req, res) => {
 app.patch('/api/contracts/:id', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     if (req.body?.attachmentStoragePath) {
@@ -974,7 +971,11 @@ app.patch('/api/contracts/:id', async (req, res) => {
     if (!req.body?.name?.trim()) {
       return res.status(400).json({ error: 'name: Signature name is required' })
     }
-    const signed = await signContract(database, req.params.id, user.id, { name: req.body.name })
+    const signed = await signContract(database, req.params.id, user.id, {
+      name: req.body.name,
+      ip: getClientIp(req),
+      userAgent: req.headers['user-agent'] || null,
+    })
     res.json(signed)
   } catch (err) {
     res.status(err.message === 'Forbidden' ? 403 : 500).json({ error: err.message })
@@ -984,7 +985,7 @@ app.patch('/api/contracts/:id', async (req, res) => {
 app.get('/api/contracts/:id/milestones', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const { data: contract, error } = await database.from('contracts').select('*').eq('id', req.params.id).single()
@@ -1003,7 +1004,7 @@ app.get('/api/contracts/:id/milestones', async (req, res) => {
 app.post('/api/contracts/:id/milestones/:milestoneId/pay', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   const { id: contractId, milestoneId } = req.params
   try {
@@ -1048,7 +1049,7 @@ app.post('/api/contracts/:id/milestones/:milestoneId/pay', async (req, res) => {
 app.post('/api/contracts/:id/milestones/:milestoneId/approve', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const { milestone } = await getMilestoneWithContract(database, req.params.milestoneId)
@@ -1063,7 +1064,7 @@ app.post('/api/contracts/:id/milestones/:milestoneId/approve', async (req, res) 
 app.post('/api/contracts/:id/milestones/:milestoneId/deliverable', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const { milestone } = await getMilestoneWithContract(database, req.params.milestoneId)
@@ -1087,7 +1088,7 @@ app.post('/api/contracts/:id/milestones/:milestoneId/deliverable', async (req, r
 app.post('/api/contracts/:id/milestones/:milestoneId/request-release', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const { milestone } = await getMilestoneWithContract(database, req.params.milestoneId)
@@ -1110,7 +1111,7 @@ app.post('/api/contracts/:id/milestones/:milestoneId/request-release', async (re
 app.get('/api/reviews', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   const artistId = req.query.artistId
   if (!artistId) return res.status(400).json({ error: 'artistId required' })
@@ -1126,7 +1127,7 @@ app.get('/api/reviews', async (req, res) => {
 app.post('/api/reviews', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const review = await upsertReview(database, user.id, req.body)
@@ -1139,7 +1140,7 @@ app.post('/api/reviews', async (req, res) => {
 app.patch('/api/reviews/settings', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const settings = await updateArtistReviewSettings(database, user.id, req.body)
@@ -1152,7 +1153,7 @@ app.patch('/api/reviews/settings', async (req, res) => {
 app.patch('/api/reviews/:id', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const review = await updateReviewVisibility(database, req.params.id, user.id, req.body.visible)
@@ -1165,7 +1166,7 @@ app.patch('/api/reviews/:id', async (req, res) => {
 app.patch('/api/reviews/:id/respond', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const review = await upsertReviewResponse(database, req.params.id, user.id, req.body.response)
@@ -1190,7 +1191,7 @@ app.get('/api/push/vapid-public-key', (_req, res) => {
 app.post('/api/push/subscribe', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const userAgent = req.headers['user-agent'] || null
@@ -1205,7 +1206,7 @@ app.post('/api/push/subscribe', async (req, res) => {
 app.delete('/api/push/subscribe', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const endpoint = typeof req.body?.endpoint === 'string' ? req.body.endpoint : null
@@ -1221,7 +1222,7 @@ app.delete('/api/push/subscribe', async (req, res) => {
 app.get('/api/notifications', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     res.json(await listNotificationsForUser(database, user.id))
@@ -1233,7 +1234,7 @@ app.get('/api/notifications', async (req, res) => {
 app.patch('/api/notifications/read', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     await markAllNotificationsRead(database, user.id)
@@ -1246,7 +1247,7 @@ app.patch('/api/notifications/read', async (req, res) => {
 app.patch('/api/notifications/:id/read', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const updated = await markNotificationRead(database, user.id, req.params.id)
@@ -1260,7 +1261,7 @@ app.patch('/api/notifications/:id/read', async (req, res) => {
 app.get('/api/profile/notification-prefs', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     res.json(await getNotificationPrefs(database, user.id))
@@ -1272,7 +1273,7 @@ app.get('/api/profile/notification-prefs', async (req, res) => {
 app.patch('/api/profile/notification-prefs', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     res.json(await updateNotificationPrefs(database, user.id, req.body || {}))
@@ -1312,7 +1313,7 @@ const ResolveDisputeSchema = z.object({
 app.get('/api/disputes', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     res.json(await listDisputesForUser(database, user.id))
@@ -1324,7 +1325,7 @@ app.get('/api/disputes', async (req, res) => {
 app.post('/api/disputes', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const validated = CreateDisputeSchema.parse(req.body)
@@ -1363,7 +1364,7 @@ app.post('/api/disputes', async (req, res) => {
 app.get('/api/disputes/:id', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const dispute = await getDisputeById(database, req.params.id, user.id)
@@ -1377,7 +1378,7 @@ app.get('/api/disputes/:id', async (req, res) => {
 app.patch('/api/disputes/:id', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     if (req.body?.status) {
@@ -1400,7 +1401,7 @@ app.patch('/api/disputes/:id', async (req, res) => {
 app.post('/api/disputes/:id/resolve', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     if (!(await isAdmin(database, user.id))) {
@@ -1430,7 +1431,7 @@ app.post('/api/disputes/:id/resolve', async (req, res) => {
 app.post('/api/calendar/connect', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   if (!isGoogleCalendarConfigured()) {
     return res.status(503).json({ error: 'Google Calendar OAuth is not configured' })
@@ -1445,7 +1446,7 @@ app.post('/api/calendar/connect', async (req, res) => {
 })
 
 app.get('/api/calendar/callback', async (req, res) => {
-  const database = db || supabase
+  const database = db
   if (!database) return res.redirect(`${FRONTEND_URL}/account?calendar=error`)
   const { code, state, error: oauthError } = req.query
   if (oauthError || !code || !state) {
@@ -1469,7 +1470,7 @@ app.get('/api/calendar/callback', async (req, res) => {
 app.get('/api/calendar/status', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     res.json(await getCalendarConnectionStatus(database, user.id))
@@ -1481,7 +1482,7 @@ app.get('/api/calendar/status', async (req, res) => {
 app.delete('/api/calendar/status', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     await disconnectCalendar(database, user.id)
@@ -1494,7 +1495,7 @@ app.delete('/api/calendar/status', async (req, res) => {
 app.post('/api/calendar/status', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const artistId = await getArtistIdForProfile(database, user.id)
@@ -1519,7 +1520,7 @@ app.post('/api/calendar/status', async (req, res) => {
 })
 
 app.get('/api/calendar/feed/:token', async (req, res) => {
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).send('Database not configured')
   try {
     const profile = await getProfileIdForFeedToken(database, req.params.token)
@@ -1557,7 +1558,7 @@ app.get('/api/calendar/feed/:token', async (req, res) => {
 app.get('/api/calendar/feed-token', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
     const token = await ensureCalendarFeedToken(database, user.id)
@@ -1574,7 +1575,7 @@ const PortfolioReorderSchema = z.object({
 app.get('/api/portfolio', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   const artistId = await getArtistIdForProfile(database, user.id)
   if (!artistId) return res.status(403).json({ error: 'Artist profile required' })
@@ -1590,7 +1591,7 @@ app.get('/api/portfolio', async (req, res) => {
 app.post('/api/portfolio', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   const artistId = await getArtistIdForProfile(database, user.id)
   if (!artistId) return res.status(403).json({ error: 'Artist profile required' })
@@ -1627,7 +1628,7 @@ app.post('/api/portfolio', async (req, res) => {
 app.patch('/api/portfolio/reorder', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   const artistId = await getArtistIdForProfile(database, user.id)
   if (!artistId) return res.status(403).json({ error: 'Artist profile required' })
@@ -1666,7 +1667,7 @@ app.patch('/api/portfolio/reorder', async (req, res) => {
 app.delete('/api/portfolio/:id', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-  const database = db || supabase
+  const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   const artistId = await getArtistIdForProfile(database, user.id)
   if (!artistId) return res.status(403).json({ error: 'Artist profile required' })
@@ -1717,10 +1718,10 @@ httpServer.listen(PORT, () => {
   console.log(`\n🚀 The Callsheet API running on http://localhost:${PORT}`)
   console.log(`   Security: ✅ Helmet + Rate Limiting`)
   console.log(`   Stripe: ${stripe ? `✅ ${STRIPE_MODE}` : '❌ not configured (payments fail closed)'}`)
-  console.log(`   Persistence: ${supabase ? '✅ Supabase' : '⚠️  In-memory'}`)
-  if (!supabase) {
+  console.log(`   Persistence: ${db ? (dbUsesServiceRole ? '✅ Supabase (service role)' : '⚠️  Supabase (anon — set SERVICE_ROLE for prod)') : '⚠️  In-memory'}`)
+  if (!db) {
     console.warn(
-      '   Missing VITE_SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY (or VITE_SUPABASE_ANON_KEY) — set these in Railway Variables'
+      '   Missing VITE_SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY — set these in Railway Variables'
     )
   }
   console.log()

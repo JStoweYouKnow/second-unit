@@ -2,6 +2,7 @@ import Stripe from 'stripe'
 import { db } from '../_lib/db.js'
 import { completeBookingPayment } from '../_lib/completeBookingPayment.js'
 import { completeMilestonePayment } from '../_lib/milestones.js'
+import { captureException, initSentry } from '../_lib/sentry.js'
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null
 
@@ -18,6 +19,7 @@ function readMetadata(obj) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+  await initSentry()
   if (!stripe) return res.status(503).send('Stripe not configured')
 
   const sig = req.headers['stripe-signature']
@@ -30,6 +32,7 @@ export default async function handler(req, res) {
     for await (const chunk of req) chunks.push(chunk)
     event = stripe.webhooks.constructEvent(Buffer.concat(chunks), sig, secret)
   } catch (err) {
+    captureException(err, { route: 'webhooks/stripe', phase: 'signature' })
     return res.status(400).send(`Webhook Error: ${err.message}`)
   }
 
@@ -43,16 +46,21 @@ export default async function handler(req, res) {
       ? (typeof obj.payment_intent === 'string' ? obj.payment_intent : obj.payment_intent?.id)
       : obj.id
 
-  if (
-    db &&
-    (event.type === 'payment_intent.succeeded' || event.type === 'checkout.session.completed')
-  ) {
-    // Always escrow on the platform — artist payouts happen on milestone approval / booking complete.
-    if (milestoneId) {
-      await completeMilestonePayment(db, milestoneId, { paymentIntentId })
-    } else if (bookingId) {
-      await completeBookingPayment(db, bookingId, { paymentIntentId })
+  try {
+    if (
+      db &&
+      (event.type === 'payment_intent.succeeded' || event.type === 'checkout.session.completed')
+    ) {
+      // Always escrow on the platform — artist payouts happen on milestone approval / booking complete.
+      if (milestoneId) {
+        await completeMilestonePayment(db, milestoneId, { paymentIntentId })
+      } else if (bookingId) {
+        await completeBookingPayment(db, bookingId, { paymentIntentId })
+      }
     }
+  } catch (err) {
+    captureException(err, { route: 'webhooks/stripe', bookingId, milestoneId, type: event.type })
+    return res.status(500).json({ error: 'Webhook processing failed' })
   }
 
   res.json({ received: true })

@@ -4,8 +4,10 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import { applyTheme, readStoredTheme } from './lib/theme'
 import { ThemeProvider } from './context/ThemeContext'
+import { initClientSentry } from './lib/sentry'
 import App from './App.jsx'
 
+initClientSentry()
 applyTheme(readStoredTheme())
 
 // Fix for Vite dynamic import preload error infinite loop

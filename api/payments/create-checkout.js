@@ -1,18 +1,22 @@
-import { stripe, FRONTEND_URL } from '../_lib/stripe.js'
+import { stripe, FRONTEND_URL, rejectIfStripeMissing } from '../_lib/stripe.js'
 import { requireAuth } from '../_lib/auth.js'
 import { rateLimit, getClientIp } from '../_lib/ratelimit.js'
 import { db } from '../_lib/db.js'
-import { completeBookingPayment } from '../_lib/completeBookingPayment.js'
 import { createProjectCheckoutSession } from '../_lib/checkout.js'
+import { captureException, initSentry } from '../_lib/sentry.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+  await initSentry()
 
   const { ok } = rateLimit(getClientIp(req), 10, 60_000)
   if (!ok) return res.status(429).json({ error: 'Too many requests' })
 
   const user = await requireAuth(req, res)
   if (!user) return
+
+  if (rejectIfStripeMissing(res)) return
 
   const { amount, artistName, description, bookingId } = req.body
 
@@ -26,15 +30,6 @@ export default async function handler(req, res) {
     if (booking && booking.employer_id !== user.id) {
       return res.status(403).json({ error: 'Not authorized to pay for this booking' })
     }
-  }
-
-  if (!stripe) {
-    if (bookingId && db) {
-      await completeBookingPayment(db, bookingId, { paymentIntentId: null })
-    }
-    return res.json({
-      url: `${FRONTEND_URL}/bookings?payment_success=1&booking_id=${bookingId || ''}`,
-    })
   }
 
   try {
@@ -67,6 +62,7 @@ export default async function handler(req, res) {
     })
     res.json({ url: session.url })
   } catch (err) {
+    captureException(err, { route: 'payments/create-checkout', bookingId })
     res.status(500).json({ error: err.message })
   }
 }

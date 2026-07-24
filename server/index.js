@@ -70,7 +70,10 @@ import {
   syncBookingToConnectedCalendars,
 } from '../api/_lib/googleCalendar.js'
 import { buildIcalCalendar, ensureCalendarFeedToken, getProfileIdForFeedToken } from '../api/_lib/icalFeed.js'
-import { FRONTEND_URL } from '../api/_lib/stripe.js'
+import { FRONTEND_URL, rejectIfStripeMissing, STRIPE_MODE } from '../api/_lib/stripe.js'
+import { dbUsesServiceRole } from '../api/_lib/db.js'
+import { allowMockPayments, isVercelProduction } from '../api/_lib/env.js'
+import { captureException, initSentry } from '../api/_lib/sentry.js'
 import {
   ensureConnectAccount,
   createConnectOnboardingLink,
@@ -564,14 +567,7 @@ app.post('/api/payments/create-checkout', async (req, res) => {
     }
   }
 
-  if (!stripe) {
-    if (bookingId && database) {
-      await completeBookingPayment(database, bookingId, { paymentIntentId: null })
-    }
-    return res.json({
-      url: `${FRONTEND_URL}/bookings?payment_success=1&booking_id=${bookingId || ''}`,
-    })
-  }
+  if (rejectIfStripeMissing(res)) return
 
   try {
     let artistStripeAccountId = null
@@ -602,13 +598,14 @@ app.post('/api/payments/create-checkout', async (req, res) => {
     })
     res.json({ url: session.url })
   } catch (err) {
+    captureException(err, { route: 'payments/create-checkout' })
     res.status(500).json({ error: err.message })
   }
 })
 
 // ---- Payment Intent Routes ----
 app.post('/api/payments/create-intent', async (req, res) => {
-  if (!stripe) return res.json({ clientSecret: 'mock_secret_' + Date.now() })
+  if (rejectIfStripeMissing(res)) return
   try {
     const { amount, bookingId, description } = req.body
     // Separate charges: no transfer_data — full amount lands on platform account.
@@ -711,18 +708,11 @@ app.patch('/api/bookings/:id/respond', async (req, res) => {
 app.post('/api/bookings/:id/pay', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
-
-  const { id } = req.params
-  const database = db || supabase
-  if (database) {
-    const result = await completeBookingPayment(database, id, { paymentIntentId: null })
-    if (result.error) return res.status(500).json({ error: result.error })
-    return res.json({ success: true, booking: mapBookingToClient(result.booking) })
-  }
-
-  const b = bookingsStore.find(x => x.id === id)
-  if (b) b.status = 'paid'
-  res.json({ success: true })
+  if (rejectIfStripeMissing(res)) return
+  return res.status(400).json({
+    error:
+      'Direct booking pay is disabled. Use Stripe Checkout via /api/payments/create-checkout so funds are collected before marking paid.',
+  })
 })
 
 // Release the artist's 85% payout once the project is complete
@@ -848,11 +838,17 @@ async function handleWebhook(req, res) {
 }
 
 app.get('/api/health', (req, res) => {
+  const mockPayments = allowMockPayments()
+  const readyForMoney = !!stripe && !!(db || supabase) && dbUsesServiceRole && !mockPayments
   res.json({
-    status: 'ok',
+    status: readyForMoney || (!isVercelProduction() && !!(db || supabase)) ? 'ok' : 'degraded',
     stripe: !!stripe,
-    supabase: !!supabase,
-    mode: stripe ? 'live' : 'mock',
+    stripeMode: STRIPE_MODE,
+    supabase: !!(db || supabase),
+    serviceRole: dbUsesServiceRole,
+    mockPayments,
+    production: isVercelProduction(),
+    readyForMoney,
     connections: onlineUsers.size,
   })
 })
@@ -1030,11 +1026,7 @@ app.post('/api/contracts/:id/milestones/:milestoneId/pay', async (req, res) => {
     if (!Number.isFinite(amountDollars) || amountDollars <= 0) {
       return res.status(400).json({ error: 'Milestone amount is invalid' })
     }
-    if (!stripe) {
-      const result = await completeMilestonePayment(database, milestoneId, { paymentIntentId: null })
-      if (result.error) return res.status(400).json({ error: result.error })
-      return res.json({ url: `${FRONTEND_URL}/projects?milestone_paid=1&contract_id=${contractId}` })
-    }
+    if (rejectIfStripeMissing(res)) return
     const { data: artist } = await database.from('artists').select('display_name, stripe_account_id').eq('id', contract.artist_id).maybeSingle()
     const session = await createProjectCheckoutSession(stripe, {
       amountDollars,
@@ -1719,9 +1711,12 @@ httpServer.on('error', (err) => {
   process.exit(1)
 })
 
+await initSentry()
+
 httpServer.listen(PORT, () => {
   console.log(`\n🚀 The Callsheet API running on http://localhost:${PORT}`)
   console.log(`   Security: ✅ Helmet + Rate Limiting`)
+  console.log(`   Stripe: ${stripe ? `✅ ${STRIPE_MODE}` : '❌ not configured (payments fail closed)'}`)
   console.log(`   Persistence: ${supabase ? '✅ Supabase' : '⚠️  In-memory'}`)
   if (!supabase) {
     console.warn(

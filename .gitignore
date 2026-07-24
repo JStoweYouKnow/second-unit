@@ -34,3 +34,6 @@ build
 *.sw?
 .vercel
 .env*.local
+
+# Supabase CLI cache
+supabase/.temp/

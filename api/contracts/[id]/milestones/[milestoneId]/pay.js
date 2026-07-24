@@ -1,18 +1,20 @@
-import { stripe, FRONTEND_URL } from '../../../../_lib/stripe.js'
+import { stripe, FRONTEND_URL, rejectIfStripeMissing } from '../../../../_lib/stripe.js'
 import { requireAuth } from '../../../../_lib/auth.js'
 import { rateLimit, getClientIp } from '../../../../_lib/ratelimit.js'
 import { db } from '../../../../_lib/db.js'
 import {
-  completeMilestonePayment,
   getMilestoneWithContract,
   canPayMilestone,
   listMilestonesForContract,
   mapMilestoneToClient,
 } from '../../../../_lib/milestones.js'
 import { createProjectCheckoutSession } from '../../../../_lib/checkout.js'
+import { captureException, initSentry } from '../../../../_lib/sentry.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+  await initSentry()
 
   const { ok } = rateLimit(getClientIp(req), 10, 60_000)
   if (!ok) return res.status(429).json({ error: 'Too many requests' })
@@ -21,6 +23,7 @@ export default async function handler(req, res) {
   if (!user) return
 
   if (!db) return res.status(503).json({ error: 'Database not configured' })
+  if (rejectIfStripeMissing(res)) return
 
   const contractId = req.query?.id || req.query?.contractId
   const milestoneId = req.query?.milestoneId
@@ -60,15 +63,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Milestone amount is invalid' })
     }
 
-    if (!stripe) {
-      const result = await completeMilestonePayment(db, milestoneId, { paymentIntentId: null })
-      if (result.error) return res.status(400).json({ error: result.error })
-      return res.json({
-        url: `${FRONTEND_URL}/projects?milestone_paid=1&contract_id=${contractId}`,
-        milestone: result.milestone,
-      })
-    }
-
     const { data: artist } = await db
       .from('artists')
       .select('display_name, stripe_account_id')
@@ -91,6 +85,7 @@ export default async function handler(req, res) {
 
     return res.json({ url: session.url })
   } catch (err) {
+    captureException(err, { route: 'milestones/pay', contractId, milestoneId })
     console.error('[milestones/pay]', err?.message || err)
     return res.status(500).json({ error: err.message || 'Failed to start milestone payment' })
   }

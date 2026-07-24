@@ -95,6 +95,8 @@ export function artistRecordToForm(artist) {
 }
 
 export function formToApplicationPayload(form, profileId, email) {
+  // Only columns on artist_applications (see supabase/artist-applications.sql).
+  // day_rate / project_flat_rate belong on artists, not applications.
   return {
     profile_id: profileId,
     email,
@@ -103,8 +105,6 @@ export function formToApplicationPayload(form, profileId, email) {
     bio: form.bio.trim() || null,
     location: form.location.trim() || null,
     hourly_rate: form.hourlyRate ? parseInt(form.hourlyRate, 10) || 0 : 0,
-    day_rate: form.dailyRate ? parseInt(form.dailyRate, 10) || null : null,
-    project_flat_rate: form.projectFlatRate ? parseInt(form.projectFlatRate, 10) || null : null,
     skills: parseCommaList(form.skills),
     brands: parseCommaList(form.brands),
     website: form.website.trim() || null,

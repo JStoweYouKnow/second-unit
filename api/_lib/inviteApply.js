@@ -9,6 +9,7 @@ function parseCommaList(value) {
 }
 
 function formToPayload(form, profileId, email) {
+  // Match artist_applications columns (hourly_rate only — day/project rates live on artists).
   return {
     profile_id: profileId,
     email,
@@ -17,8 +18,6 @@ function formToPayload(form, profileId, email) {
     bio: String(form.bio || '').trim() || null,
     location: String(form.location || '').trim() || null,
     hourly_rate: form.hourlyRate ? parseInt(form.hourlyRate, 10) || 0 : 0,
-    day_rate: form.dailyRate ? parseInt(form.dailyRate, 10) || null : null,
-    project_flat_rate: form.projectFlatRate ? parseInt(form.projectFlatRate, 10) || null : null,
     skills: parseCommaList(form.skills),
     brands: parseCommaList(form.brands),
     website: String(form.website || '').trim() || null,

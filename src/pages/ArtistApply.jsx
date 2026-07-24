@@ -155,35 +155,37 @@ export default function ArtistApply() {
         sessionStorage.setItem(PENDING_APPLY_KEY, JSON.stringify(form))
         sessionStorage.setItem(INVITE_SESSION_KEY, activeToken)
 
-        const result = await artistApplications.applyWithInvite({
-          inviteToken: activeToken,
-          email: form.email.trim(),
-          password: form.password,
-          form: {
-            fullName: form.fullName,
-            roleTitle: form.roleTitle,
-            bio: form.bio,
-            location: form.location,
-            hourlyRate: form.hourlyRate,
-            dailyRate: form.dailyRate,
-            projectFlatRate: form.projectFlatRate,
-            skills: form.skills,
-            brands: form.brands,
-            website: form.website,
-            twitter: form.twitter,
-            instagram: form.instagram,
-            linkedin: form.linkedin,
-            videoLinks: form.videoLinks,
-          },
-        })
+        try {
+          await artistApplications.applyWithInvite({
+            inviteToken: activeToken,
+            email: form.email.trim(),
+            password: form.password,
+            form: {
+              fullName: form.fullName,
+              roleTitle: form.roleTitle,
+              bio: form.bio,
+              location: form.location,
+              hourlyRate: form.hourlyRate,
+              skills: form.skills,
+              brands: form.brands,
+              website: form.website,
+              twitter: form.twitter,
+              instagram: form.instagram,
+              linkedin: form.linkedin,
+              videoLinks: form.videoLinks,
+            },
+          })
+        } catch (applyErr) {
+          // Never fall through to client signUp (that hits broken confirmation email).
+          setError(applyErr.message || 'Could not submit application')
+          setLoading(false)
+          return
+        }
 
         sessionStorage.removeItem(PENDING_APPLY_KEY)
         clearStoredInviteToken()
         setSubmitted(true)
         setLoading(false)
-        if (result?.message) {
-          // keep success screen; message is in the submitted UI copy
-        }
         return
       }
 

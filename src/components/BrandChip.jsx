@@ -7,6 +7,7 @@ export default function BrandChip({ brand, onVerify, verifyBusy = false }) {
 
   return (
     <div
+      className="brand-chip"
       style={{
         display: 'inline-flex',
         alignItems: 'center',

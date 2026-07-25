@@ -1256,6 +1256,13 @@ button.mobile-topbar-brand--home:focus-visible {
   justify-content: flex-end;
 }
 .profile-hero--visual .profile-hero-content * { color: rgba(255,255,255,0.85) !important; }
+/* Brand chips keep a solid --surface bg; over a photo hero the forced-white text
+   would be unreadable on it, so give them a dark glass background here. */
+.profile-hero--visual .profile-hero-brands-list .brand-chip {
+  background: rgba(0, 0, 0, 0.55) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  backdrop-filter: blur(8px);
+}
 .profile-hero--visual .profile-hero-content h1 { color: #fff !important; font-size: clamp(28px, 4vw, 48px) !important; }
 .profile-hero--visual .profile-hero-content .role { color: rgba(255,255,255,0.55) !important; letter-spacing: 0.1em !important; }
 .profile-hero--visual .social-btn {

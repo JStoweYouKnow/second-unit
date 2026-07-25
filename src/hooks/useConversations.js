@@ -126,9 +126,14 @@ export function useConversations(enabled = true) {
   }, [refetch])
 
   const markRead = useCallback(async (conversationId) => {
-    setConversations((prev) =>
-      prev.map((c) => (c.id === conversationId ? { ...c, unread: false } : c))
-    )
+    let shouldSync = false
+    setConversations((prev) => {
+      const conv = prev.find((c) => c.id === conversationId)
+      if (!conv?.unread) return prev
+      shouldSync = true
+      return prev.map((c) => (c.id === conversationId ? { ...c, unread: false } : c))
+    })
+    if (!shouldSync) return
 
     if (!isSupabaseConfigured) {
       const next = loadMock().map((c) =>
@@ -139,12 +144,7 @@ export function useConversations(enabled = true) {
     }
 
     try {
-      const result = await conversationsApi.markRead(conversationId)
-      if (result?.conversation) {
-        setConversations((prev) =>
-          prev.map((c) => (c.id === conversationId ? result.conversation : c))
-        )
-      }
+      await conversationsApi.markRead(conversationId)
     } catch {
       /* non-fatal */
     }

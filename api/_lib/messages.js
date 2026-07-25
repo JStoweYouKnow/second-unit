@@ -221,8 +221,24 @@ export async function markConversationRead(db, conversationId, userId) {
   if (!canAccess) throw new Error('Forbidden')
 
   const artistId = await getArtistIdForProfile(db, userId)
-  const now = new Date().toISOString()
   const viewerIsArtist = artistId != null && conversation.artist_id === artistId
+  const alreadyRead = viewerIsArtist
+    ? (conversation.artist_unread ?? 0) === 0
+    : (conversation.employer_unread ?? 0) === 0
+
+  const { data: messages, error: msgError } = await db
+    .from('messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true })
+
+  if (msgError) throw msgError
+
+  if (alreadyRead) {
+    return mapConversationToClient(conversation, messages || [], { viewerIsArtist })
+  }
+
+  const now = new Date().toISOString()
   const patch = viewerIsArtist
     ? { artist_unread: 0, artist_last_read_at: now }
     : { employer_unread: 0, employer_last_read_at: now }
@@ -238,14 +254,6 @@ export async function markConversationRead(db, conversationId, userId) {
     .single()
 
   if (updateError) throw updateError
-
-  const { data: messages, error: msgError } = await db
-    .from('messages')
-    .select('*')
-    .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: true })
-
-  if (msgError) throw msgError
 
   return mapConversationToClient(updated, messages || [], { viewerIsArtist })
 }

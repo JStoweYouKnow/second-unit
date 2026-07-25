@@ -103,15 +103,23 @@ export default function Messages() {
 
   useEffect(() => {
     if (!activeConv) return
+    const conv = visibleMessages.find((m) => m.id === activeConv)
+    if (!conv?.unread) return
     markConversationRead(activeConv)
+  }, [activeConv, visibleMessages, markConversationRead])
+
+  useEffect(() => {
+    if (!activeConv) return
+    const conv = visibleMessages.find((m) => m.id === activeConv)
+    if (!conv) return
     const socket = getSocket()
-    if (socket?.connected && conversation) {
-      const recipientId = convIsArtist ? conversation.employerId : conversation.artistProfileId
-      if (recipientId) {
-        socket.emit('message:read', { conversationId: activeConv, recipientId })
-      }
+    if (!socket?.connected) return
+    const convIsArtistForThread = conv.viewerIsArtist ?? isArtist
+    const recipientId = convIsArtistForThread ? conv.employerId : conv.artistProfileId
+    if (recipientId) {
+      socket.emit('message:read', { conversationId: activeConv, recipientId })
     }
-  }, [activeConv, conversation, convIsArtist, markConversationRead])
+  }, [activeConv, visibleMessages, isArtist])
 
   const recipientProfileId = convIsArtist
     ? conversation?.employerId

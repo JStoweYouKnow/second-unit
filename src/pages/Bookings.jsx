@@ -440,7 +440,7 @@ export default function Bookings() {
             const total = bookingSubtotal(b)
             const isProcessing = loading === b.id
             return (
-              <div key={b.id} className="card slide-up" style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 16, opacity: isProcessing ? 0.7 : 1 }}>
+              <div key={b.id} className="card slide-up stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 16, opacity: isProcessing ? 0.7 : 1 }}>
                 <div
                   role="button"
                   tabIndex={0}

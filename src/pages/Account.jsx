@@ -945,13 +945,15 @@ export default function Account() {
 
               <h4 style={{ marginBottom: 16 }}>Billing History</h4>
               <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', padding: '12px 16px', background: 'var(--surface)', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
-                  <div>Date</div>
-                  <div>Description</div>
-                  <div style={{ textAlign: 'right' }}>Amount</div>
-                </div>
-                <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
-                  No billing history available yet.
+                <div style={{ overflowX: 'auto' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', minWidth: 360, padding: '12px 16px', background: 'var(--surface)', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
+                    <div>Date</div>
+                    <div>Description</div>
+                    <div style={{ textAlign: 'right' }}>Amount</div>
+                  </div>
+                  <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+                    No billing history available yet.
+                  </div>
                 </div>
               </div>
             </div>

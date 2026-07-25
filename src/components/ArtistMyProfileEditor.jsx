@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Upload, Loader2, Trash2, ChevronUp, ChevronDown, Eye, EyeOff, ExternalLink,
+  Upload, Loader2, Trash2, ChevronUp, ChevronDown, Eye, EyeOff, ExternalLink, Calendar,
 } from './icons'
+import CalendarModal from './CalendarModal'
 import { ArtistFormFields } from './ArtistFormFields'
 import ArtistReviewSettings from './ArtistReviewSettings'
 import { useArtist } from '../hooks/useData'
@@ -47,6 +48,7 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
   const [portfolioBusy, setPortfolioBusy] = useState(false)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
+  const [showCalendar, setShowCalendar] = useState(false)
   const headerInputRef = useRef(null)
   const portfolioInputRef = useRef(null)
 
@@ -275,6 +277,9 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
           <Link to={`/artist/${artistId}?view=public`} className="btn btn-secondary btn-sm">
             <ExternalLink size={14} /> View public page
           </Link>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowCalendar(true)}>
+            <Calendar size={14} /> Manage calendar
+          </button>
         </div>
       </div>
 
@@ -484,6 +489,16 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
         getVisibility={getVisibility}
         onReviewVisibilityChange={updateReviewVisibility}
       />
+
+      {showCalendar && (
+        <CalendarModal
+          artist={artist}
+          editable
+          artistDbId={artistId}
+          onAvailabilitySaved={() => onUpdated?.()}
+          onClose={() => setShowCalendar(false)}
+        />
+      )}
     </div>
   )
 }

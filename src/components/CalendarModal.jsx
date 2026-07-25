@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { format, addMonths, subMonths, parse, addHours } from 'date-fns'
-import { X, ChevronLeft, ChevronRight, ExternalLink, Download, Clock } from './icons'
+import { X, ChevronLeft, ChevronRight, ExternalLink, Download, Clock, Loader2, CheckCircle } from './icons'
+import { useArtistAvailability } from '../hooks/useArtistAvailability'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import {
   normalizeArtistAvailability,
   buildMonthWeeks,
@@ -13,6 +15,11 @@ import {
   resolveDayRange,
   buildBookingPrefillFromSelection,
   labelToFormTime,
+  STANDARD_SLOT_LABELS,
+  SLOT_PRESETS,
+  sortSlotLabels,
+  listTimeZones,
+  isPastDate,
 } from '../lib/availability'
 
 const CAL_COMP_NOTE = 'Compensation is agreed with the client for each engagement (not shown here).'
@@ -30,7 +37,23 @@ function rangeEndDateTime(dateKey, startLabel, durationHours) {
   return addHours(start, durationHours)
 }
 
-export default function CalendarModal({ artist, onClose, onBook }) {
+export default function CalendarModal({
+  artist,
+  onClose,
+  onBook,
+  editable = false,
+  artistDbId = null,
+  onAvailabilitySaved = null,
+}) {
+  const resolvedArtistId = artistDbId || artist.id
+  const {
+    availability: liveAvailability,
+    loading: availabilityLoading,
+    saving: availabilitySaving,
+    error: availabilityError,
+    updateDayAvailability,
+  } = useArtistAvailability(editable ? resolvedArtistId : null)
+
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [mode, setMode] = useState('hours') // 'hours' | 'days'
   const [selectedDate, setSelectedDate] = useState(null)
@@ -39,13 +62,29 @@ export default function CalendarModal({ artist, onClose, onBook }) {
   const [dayAnchor, setDayAnchor] = useState(null)
   const [dayEnd, setDayEnd] = useState(null)
   const [rangeError, setRangeError] = useState('')
+  const [draftSlots, setDraftSlots] = useState([])
+  const [saveStatus, setSaveStatus] = useState('')
+  const [timeZone, setTimeZone] = useState(artist.timezone || detectBrowserTimeZone())
+  const [tzSaving, setTzSaving] = useState(false)
+  const [tzStatus, setTzStatus] = useState('')
 
-  const timeZone = artist.timezone || detectBrowserTimeZone()
+  const timeZones = useMemo(() => listTimeZones(), [])
 
-  const availability = useMemo(
-    () => normalizeArtistAvailability(artist.availability),
-    [artist.availability]
+  useEffect(() => {
+    if (artist.timezone) setTimeZone(artist.timezone)
+  }, [artist.timezone])
+
+  const availability = useMemo(() => {
+    if (editable) return liveAvailability
+    return normalizeArtistAvailability(artist.availability)
+  }, [editable, liveAvailability, artist.availability])
+
+  const availableDateKeys = useMemo(
+    () => (availability || []).map((entry) => entry.date),
+    [availability]
   )
+  const availableDateSet = useMemo(() => new Set(availableDateKeys), [availableDateKeys])
+
   const openDateKeys = useMemo(() => datesWithOpenSlots(availability), [availability])
   const openDateSet = useMemo(() => new Set(openDateKeys), [openDateKeys])
 
@@ -57,6 +96,21 @@ export default function CalendarModal({ artist, onClose, onBook }) {
   const canGoPrev = !isMonthFullyPast(subMonths(currentMonth, 1), timeZone)
 
   const selectedDateStr = selectedDate || null
+  const dayEntry = useMemo(
+    () => (selectedDateStr ? availability.find((a) => a.date === selectedDateStr) : null),
+    [availability, selectedDateStr]
+  )
+  const bookedOnDay = dayEntry?.bookedSlots || []
+
+  useEffect(() => {
+    if (!editable || !selectedDateStr) {
+      setDraftSlots([])
+      return
+    }
+    setDraftSlots(dayEntry?.slots ? [...dayEntry.slots] : [])
+    setSaveStatus('')
+  }, [editable, selectedDateStr, dayEntry])
+
   const openSlots = useMemo(
     () => (selectedDateStr ? getOpenSlotsForDate(availability, selectedDateStr) : []),
     [availability, selectedDateStr]
@@ -116,9 +170,15 @@ export default function CalendarModal({ artist, onClose, onBook }) {
   const handleDayClick = (cell) => {
     if (cell.hide || cell.past || !cell.inMonth) return
     const key = cell.dateKey
-    if (!openDateSet.has(key)) return
+
+    if (editable) {
+      setSelectedDate(key)
+      setRangeError('')
+      return
+    }
 
     setRangeError('')
+    if (!openDateSet.has(key)) return
 
     if (mode === 'hours') {
       setSelectedDate(key)
@@ -245,6 +305,66 @@ END:VCALENDAR`
     })
   }
 
+  const persistTimeZone = async (nextTz) => {
+    setTimeZone(nextTz)
+    setTzStatus('')
+    if (!resolvedArtistId || !isSupabaseConfigured || !supabase) return
+    setTzSaving(true)
+    try {
+      const { error: tzErr } = await supabase
+        .from('artists')
+        .update({ timezone: nextTz, updated_at: new Date().toISOString() })
+        .eq('id', resolvedArtistId)
+      if (tzErr) throw tzErr
+      setTzStatus('saved')
+      onAvailabilitySaved?.()
+      setTimeout(() => setTzStatus(''), 2000)
+    } catch (err) {
+      setTzStatus(err.message || 'Could not save timezone')
+    } finally {
+      setTzSaving(false)
+    }
+  }
+
+  const toggleEditSlot = (label) => {
+    if (bookedOnDay.includes(label)) return
+    setDraftSlots((prev) => {
+      const set = new Set(prev)
+      if (set.has(label)) set.delete(label)
+      else set.add(label)
+      return sortSlotLabels([...set])
+    })
+    setSaveStatus('')
+  }
+
+  const applyPreset = (labels) => {
+    const merged = sortSlotLabels([...new Set([...bookedOnDay, ...labels])])
+    setDraftSlots(merged)
+    setSaveStatus('')
+  }
+
+  const handleSaveDay = async () => {
+    if (!selectedDateStr) return
+    setSaveStatus('')
+    const { error: saveError } = await updateDayAvailability(selectedDateStr, draftSlots)
+    if (saveError) {
+      setSaveStatus(saveError.message)
+      return
+    }
+    setSaveStatus('saved')
+    onAvailabilitySaved?.()
+    setTimeout(() => setSaveStatus(''), 2500)
+  }
+
+  const draftChanged =
+    editable &&
+    selectedDateStr &&
+    sortSlotLabels(draftSlots).join('|') !== sortSlotLabels(dayEntry?.slots || []).join('|')
+
+  const selectedDateObj = selectedDateStr ? new Date(`${selectedDateStr}T12:00:00`) : null
+  const showEditPanel =
+    editable && selectedDateStr && selectedDateObj && !isPastDate(selectedDateObj, timeZone)
+
   const summary = selectionSummary()
 
   return (
@@ -257,7 +377,9 @@ END:VCALENDAR`
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h2 id="calendar-modal-title">{`${artist.name}'s availability`}</h2>
+          <h2 id="calendar-modal-title">
+            {editable ? 'Manage your availability' : `${artist.name}'s availability`}
+          </h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close calendar">
             <X size={18} aria-hidden />
           </button>
@@ -280,6 +402,40 @@ END:VCALENDAR`
           </div>
         </div>
 
+        {editable && (
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            <label className="form-label" htmlFor="calendar-modal-timezone">Working timezone</label>
+            <select
+              id="calendar-modal-timezone"
+              className="form-input"
+              value={timeZone}
+              onChange={(e) => persistTimeZone(e.target.value)}
+              disabled={tzSaving}
+              style={{ maxWidth: 360 }}
+            >
+              {!timeZones.includes(timeZone) && timeZone && (
+                <option value={timeZone}>{formatTimeZoneLabel(timeZone)}</option>
+              )}
+              {timeZones.map((tz) => (
+                <option key={tz} value={tz}>{formatTimeZoneLabel(tz)}</option>
+              ))}
+            </select>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, display: 'block' }}>
+              Hours you set are wall-clock times in {formatTimeZoneLabel(timeZone)}.
+              {tzSaving && ' Saving…'}
+              {tzStatus === 'saved' && ' Saved.'}
+              {tzStatus && tzStatus !== 'saved' && (
+                <span style={{ color: 'var(--danger)' }}> {tzStatus}</span>
+              )}
+            </span>
+          </div>
+        )}
+
+        {availabilityError && (
+          <div className="auth-error" style={{ marginBottom: 16 }}>{availabilityError}</div>
+        )}
+
+        {!editable && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           <button
             type="button"
@@ -301,6 +457,14 @@ END:VCALENDAR`
               : 'Pick a start day, then an end day'}
           </span>
         </div>
+        )}
+
+        {editable && (
+          <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-muted)' }}>
+            Select a date, then tap hours to open them for booking. Booked slots stay locked.
+            {availabilityLoading && ' Loading availability…'}
+          </p>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <button
@@ -335,25 +499,29 @@ END:VCALENDAR`
           <div key={week[0].dateKey} className="calendar-grid">
             {week.map((cell) => {
               const hasOpen = openDateSet.has(cell.dateKey)
-              const isSelectedHours = mode === 'hours' && selectedDateStr === cell.dateKey
-              const inDayRange = mode === 'days' && (
+              const hasAnySlots = availableDateSet.has(cell.dateKey)
+              const isSelectedHours = !editable && mode === 'hours' && selectedDateStr === cell.dateKey
+              const isSelectedEdit = editable && selectedDateStr === cell.dateKey
+              const inDayRange = !editable && mode === 'days' && (
                 dayRangeKeys.has(cell.dateKey)
                 || cell.dateKey === dayAnchor
                 || cell.dateKey === dayEnd
               )
-              const isSelected = isSelectedHours || inDayRange
-              const clickable = hasOpen && cell.inMonth && !cell.past
+              const isSelected = isSelectedHours || isSelectedEdit || inDayRange
+              const clickable = editable
+                ? cell.inMonth && !cell.past
+                : hasOpen && cell.inMonth && !cell.past
 
               return (
                 <div
                   key={cell.dateKey}
-                  className={`calendar-day ${!cell.inMonth ? 'other-month' : ''} ${cell.isToday ? 'today' : ''} ${clickable ? 'has-event' : ''}`}
+                  className={`calendar-day ${!cell.inMonth ? 'other-month' : ''} ${cell.isToday ? 'today' : ''} ${(editable ? hasAnySlots : hasOpen) ? 'has-event' : ''}`}
                   style={{
                     ...(isSelected
                       ? { background: 'var(--accent)', color: 'var(--paper)', borderRadius: 'var(--radius-sm)' }
                       : {}),
                     cursor: clickable ? 'pointer' : 'default',
-                    opacity: cell.past || !cell.inMonth ? 0.3 : hasOpen ? 1 : 0.45,
+                    opacity: cell.past || !cell.inMonth ? 0.3 : (editable ? hasAnySlots : hasOpen) ? 1 : 0.45,
                   }}
                   onClick={() => handleDayClick(cell)}
                 >
@@ -364,13 +532,113 @@ END:VCALENDAR`
           </div>
         ))}
 
-        {availability.length === 0 && (
+        {availability.length === 0 && !editable && (
           <p style={{ marginTop: 16, fontSize: 14, color: 'var(--text-muted)' }}>
             No availability published yet. This artist hasn&apos;t opened booking slots on their calendar.
           </p>
         )}
 
-        {mode === 'hours' && selectedDateStr && (
+        {editable && !selectedDateStr && (
+          <p style={{ marginTop: 16, fontSize: 14, color: 'var(--text-muted)' }}>
+            Pick a date on the calendar to set your open hours.
+          </p>
+        )}
+
+        {showEditPanel && (
+          <div className="slide-up" style={{ marginTop: 24 }}>
+            <h3 style={{ fontSize: 15, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Clock size={16} style={{ color: 'var(--accent)' }} />
+              {format(new Date(`${selectedDateStr}T12:00:00`), 'EEEE, MMMM d, yyyy')}
+              <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: 13 }}>
+                · {formatTimeZoneLabel(timeZone)}
+              </span>
+            </h3>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => applyPreset(SLOT_PRESETS.fullDay)}>
+                Full day
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => applyPreset(SLOT_PRESETS.business)}>
+                Business hours
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => applyPreset(SLOT_PRESETS.morning)}>
+                Morning
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => applyPreset(SLOT_PRESETS.afternoon)}>
+                Afternoon
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => applyPreset(SLOT_PRESETS.evening)}>
+                Evening
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setDraftSlots([...bookedOnDay])}
+              >
+                Clear unbooked
+              </button>
+            </div>
+
+            <div
+              className="availability-slot-grid"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+                gap: 8,
+                marginBottom: 20,
+                maxHeight: 220,
+                overflowY: 'auto',
+              }}
+            >
+              {STANDARD_SLOT_LABELS.map((slot) => {
+                const active = draftSlots.includes(slot)
+                const locked = bookedOnDay.includes(slot)
+                return (
+                  <button
+                    key={slot}
+                    type="button"
+                    className={`btn btn-sm ${active ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => toggleEditSlot(slot)}
+                    disabled={locked}
+                    title={locked ? 'Booked — cannot remove' : active ? 'Open — click to block' : 'Blocked — click to open'}
+                    style={{ justifyContent: 'center' }}
+                  >
+                    {slot}
+                    {locked ? ' · booked' : ''}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveDay}
+                disabled={availabilitySaving || !draftChanged}
+                aria-busy={availabilitySaving}
+              >
+                {availabilitySaving ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Saving…
+                  </>
+                ) : (
+                  'Save this day'
+                )}
+              </button>
+              {saveStatus === 'saved' && (
+                <span style={{ fontSize: 13, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <CheckCircle size={14} /> Availability updated
+                </span>
+              )}
+              {saveStatus && saveStatus !== 'saved' && (
+                <span style={{ fontSize: 13, color: 'var(--danger)' }}>{saveStatus}</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!editable && mode === 'hours' && selectedDateStr && (
           <div className="slide-up" style={{ marginTop: 24 }}>
             <h3 style={{ fontSize: 15, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Clock size={16} style={{ color: 'var(--accent)' }} />
@@ -415,7 +683,7 @@ END:VCALENDAR`
           </div>
         )}
 
-        {mode === 'days' && dayAnchor && !dayEnd && (
+        {!editable && mode === 'days' && dayAnchor && !dayEnd && (
           <p style={{ marginTop: 16, fontSize: 13, color: 'var(--text-muted)' }}>
             Start day selected. Click another open day to complete the range
             {dayAnchor ? ` (from ${format(new Date(`${dayAnchor}T12:00:00`), 'MMM d')})` : ''}.
@@ -426,7 +694,7 @@ END:VCALENDAR`
           <p style={{ marginTop: 12, fontSize: 13, color: 'var(--danger)' }}>{rangeError}</p>
         )}
 
-        {bookingPrefill && summary && (
+        {!editable && bookingPrefill && summary && (
           <div className="slide-up" style={{ marginTop: 20, padding: 20, background: 'var(--accent-tint-05)', border: '1px solid var(--accent-tint-border)', borderRadius: 'var(--radius-sm)' }}>
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontWeight: 600, marginBottom: 2 }}>{summary}</div>
@@ -458,9 +726,14 @@ END:VCALENDAR`
 
         <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} /> Open day
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
+            {editable ? 'Dot = day has hours set' : 'Open day'}
           </span>
-          <span>Hours: contiguous open slots · Days: every day in range must be open</span>
+          <span>
+            {editable
+              ? 'Tap hours to open or block segments · booked slots stay locked'
+              : 'Hours: contiguous open slots · Days: every day in range must be open'}
+          </span>
         </div>
       </div>
     </div>

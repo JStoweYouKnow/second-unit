@@ -319,7 +319,7 @@ export default function ArtistProfile() {
           </button>
         )}
         <button className="btn btn-secondary" onClick={() => setShowCalendar(true)}>
-          <Calendar size={16} /> View Calendar
+          <Calendar size={16} /> {isOwnProfile ? 'Manage Calendar' : 'View Calendar'}
         </button>
         <button className="btn btn-ghost" onClick={() => toggleFavorite(artist.id)}
           style={isFav ? { color: 'var(--danger)' } : {}}>
@@ -445,19 +445,26 @@ export default function ArtistProfile() {
       {showCalendar && (
         <CalendarModal
           artist={artist}
+          editable={isOwnProfile}
+          artistDbId={artist.id}
+          onAvailabilitySaved={() => refetchArtist?.()}
           onClose={() => setShowCalendar(false)}
-          onBook={({ artist: a, date, time, duration, durationUnit }) => {
-            setShowCalendar(false)
-            const params = new URLSearchParams({
-              new: '1',
-              artistId: String(a.id),
-              date,
-              time: time || '09:00',
-              duration: String(duration),
-              durationUnit: durationUnit || 'hours',
-            })
-            navigate(`/bookings?${params.toString()}`)
-          }}
+          onBook={
+            isOwnProfile
+              ? undefined
+              : ({ artist: a, date, time, duration, durationUnit }) => {
+                  setShowCalendar(false)
+                  const params = new URLSearchParams({
+                    new: '1',
+                    artistId: String(a.id),
+                    date,
+                    time: time || '09:00',
+                    duration: String(duration),
+                    durationUnit: durationUnit || 'hours',
+                  })
+                  navigate(`/bookings?${params.toString()}`)
+                }
+          }
         />
       )}
     </div>

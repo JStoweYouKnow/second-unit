@@ -1230,7 +1230,30 @@ button.mobile-topbar-brand--home:focus-visible {
   bottom: 0; left: 0; right: 0;
   padding: 40px 48px;
   z-index: 2;
+  flex-direction: row;
   align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+}
+.profile-hero--visual .profile-hero-main {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+.profile-hero--visual .profile-hero-meta {
+  flex-shrink: 0;
+  width: auto;
+  max-width: min(420px, 42vw);
+  border-top: none;
+  padding-top: 0;
+  align-items: flex-end;
+  text-align: right;
+}
+.profile-hero--visual .profile-hero-brands-list {
+  justify-content: flex-end;
+}
+.profile-hero--visual .profile-hero-stats {
+  justify-content: flex-end;
 }
 .profile-hero--visual .profile-hero-content * { color: rgba(255,255,255,0.85) !important; }
 .profile-hero--visual .profile-hero-content h1 { color: #fff !important; font-size: clamp(28px, 4vw, 48px) !important; }
@@ -1714,6 +1737,27 @@ button.mobile-topbar-brand--home:focus-visible {
   .profile-hero-main { flex-direction: column; text-align: center; }
   .profile-hero-stats { justify-content: center; }
   .profile-hero-brands-list { justify-content: center; }
+  .profile-hero--visual .profile-hero-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 20px;
+    padding: 24px 20px;
+  }
+  .profile-hero--visual .profile-hero-main {
+    width: 100%;
+    text-align: left;
+  }
+  .profile-hero--visual .profile-hero-meta {
+    max-width: none;
+    align-items: stretch;
+    text-align: left;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    padding-top: 16px;
+  }
+  .profile-hero--visual .profile-hero-brands-list,
+  .profile-hero--visual .profile-hero-stats {
+    justify-content: flex-start;
+  }
   .auth-role-picker { flex-direction: column; }
 }
 

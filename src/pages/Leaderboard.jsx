@@ -5,7 +5,6 @@ import { normalizeSocialUrl } from '../lib/socialLinks'
 import { videoReelUrl } from '../lib/videoReels'
 import { buildOpenBriefCards } from '../lib/openBriefs'
 import { brandName } from '../lib/brands'
-import ArtistRateCard from '../components/ArtistRateCard'
 import { useArtists } from '../hooks/useData'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
@@ -505,7 +504,6 @@ export default function Leaderboard() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--gold)', fontSize: 13, fontWeight: 700 }}>
                     <Star size={14} fill="var(--gold)" /> {artist.rating}
                   </div>
-                  <ArtistRateCard artist={artist} compact />
                   {artist.available && (
                     <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--success)', textTransform: 'uppercase' }}>
                       ● Available

@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react'
 import CalendarModal from '../components/CalendarModal'
 import { useAuth } from '../context/AuthContext'
 import { artists as artistsApi } from '../lib/api'
-import ArtistRateCard from '../components/ArtistRateCard'
 import BrandChip from '../components/BrandChip'
 import { isArtistProfile } from '../lib/roleView'
 import { useArtist } from '../hooks/useData'
@@ -230,9 +229,6 @@ export default function ArtistProfile() {
                 <MapPin size={14} /> {artist.location}
               </span>
             </div>
-            {!hasHeroVisual && (
-              <ArtistRateCard artist={artist} />
-            )}
             <div className="profile-socials">
               {[
                 { value: artist.socials?.twitter, platform: 'twitter', title: 'X (Twitter)', Icon: IconX },
@@ -439,10 +435,6 @@ export default function ArtistProfile() {
           )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="card">
-            <h3 style={{ marginBottom: 16 }}>Rates</h3>
-            <ArtistRateCard artist={artist} />
-          </div>
           <div className="card">
             <h3 style={{ marginBottom: 16 }}>Brands & Clients</h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>

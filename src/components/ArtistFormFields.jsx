@@ -130,7 +130,7 @@ export function ArtistFormFields({ form, onChange, showAccountFields = false, di
           />
         </div>
         <div className="form-group">
-          <label className="form-label">Hourly Rate (USD, public)</label>
+          <label className="form-label">Hourly Rate (USD, private)</label>
           <input
             className="form-input"
             type="number"
@@ -139,9 +139,12 @@ export function ArtistFormFields({ form, onChange, showAccountFields = false, di
             value={form.hourlyRate}
             onChange={set('hourlyRate')}
           />
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, display: 'block' }}>
+            Not shown on your public profile or Spotlight — used when you negotiate fees.
+          </span>
         </div>
         <div className="form-group">
-          <label className="form-label">Day Rate (USD, public)</label>
+          <label className="form-label">Day Rate (USD, private)</label>
           <input
             className="form-input"
             type="number"
@@ -152,7 +155,7 @@ export function ArtistFormFields({ form, onChange, showAccountFields = false, di
           />
         </div>
         <div className="form-group">
-          <label className="form-label">Flat Project Rate (USD, public)</label>
+          <label className="form-label">Flat Project Rate (USD, private)</label>
           <input
             className="form-input"
             type="number"

@@ -64,6 +64,7 @@ export function useConversations(enabled = true) {
         artistId: artist.id,
         artistName: artist.name,
         avatar: artist.avatar || artist.name?.slice(0, 2),
+        viewerIsArtist: false, // employer always initiates a conversation
         unread: false,
         lastMessage: '',
         time: 'Now',
@@ -170,15 +171,11 @@ export function useConversations(enabled = true) {
       if (!conv) return prev
       if (conv.thread.some((t) => t.id === msgRow.id)) return prev
 
+      // Prefer the conversation's own role tag over the caller's global flag.
+      const va = conv.viewerIsArtist ?? viewerIsArtist
       const fromEmployer = msgRow.sender_role === 'employer'
-      const sender = viewerIsArtist
-        ? fromEmployer
-          ? 'user'
-          : 'artist'
-        : fromEmployer
-          ? 'user'
-          : 'artist'
-      const fromSelf = viewerIsArtist
+      const sender = fromEmployer ? 'user' : 'artist'
+      const fromSelf = va
         ? msgRow.sender_role === 'artist'
         : msgRow.sender_role === 'employer'
 
@@ -209,7 +206,8 @@ export function useConversations(enabled = true) {
     setConversations((prev) =>
       prev.map((c) => {
         if (c.id !== row.id) return c
-        const unread = viewerIsArtist
+        const va = c.viewerIsArtist ?? viewerIsArtist
+        const unread = va
           ? (row.artist_unread ?? 0) > 0
           : (row.employer_unread ?? 0) > 0
         return {

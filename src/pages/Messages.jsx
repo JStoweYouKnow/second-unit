@@ -4,22 +4,18 @@ import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { getSocket } from '../lib/socket'
 import { isSupabaseConfigured } from '../lib/supabase'
-import { useArtistProfile } from '../hooks/useArtistProfile'
 import { useTypingBroadcast } from '../hooks/useTypingBroadcast'
-import { isArtistProfile, demoArtistPersona } from '../lib/roleView'
+import { isArtistProfile } from '../lib/roleView'
 
 export default function Messages() {
   const { allMessages, sendMessage, localProjects, markConversationRead, realtimeConnected } = useApp()
   const { user, profile } = useAuth()
-  const { artist: myArtistRecord } = useArtistProfile(profile?.id)
   const isArtist = isArtistProfile(profile)
 
-  const visibleMessages = useMemo(() => {
-    if (!isArtist) return allMessages
-    const persona = demoArtistPersona(profile, myArtistRecord)
-    if (!persona?.id) return allMessages
-    return allMessages.filter((m) => String(m.artistId) === String(persona.id))
-  }, [allMessages, profile, myArtistRecord, isArtist])
+  // Show every thread the user is part of, from either side (hirer or artist).
+  // Each conversation carries its own `viewerIsArtist`, so a dual-role user no
+  // longer loses hirer-side threads they started.
+  const visibleMessages = useMemo(() => allMessages, [allMessages])
 
   const [activeConv, setActiveConv] = useState(null)
   const [input, setInput] = useState('')
@@ -57,6 +53,8 @@ export default function Messages() {
   }, [activeConv, setTypingHandler])
 
   const conversation = visibleMessages.find(m => m.id === activeConv) || visibleMessages[0]
+  // Role of the viewer *for the active thread* (a user can be artist on one and hirer on another).
+  const convIsArtist = conversation?.viewerIsArtist ?? isArtist
 
   useEffect(() => {
     const socket = getSocket()
@@ -103,21 +101,21 @@ export default function Messages() {
     markConversationRead(activeConv)
     const socket = getSocket()
     if (socket?.connected && conversation) {
-      const recipientId = isArtist ? conversation.employerId : conversation.artistProfileId
+      const recipientId = convIsArtist ? conversation.employerId : conversation.artistProfileId
       if (recipientId) {
         socket.emit('message:read', { conversationId: activeConv, recipientId })
       }
     }
-  }, [activeConv, conversation, isArtist, markConversationRead])
+  }, [activeConv, conversation, convIsArtist, markConversationRead])
 
-  const recipientProfileId = isArtist
+  const recipientProfileId = convIsArtist
     ? conversation?.employerId
     : conversation?.artistProfileId
 
   const handleSend = async () => {
     if (!input.trim() || !activeConv) return
 
-    const senderRole = isArtist ? 'artist' : 'user'
+    const senderRole = convIsArtist ? 'artist' : 'user'
     await sendMessage(activeConv, input.trim(), senderRole)
 
     if (isSupabaseConfigured) {
@@ -186,10 +184,10 @@ export default function Messages() {
               <div key={m.id}
                 className={`message-item ${m.id === (activeConv || visibleMessages[0]?.id) ? 'active' : ''} ${m.unread ? 'unread' : ''}`}
                 onClick={() => setActiveConv(m.id)}>
-                <div className="avatar avatar-sm">{isArtist ? <User size={16} /> : m.avatar}</div>
+                <div className="avatar avatar-sm">{m.viewerIsArtist ? <User size={16} /> : m.avatar}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span className="message-name">{isArtist ? 'Client' : m.artistName}</span>
+                    <span className="message-name">{m.viewerIsArtist ? 'Client' : m.artistName}</span>
                     <span className="message-time">{m.time}</span>
                   </div>
                   <div className="message-preview">
@@ -208,9 +206,9 @@ export default function Messages() {
       {conversation ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div className="avatar avatar-sm">{isArtist ? <User size={16} /> : conversation.avatar}</div>
+            <div className="avatar avatar-sm">{convIsArtist ? <User size={16} /> : conversation.avatar}</div>
             <div>
-              <div style={{ fontWeight: 600 }}>{isArtist ? 'Client' : conversation.artistName}</div>
+              <div style={{ fontWeight: 600 }}>{convIsArtist ? 'Client' : conversation.artistName}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 {typingIndicator[activeConv]
                   ? <span style={{ color: 'var(--accent)' }}>typing...</span>
@@ -223,9 +221,9 @@ export default function Messages() {
                 onClick={() => {
                   const project = localProjects.find(p => String(p.artistId) === String(conversation.artistId))
                   if (project) {
-                    sendMessage(activeConv, `I've accepted the project "${project.title}"! Let's get started.`, isArtist ? 'artist' : 'user')
+                    sendMessage(activeConv, `I've accepted the project "${project.title}"! Let's get started.`, convIsArtist ? 'artist' : 'user')
                   } else {
-                    sendMessage(activeConv, "I'm ready to accept! Please send over the project details.", isArtist ? 'artist' : 'user')
+                    sendMessage(activeConv, "I'm ready to accept! Please send over the project details.", convIsArtist ? 'artist' : 'user')
                   }
                 }}
               >
@@ -245,7 +243,7 @@ export default function Messages() {
 
           <div className="chat-messages">
             {(conversation.thread || []).map(msg => {
-              const isMe = isArtist ? msg.sender === 'artist' : msg.sender === 'user'
+              const isMe = convIsArtist ? msg.sender === 'artist' : msg.sender === 'user'
               return (
                 <div key={msg.id} className={`chat-bubble ${isMe ? 'sent' : 'received'}`}>
                   {msg.text}

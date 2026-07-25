@@ -53,6 +53,10 @@ export function mapConversationToClient(row, messages, { viewerIsArtist }) {
     employerId: row.employer_id,
     artistName,
     avatar: artistName.split(' ').map((n) => n[0]).join('').slice(0, 2),
+    // Per-conversation role of the viewer. A user who is both an artist and a
+    // hirer sees threads from both sides; the client renders each thread using
+    // this flag rather than a single global role.
+    viewerIsArtist: !!viewerIsArtist,
     unread,
     lastMessage: row.last_message ?? '',
     time: formatMessageTime(row.last_message_at) || 'Now',
@@ -72,7 +76,9 @@ export async function listConversationsForUser(db, userId) {
     .order('last_message_at', { ascending: false, nullsFirst: false })
 
   if (artistId) {
-    query = query.eq('artist_id', artistId)
+    // The user may be an artist AND a hirer — return threads from both sides so
+    // hirer-side conversations they start don't disappear on the next fetch.
+    query = query.or(`employer_id.eq.${userId},artist_id.eq.${artistId}`)
   } else {
     query = query.eq('employer_id', userId)
   }

@@ -1,6 +1,6 @@
 import { useState, useCallback, lazy, Suspense, useMemo, useEffect } from 'react'
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom'
-import { LayoutDashboard, Trophy, MessageSquare, Calendar, FileText, CreditCard, LogOut, Loader2, User, Menu, X, UserPlus, Shield } from './components/icons'
+import { LayoutDashboard, Trophy, MessageSquare, Calendar, FileText, CreditCard, LogOut, Loader2, User, Menu, X, UserPlus, Shield, Briefcase } from './components/icons'
 import { demoArtistPersona, isArtistProfile } from './lib/roleView'
 import { useArtistProfile } from './hooks/useArtistProfile'
 import { useMyApplication, isPendingApplicant, useAdminApplications } from './hooks/useArtistApplication'
@@ -28,6 +28,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Messages = lazy(() => import('./pages/Messages'))
 const Bookings = lazy(() => import('./pages/Bookings'))
 const Projects = lazy(() => import('./pages/Projects'))
+const Briefs = lazy(() => import('./pages/Briefs'))
 const Payments = lazy(() => import('./pages/Payments'))
 const SignIn = lazy(() => import('./pages/SignIn'))
 const SignUp = lazy(() => import('./pages/SignUp'))
@@ -212,6 +213,7 @@ function AppShell() {
         { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
         { path: '/bookings', icon: Calendar, label: 'Schedule' },
         { path: '/projects', icon: FileText, label: 'Projects' },
+        { path: '/briefs', icon: Briefcase, label: 'Open Briefs' },
         { path: '/payments', icon: CreditCard, label: 'Payments' },
       ]
     }
@@ -223,6 +225,7 @@ function AppShell() {
         { path: '/bookings', icon: Calendar, label: 'Schedule' },
         { path: '/disputes', icon: Shield, label: 'Disputes' },
         { path: '/projects', icon: FileText, label: 'Projects' },
+        { path: '/briefs', icon: Briefcase, label: 'Open Briefs' },
         { path: '/payments', icon: CreditCard, label: 'Earnings' },
       ]
       if (pid) {
@@ -237,6 +240,7 @@ function AppShell() {
       { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
       { path: '/bookings', icon: Calendar, label: 'Schedule' },
       { path: '/projects', icon: FileText, label: 'Projects' },
+      { path: '/briefs', icon: Briefcase, label: 'Open Briefs' },
       { path: '/payments', icon: CreditCard, label: 'Payments' },
     ]
   }, [effectiveRole, adminViewAs, unreadCount, demoPersona?.id, artist?.id, isAdmin, pendingApplicationCount, activeInviteCount, openDisputeCount])
@@ -538,6 +542,7 @@ function AppShell() {
                 <Route path="/messages" element={<ProtectedRoute><ApplicantGate><Messages /></ApplicantGate></ProtectedRoute>} />
                 <Route path="/bookings" element={<ProtectedRoute><ApplicantGate><Bookings /></ApplicantGate></ProtectedRoute>} />
                 <Route path="/projects" element={<ProtectedRoute><ApplicantGate><Projects /></ApplicantGate></ProtectedRoute>} />
+                <Route path="/briefs" element={<ProtectedRoute><ApplicantGate><Briefs /></ApplicantGate></ProtectedRoute>} />
                 <Route path="/payments" element={<ProtectedRoute><ApplicantGate><Payments /></ApplicantGate></ProtectedRoute>} />
                 <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
                 <Route path="/disputes" element={<ProtectedRoute><ApplicantGate><Disputes /></ApplicantGate></ProtectedRoute>} />

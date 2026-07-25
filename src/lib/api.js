@@ -332,6 +332,92 @@ export const contracts = {
   artistTaxDoc: (contractId) => request(`/api/contracts/${contractId}/artist-tax-doc`),
 }
 
+// ---- Open-brief marketplace ----
+const readBriefsMock = () => JSON.parse(localStorage.getItem('mock_briefs') || '[]')
+const writeBriefsMock = (list) => localStorage.setItem('mock_briefs', JSON.stringify(list))
+const readAppsMock = () => JSON.parse(localStorage.getItem('mock_brief_apps') || '[]')
+const writeAppsMock = (list) => localStorage.setItem('mock_brief_apps', JSON.stringify(list))
+
+export const briefs = {
+  list: async ({ mine = false } = {}) => {
+    if (!isSupabaseConfigured) {
+      const all = readBriefsMock()
+      const apps = readAppsMock()
+      if (mine) {
+        return all.map((b) => ({
+          ...b,
+          applicationCount: apps.filter((a) => a.briefId === b.id).length,
+        }))
+      }
+      return all.filter((b) => b.status === 'open')
+    }
+    return request(`/api/briefs${mine ? '?mine=1' : ''}`)
+  },
+
+  create: async (payload) => {
+    if (!isSupabaseConfigured) {
+      const brief = {
+        id: `mock-brief-${Date.now()}`,
+        ...payload,
+        status: 'open',
+        employerName: 'You',
+        createdAt: new Date().toISOString(),
+        applicationCount: 0,
+      }
+      writeBriefsMock([brief, ...readBriefsMock()])
+      return brief
+    }
+    return request('/api/briefs', { method: 'POST', body: JSON.stringify(payload) })
+  },
+
+  get: async (id) => {
+    if (!isSupabaseConfigured) {
+      const brief = readBriefsMock().find((b) => String(b.id) === String(id))
+      if (!brief) throw new Error('Brief not found')
+      return { ...brief, applications: readAppsMock().filter((a) => a.briefId === id) }
+    }
+    return request(`/api/briefs/${id}`)
+  },
+
+  update: async (id, patch) => {
+    if (!isSupabaseConfigured) {
+      const list = readBriefsMock().map((b) => (String(b.id) === String(id) ? { ...b, ...patch } : b))
+      writeBriefsMock(list)
+      return list.find((b) => String(b.id) === String(id))
+    }
+    return request(`/api/briefs/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
+  },
+
+  apply: async (id, payload) => {
+    if (!isSupabaseConfigured) {
+      const app = {
+        id: `mock-app-${Date.now()}`,
+        briefId: id,
+        artistName: 'You',
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        ...payload,
+      }
+      writeAppsMock([app, ...readAppsMock().filter((a) => !(a.briefId === id && a.artistName === 'You'))])
+      return app
+    }
+    return request(`/api/briefs/${id}/apply`, { method: 'POST', body: JSON.stringify(payload) })
+  },
+
+  setApplicationStatus: async (id, appId, status) => {
+    if (!isSupabaseConfigured) {
+      const list = readAppsMock().map((a) => (String(a.id) === String(appId) ? { ...a, status } : a))
+      writeAppsMock(list)
+      if (status === 'accepted') await briefs.update(id, { status: 'filled' })
+      return list.find((a) => String(a.id) === String(appId))
+    }
+    return request(`/api/briefs/${id}/applications/${appId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    })
+  },
+}
+
 // ---- Notifications ----
 export const notifications = {
   list: () => request('/api/notifications'),

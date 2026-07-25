@@ -87,5 +87,8 @@ export function durationUnitLabel(model) {
 export function formatBudgetRange(min, max) {
   const a = Number(min) || 0
   const b = Number(max) || 0
-  return `$${a.toLocaleString()} – $${b.toLocaleString()}`
+  if (!a && !b) return 'Flexible'
+  if (a && b && a !== b) return `$${a.toLocaleString()} – $${b.toLocaleString()}`
+  const single = a || b
+  return `$${single.toLocaleString()}`
 }

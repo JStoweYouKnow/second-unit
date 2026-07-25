@@ -23,6 +23,17 @@ import {
   getArtistIdForProfile,
 } from '../api/_lib/bookings.js'
 import { updatePendingBooking } from '../api/_lib/updateBooking.js'
+import {
+  listOpenBriefs,
+  listMyBriefs,
+  createBrief,
+  getBriefRow,
+  mapBriefToClient,
+  listApplicationsForBrief,
+  updateBrief,
+  applyToBrief,
+  updateApplicationStatus,
+} from '../api/_lib/briefs.js'
 import { listPaymentsForUser } from '../api/_lib/payments.js'
 import { completeBookingPayment } from '../api/_lib/completeBookingPayment.js'
 import { createProjectCheckoutSession } from '../api/_lib/checkout.js'
@@ -1075,6 +1086,125 @@ app.get('/api/contracts/:id/milestones', async (req, res) => {
       await ensureContractMilestones(database, contract)
     }
     res.json(await listMilestonesForContract(database, req.params.id))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ---- Open-brief marketplace ----
+app.get('/api/briefs', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  if (!db) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const mine = req.query?.mine === '1' || req.query?.mine === 'true'
+    const briefs = mine ? await listMyBriefs(db, user.id) : await listOpenBriefs(db, user.id)
+    res.json(briefs)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/briefs', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  if (!db) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const brief = await createBrief(db, user.id, req.body || {})
+    res.status(201).json(brief)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.get('/api/briefs/:id', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  if (!db) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const brief = await getBriefRow(db, req.params.id)
+    if (!brief) return res.status(404).json({ error: 'Brief not found' })
+    if (brief.employer_id === user.id) {
+      const result = await listApplicationsForBrief(db, req.params.id, user.id)
+      return res.json({ ...result.brief, applications: result.applications })
+    }
+    res.json(mapBriefToClient(brief))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.patch('/api/briefs/:id', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  if (!db) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const result = await updateBrief(db, req.params.id, user.id, req.body || {})
+    if (result.error === 'not_found') return res.status(404).json({ error: 'Brief not found' })
+    if (result.error === 'forbidden') return res.status(403).json({ error: 'Not your brief' })
+    res.json(result.brief)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/briefs/:id/apply', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  if (!db) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const result = await applyToBrief(db, req.params.id, user.id, req.body || {})
+    if (result.error === 'not_artist') return res.status(403).json({ error: 'Only artists can apply' })
+    if (result.error === 'not_found') return res.status(404).json({ error: 'Brief not found' })
+    if (result.error === 'closed') return res.status(400).json({ error: 'This brief is no longer open' })
+    try {
+      const { data: artist } = await db.from('artists').select('display_name').eq('id', result.artistId).maybeSingle()
+      await createNotification(db, {
+        userId: result.brief.employer_id,
+        type: 'system',
+        title: 'New application',
+        body: `${artist?.display_name || 'An artist'} applied to "${result.brief.title}"`,
+        link: `/briefs?id=${req.params.id}`,
+      })
+    } catch (notifyErr) {
+      console.error('[briefs] apply notify failed:', notifyErr?.message || notifyErr)
+    }
+    res.status(201).json(result.application)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.patch('/api/briefs/:id/applications/:appId', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  if (!db) return res.status(503).json({ error: 'Database not configured' })
+  const STATUS_MESSAGE = {
+    shortlisted: 'You were shortlisted for',
+    accepted: 'You were selected for',
+    declined: 'Your application was not selected for',
+  }
+  try {
+    const result = await updateApplicationStatus(db, req.params.id, req.params.appId, user.id, req.body?.status)
+    if (result.error === 'not_found') return res.status(404).json({ error: 'Not found' })
+    if (result.error === 'forbidden') return res.status(403).json({ error: 'Not your brief' })
+    if (result.error === 'bad_status') return res.status(400).json({ error: 'Invalid status' })
+    try {
+      const note = STATUS_MESSAGE[req.body?.status]
+      const artistProfileId = result.application.artistProfileId
+      if (note && artistProfileId) {
+        await createNotification(db, {
+          userId: artistProfileId,
+          type: 'system',
+          title: 'Application update',
+          body: `${note} "${result.brief.title}"`,
+          link: '/briefs',
+        })
+      }
+    } catch (notifyErr) {
+      console.error('[briefs] status notify failed:', notifyErr?.message || notifyErr)
+    }
+    res.json(result.application)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

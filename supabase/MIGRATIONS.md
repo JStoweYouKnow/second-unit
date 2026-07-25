@@ -70,6 +70,7 @@ npm run verify:migrations                      # includes product features
 | 32 | `avatars-storage.sql` | Profile avatar uploads (`avatars` bucket) |
 | 33 | `artist-skills-brands-sync-rpc.sql` | Artist-owned RPC to sync skills/brands (expertise) |
 | 34 | `contract-milestone-descriptions.sql` | Hirer-set expected deliverable per milestone (`contracts.milestone_descriptions`) |
+| 35 | `open-briefs.sql` | Open-brief marketplace (`open_briefs`, `brief_applications`) |
 
 ## Ad-hoc fixes (run only if needed)
 

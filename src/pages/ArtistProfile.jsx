@@ -1,7 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Heart, Star, MapPin, Calendar, Play, Globe, IconX, Instagram, LinkedIn, Send } from '../components/icons'
+import { ArrowLeft, Heart, Star, MapPin, Calendar, Play, Globe, IconX, Instagram, LinkedIn, Send, ChevronLeft, ChevronRight } from '../components/icons'
 import { useApp } from '../context/AppContext'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import CalendarModal from '../components/CalendarModal'
 import { useAuth } from '../context/AuthContext'
 import { artists as artistsApi } from '../lib/api'
@@ -402,35 +402,7 @@ export default function ArtistProfile() {
                 ))}
               </div>
               )}
-              {videoLinks.length > 0 && (
-                <div className="video-reel-list" style={{ marginTop: 28 }}>
-                  <h3 style={{ marginBottom: 16 }}>Video Reels</h3>
-                  <div className="video-reel-scroll" role="list" aria-label="Video reels">
-                    {videoLinks.map((reel, i) => {
-                      const url = videoReelUrl(reel)
-                      const label = videoReelTitle(reel, i)
-                      return (
-                        <div
-                          key={url || `reel-${i}`}
-                          className="card video-reel-item"
-                          role="listitem"
-                          style={{ padding: 0, overflow: 'hidden' }}
-                        >
-                          <VideoPlayer
-                            url={url}
-                            thumbnail={reel.thumbnail}
-                            title={label}
-                          />
-                          <div className="video-player__caption">
-                            <Play size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                            <span style={{ fontWeight: 500, fontSize: 14 }}>{label}</span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
+              {videoLinks.length > 0 && <VideoReelRow videoLinks={videoLinks} />}
             </div>
           )}
 
@@ -480,6 +452,82 @@ export default function ArtistProfile() {
           }}
         />
       )}
+    </div>
+  )
+}
+
+function VideoReelRow({ videoLinks }) {
+  const scrollRef = useRef(null)
+  const [canLeft, setCanLeft] = useState(false)
+  const [canRight, setCanRight] = useState(false)
+
+  const updateArrows = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const { scrollLeft, scrollWidth, clientWidth } = el
+    setCanLeft(scrollLeft > 4)
+    setCanRight(scrollLeft + clientWidth < scrollWidth - 4)
+  }, [])
+
+  useEffect(() => {
+    updateArrows()
+    const el = scrollRef.current
+    if (!el) return
+    el.addEventListener('scroll', updateArrows, { passive: true })
+    window.addEventListener('resize', updateArrows)
+    return () => {
+      el.removeEventListener('scroll', updateArrows)
+      window.removeEventListener('resize', updateArrows)
+    }
+  }, [updateArrows, videoLinks.length])
+
+  const scrollBy = (dir) => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollBy({ left: dir * Math.max(el.clientWidth * 0.8, 240), behavior: 'smooth' })
+  }
+
+  return (
+    <div className="video-reel-list" style={{ marginTop: 28 }}>
+      <h3 style={{ marginBottom: 16 }}>Video Reels</h3>
+      <div className="video-reel-viewport">
+        <button
+          type="button"
+          className={`video-reel-arrow video-reel-arrow--left ${canLeft ? '' : 'is-hidden'}`}
+          aria-label="Scroll to previous videos"
+          onClick={() => scrollBy(-1)}
+        >
+          <ChevronLeft size={22} />
+        </button>
+        <div className="video-reel-scroll" role="list" aria-label="Video reels" ref={scrollRef}>
+          {videoLinks.map((reel, i) => {
+            const url = videoReelUrl(reel)
+            const label = videoReelTitle(reel, i)
+            return (
+              <div
+                key={url || `reel-${i}`}
+                className="card video-reel-item"
+                role="listitem"
+                style={{ padding: 0, overflow: 'hidden' }}
+              >
+                <VideoPlayer url={url} thumbnail={reel.thumbnail} title={label} />
+                <div className="video-player__caption">
+                  <Play size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <span style={{ fontWeight: 500, fontSize: 14 }}>{label}</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <button
+          type="button"
+          className={`video-reel-arrow video-reel-arrow--right ${canRight ? '' : 'is-hidden'}`}
+          aria-label="Scroll to more videos"
+          onClick={() => scrollBy(1)}
+        >
+          <ChevronRight size={22} />
+        </button>
+      </div>
     </div>
   )
 }

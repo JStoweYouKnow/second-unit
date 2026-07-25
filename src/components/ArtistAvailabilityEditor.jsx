@@ -215,7 +215,7 @@ export default function ArtistAvailabilityEditor({
                   cursor: disabled ? 'default' : 'pointer',
                   border: 'none',
                   background: isSelected ? 'var(--accent)' : 'transparent',
-                  color: isSelected ? 'white' : undefined,
+                  color: isSelected ? 'var(--paper)' : undefined,
                 }}
                 aria-label={format(cell.date, 'EEEE, MMMM d, yyyy')}
                 aria-pressed={isSelected}

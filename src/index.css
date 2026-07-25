@@ -49,6 +49,9 @@
   --success: #1a6b4a;
   --success-muted-bg: rgba(26, 107, 74, 0.08);
   --warning: var(--ink-muted);
+  /* Text/icon color to sit ON a solid --success / --danger fill. */
+  --on-success: #ffffff;
+  --on-danger: #ffffff;
 
   --radius-sm: 0;
   --radius-md: 0;
@@ -104,6 +107,12 @@
   --silver: #a8a8a4;
   --bronze: #71716e;
   --success-muted-bg: rgba(26, 107, 74, 0.22);
+  /* Brighter status colors so labels/errors stay legible on the near-black bg,
+     with dark on-colors for solid button/badge fills. */
+  --danger: #f2647b;
+  --success: #3fbf8f;
+  --on-success: #0a0a0a;
+  --on-danger: #0a0a0a;
   --shadow-lg: 8px 8px 0 rgba(0, 0, 0, 0.45);
 
   --band-bg: #fafaf8;
@@ -361,9 +370,9 @@ img.brand-logo.brand-logo--auth {
 .btn-inverse:hover { background: var(--paper-warm); }
 .btn-secondary { background: var(--paper-elevated); color: var(--text-primary); border: 1px solid var(--border-strong); }
 .btn-secondary:hover { background: var(--surface); }
-.btn-success { background: var(--success); color: #fff; border-color: var(--success); }
+.btn-success { background: var(--success); color: var(--on-success); border-color: var(--success); }
 .btn-success:hover { filter: brightness(1.05); }
-.btn-danger { background: var(--danger); color: white; border-color: var(--danger); }
+.btn-danger { background: var(--danger); color: var(--on-danger); border-color: var(--danger); }
 .btn-ghost { background: transparent; color: var(--text-secondary); padding: 8px 12px; border-color: transparent; }
 .btn-ghost:hover { color: var(--text-primary); background: var(--surface); }
 .btn-sm { padding: 8px 16px; font-size: 12px; }
@@ -1508,7 +1517,7 @@ button.mobile-topbar-brand--home:focus-visible {
 .notif-bell:hover { color: var(--text-primary); border-color: var(--border-hover); }
 .notif-badge {
   position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px;
-  background: var(--danger); color: #fff; font-size: 10px; font-weight: 700;
+  background: var(--danger); color: var(--on-danger); font-size: 10px; font-weight: 700;
   border-radius: 10px; display: flex; align-items: center; justify-content: center;
   padding: 0 4px; border: 2px solid var(--bg-secondary);
   text-transform: none; letter-spacing: normal;

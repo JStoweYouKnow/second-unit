@@ -429,7 +429,7 @@ export default function Account() {
                       width: 32,
                       height: 32,
                       background: 'var(--accent)',
-                      color: 'white',
+                      color: 'var(--paper)',
                       borderColor: 'transparent',
                       opacity: avatarBusy ? 0.7 : 1,
                       zIndex: 1,

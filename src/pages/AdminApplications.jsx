@@ -87,7 +87,7 @@ function ApplicationCard({ app, onApprove, onReject, busy }) {
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowReject(false)} disabled={busy}>
                   Cancel
                 </button>
-                <button type="button" className="btn btn-sm" style={{ background: 'var(--danger)', color: '#fff', border: 'none' }} onClick={() => onReject(app.id, reason)} disabled={busy}>
+                <button type="button" className="btn btn-sm" style={{ background: 'var(--danger)', color: 'var(--on-danger)', border: 'none' }} onClick={() => onReject(app.id, reason)} disabled={busy}>
                   Confirm reject
                 </button>
               </div>

@@ -361,7 +361,7 @@ END:VCALENDAR`
                   className={`calendar-day ${!cell.inMonth ? 'other-month' : ''} ${cell.isToday ? 'today' : ''} ${clickable ? 'has-event' : ''}`}
                   style={{
                     ...(isSelected
-                      ? { background: 'var(--accent)', color: 'white', borderRadius: 'var(--radius-sm)' }
+                      ? { background: 'var(--accent)', color: 'var(--paper)', borderRadius: 'var(--radius-sm)' }
                       : {}),
                     cursor: clickable ? 'pointer' : 'default',
                     opacity: cell.past || !cell.inMonth ? 0.3 : hasOpen ? 1 : 0.45,

@@ -1,16 +1,21 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Send, Check, CheckCheck, HelpCircle, Wifi, WifiOff, User } from '../components/icons'
+import { Send, Check, CheckCheck, HelpCircle, Wifi, WifiOff, User, Plus, X, Search } from '../components/icons'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
+import { useArtists } from '../hooks/useData'
 import { getSocket } from '../lib/socket'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { useTypingBroadcast } from '../hooks/useTypingBroadcast'
 import { isArtistProfile } from '../lib/roleView'
 
 export default function Messages() {
-  const { allMessages, sendMessage, localProjects, markConversationRead, realtimeConnected } = useApp()
+  const { allMessages, sendMessage, startConversation, localProjects, markConversationRead, realtimeConnected } = useApp()
   const { user, profile } = useAuth()
+  const { artists } = useArtists()
   const isArtist = isArtistProfile(profile)
+  const [showCompose, setShowCompose] = useState(false)
+  const [composeSearch, setComposeSearch] = useState('')
+  const [composeBusy, setComposeBusy] = useState(false)
 
   // Show every thread the user is part of, from either side (hirer or artist).
   // Each conversation carries its own `viewerIsArtist`, so a dual-role user no
@@ -164,20 +169,47 @@ export default function Messages() {
 
   const liveConnected = realtimeConnected || socketOk
 
+  const handleStartConversation = async (artist) => {
+    if (composeBusy) return
+    setComposeBusy(true)
+    try {
+      const id = await startConversation(artist)
+      if (id) setActiveConv(id)
+      setShowCompose(false)
+      setComposeSearch('')
+    } finally {
+      setComposeBusy(false)
+    }
+  }
+
+  const composeCandidates = useMemo(() => {
+    const q = composeSearch.trim().toLowerCase()
+    return artists
+      .filter((a) => !q || a.name?.toLowerCase().includes(q) || a.role?.toLowerCase().includes(q))
+      .slice(0, 40)
+  }, [artists, composeSearch])
+
   return (
     <div className="page-container" style={{ padding: 0, display: 'flex', height: 'calc(100vh)', overflow: 'hidden' }}>
       <div style={{ width: 340, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '24px 20px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20 }}>Messages</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: liveConnected ? 'var(--success)' : 'var(--text-muted)' }}>
-            {liveConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
-            {liveConnected ? 'Live' : isSupabaseConfigured ? 'Connecting…' : 'Offline'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {!isArtist && (
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowCompose(true)}>
+                <Plus size={14} /> New
+              </button>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: liveConnected ? 'var(--success)' : 'var(--text-muted)' }}>
+              {liveConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
+              {liveConnected ? 'Live' : isSupabaseConfigured ? 'Connecting…' : 'Offline'}
+            </div>
           </div>
         </div>
         <div className="message-list" style={{ flex: 1, overflow: 'auto', padding: 8 }}>
           {visibleMessages.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
-              No messages yet. Start a conversation from an artist profile.
+              No messages yet.{!isArtist && ' Tap “New” to start a conversation with an artist.'}
             </div>
           ) : (
             visibleMessages.map(m => (
@@ -270,6 +302,50 @@ export default function Messages() {
       ) : (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
           Select a conversation to start messaging
+        </div>
+      )}
+
+      {showCompose && (
+        <div className="modal-overlay" role="presentation" onClick={() => setShowCompose(false)}>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="compose-title" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 id="compose-title">New message</h2>
+              <button type="button" className="btn-icon" onClick={() => setShowCompose(false)}><X size={18} /></button>
+            </div>
+            <div className="form-group" style={{ position: 'relative' }}>
+              <Search size={16} style={{ position: 'absolute', left: 12, top: 12, color: 'var(--text-muted)' }} />
+              <input
+                className="form-input"
+                style={{ paddingLeft: 36 }}
+                placeholder="Search artists by name or role…"
+                value={composeSearch}
+                onChange={(e) => setComposeSearch(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div style={{ maxHeight: 360, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {composeCandidates.length === 0 ? (
+                <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>No artists found.</div>
+              ) : (
+                composeCandidates.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    className="message-item"
+                    style={{ textAlign: 'left', width: '100%', opacity: composeBusy ? 0.6 : 1 }}
+                    disabled={composeBusy}
+                    onClick={() => handleStartConversation(a)}
+                  >
+                    <div className="avatar avatar-sm">{a.avatar || a.name?.slice(0, 2)}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="message-name">{a.name}</div>
+                      <div className="message-preview">{a.role}</div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

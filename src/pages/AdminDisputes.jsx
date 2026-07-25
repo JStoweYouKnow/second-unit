@@ -75,7 +75,7 @@ export default function AdminDisputes() {
       {loading ? (
         <div className="card" style={{ padding: 48, textAlign: 'center' }}><Loader2 className="animate-spin" size={28} /></div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 24 }}>
+        <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 24 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {openDisputes.length === 0 ? (
               <div className="card" style={{ padding: 20, color: 'var(--text-muted)' }}>No open disputes.</div>
@@ -121,7 +121,7 @@ export default function AdminDisputes() {
                     </select>
                   </div>
                   {outcome === 'split' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                    <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                       <div className="form-group" style={{ marginBottom: 0 }}>
                         <label className="form-label">Refund to employer ($)</label>
                         <input className="form-input" type="number" min="0" step="0.01" value={splitEmployer} onChange={(e) => setSplitEmployer(e.target.value)} required />

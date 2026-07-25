@@ -157,6 +157,43 @@ export function isMonthFullyPast(monthDate, timeZone) {
   return endKey < todayKeyInZone(timeZone)
 }
 
+const WEEKDAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/**
+ * A rolling calendar fragment that STARTS at today (no leading blank cells) and
+ * runs forward for `weeks` rows of 7 consecutive days. The weekday header labels
+ * are rotated so the first column matches today's weekday.
+ */
+export function buildForwardWeeks(weeks = 6, { timeZone } = {}) {
+  const todayKey = todayKeyInZone(timeZone)
+  // Local "today" for rendering; date comparisons use the timezone-aware key.
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+
+  const weekdayLabels = Array.from({ length: 7 }, (_, i) => WEEKDAY_ABBR[(start.getDay() + i) % 7])
+
+  const rows = []
+  let day = start
+  for (let w = 0; w < weeks; w++) {
+    const days = []
+    for (let i = 0; i < 7; i++) {
+      const d = day
+      const dateKey = format(d, 'yyyy-MM-dd')
+      days.push({
+        date: d,
+        dateKey,
+        inMonth: true,
+        past: dateKey < todayKey,
+        hide: false,
+        isToday: dateKey === todayKey,
+      })
+      day = addDays(day, 1)
+    }
+    rows.push(days)
+  }
+  return { weekdayLabels, weeks: rows }
+}
+
 /**
  * Build month grid weeks. Past days in the current month are placeholders
  * (hidden from booking) so the weekday columns stay aligned.

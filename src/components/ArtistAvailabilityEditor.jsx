@@ -1,19 +1,16 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   format,
-  addMonths,
-  subMonths,
   isSameDay,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Clock, Loader2, CheckCircle } from './icons'
+import { Clock, Loader2, CheckCircle, Plus } from './icons'
 import { useArtistAvailability } from '../hooks/useArtistAvailability'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import {
   STANDARD_SLOT_LABELS,
   SLOT_PRESETS,
   isPastDate,
-  isMonthFullyPast,
-  buildMonthWeeks,
+  buildForwardWeeks,
   sortSlotLabels,
   detectBrowserTimeZone,
   listTimeZones,
@@ -27,7 +24,7 @@ export default function ArtistAvailabilityEditor({
   onTimeZoneChange,
 }) {
   const { availability, loading, saving, error, updateDayAvailability } = useArtistAvailability(artistId)
-  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [weeksToShow, setWeeksToShow] = useState(6)
   const [selectedDate, setSelectedDate] = useState(null)
   const [draftSlots, setDraftSlots] = useState([])
   const [saveStatus, setSaveStatus] = useState('')
@@ -56,12 +53,18 @@ export default function ArtistAvailabilityEditor({
     setSaveStatus('')
   }, [selectedDateStr, dayEntry])
 
-  const weeks = useMemo(
-    () => buildMonthWeeks(currentMonth, { timeZone, hidePastDays: true }),
-    [currentMonth, timeZone]
+  const { weekdayLabels, weeks } = useMemo(
+    () => buildForwardWeeks(weeksToShow, { timeZone }),
+    [weeksToShow, timeZone]
   )
 
-  const canGoPrev = !isMonthFullyPast(subMonths(currentMonth, 1), timeZone)
+  const rangeLabel = useMemo(() => {
+    if (!weeks.length) return ''
+    const first = weeks[0][0].date
+    const last = weeks[weeks.length - 1][6].date
+    const sameYear = first.getFullYear() === last.getFullYear()
+    return `${format(first, 'MMM d')} – ${format(last, sameYear ? 'MMM d, yyyy' : 'MMM d, yyyy')}`
+  }, [weeks])
 
   const persistTimeZone = async (nextTz) => {
     setTimeZone(nextTz)
@@ -167,27 +170,15 @@ export default function ArtistAvailabilityEditor({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <button
-          type="button"
-          className="btn-icon"
-          onClick={() => canGoPrev && setCurrentMonth(subMonths(currentMonth, 1))}
-          aria-label="Previous month"
-          disabled={!canGoPrev}
-          style={{ opacity: canGoPrev ? 1 : 0.35 }}
-        >
-          <ChevronLeft size={16} />
-        </button>
         <span style={{ fontWeight: 600, fontFamily: 'var(--font-display)', fontSize: 16 }}>
-          {format(currentMonth, 'MMMM yyyy')}
+          {rangeLabel}
         </span>
-        <button type="button" className="btn-icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} aria-label="Next month">
-          <ChevronRight size={16} />
-        </button>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>From today forward</span>
       </div>
 
       <div className="calendar-grid" style={{ marginBottom: 4 }}>
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-          <div key={d} className="calendar-header">{d}</div>
+        {weekdayLabels.map((d, i) => (
+          <div key={`${d}-${i}`} className="calendar-header">{d}</div>
         ))}
       </div>
       {weeks.map((week) => (
@@ -235,6 +226,16 @@ export default function ArtistAvailabilityEditor({
           })}
         </div>
       ))}
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => setWeeksToShow((w) => w + 4)}
+        >
+          <Plus size={14} /> Show more weeks
+        </button>
+      </div>
 
       {selectedDate && !isPastDate(selectedDate, timeZone) && (
         <div className="slide-up" style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border)' }}>

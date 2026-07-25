@@ -42,8 +42,8 @@ export default function Terms() {
         Signing is a typed electronic signature (name + confirmation checkbox) that records timestamp, signer account,
         IP address when available, user agent, and a hash of the agreement content at sign time. This is intended to
         evidence intent under ESIGN/UETA-style frameworks; it is not third-party identity-proofed signing (e.g. DocuSign).
-        Parties remain responsible for ensuring agreements meet their legal and tax needs. Hirers may store W-9 / 1099
-        agreements in Account → Business &amp; tax; The Callsheet does not file taxes on your behalf.
+        Parties remain responsible for ensuring agreements meet their legal and tax needs. Artists upload W-9 forms in
+        Account → Tax info; The Callsheet does not file taxes on your behalf.
       </p>
 
       <h2>7. Disputes and Mediation</h2>

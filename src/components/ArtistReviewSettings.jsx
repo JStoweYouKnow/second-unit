@@ -14,7 +14,7 @@ export default function ArtistReviewSettings({
       <h3 style={{ marginBottom: 8, fontSize: 16 }}>Public review visibility</h3>
       <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.5 }}>
         Hirers can leave feedback after engagements. You control whether reviews appear on your profile
-        for clients browsing Artist Spotlight.
+        for clients browsing the Artist Database.
       </p>
 
       <label className="review-visibility-toggle">

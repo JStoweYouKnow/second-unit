@@ -1,17 +1,17 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { profileApi, billing, calendar } from '../lib/api'
-import { User, Mail, Shield, Bell, CreditCard, Camera, FileText, Trash2 } from '../components/icons'
+import { User, Mail, Shield, Bell, CreditCard, Camera, FileText, Trash2, Loader2 } from '../components/icons'
 import {
   uploadTaxDocument,
   listTaxDocuments,
   getTaxDocumentSignedUrl,
   deleteTaxDocument,
 } from '../lib/taxDocuments'
+import { uploadAvatar } from '../lib/avatarMedia'
 import PasswordInput from '../components/PasswordInput'
-import { ArtistFormFields } from '../components/ArtistFormFields'
 import ThemeToggle from '../components/ThemeToggle'
 import { MfaSettings } from '../components/MfaSettings'
 import {
@@ -19,13 +19,12 @@ import {
   subscribeToPushNotifications,
   unsubscribeFromPushNotifications,
 } from '../lib/pushNotifications'
-import { useArtistProfile, saveArtistProfile } from '../hooks/useArtistProfile'
+import { useArtistProfile } from '../hooks/useArtistProfile'
 import { useMyApplication, isPendingApplicant } from '../hooks/useArtistApplication'
-import { artistRecordToForm, emptyArtistForm } from '../lib/artistProfile'
 
 export default function Account() {
   const { profile, user, isMockMode, fetchProfile } = useAuth()
-  const { artist, loading: artistLoading, refetch: refetchArtist } = useArtistProfile(profile?.id)
+  const { artist } = useArtistProfile(profile?.id)
   const { application, loading: appLoading } = useMyApplication(profile?.id)
 
   const [activeTab, setActiveTab] = useState('profile')
@@ -43,11 +42,12 @@ export default function Account() {
   const [taxDocs, setTaxDocs] = useState([])
   const [taxBusy, setTaxBusy] = useState(false)
   const [taxDocType, setTaxDocType] = useState('w9')
-  const [artistForm, setArtistForm] = useState(emptyArtistForm())
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordMsg, setPasswordMsg] = useState('')
+  const [avatarBusy, setAvatarBusy] = useState(false)
+  const avatarInputRef = useRef(null)
   const [notifPrefs, setNotifPrefs] = useState({
     messages: true,
     projects: true,
@@ -75,7 +75,7 @@ export default function Account() {
   }, [profile])
 
   useEffect(() => {
-    if (!profile?.id || profile?.role === 'artist') return
+    if (!profile?.id || profile?.role !== 'artist') return
     listTaxDocuments(profile.id)
       .then(setTaxDocs)
       .catch(() => setTaxDocs([]))
@@ -83,7 +83,6 @@ export default function Account() {
 
   useEffect(() => {
     if (artist) {
-      setArtistForm(artistRecordToForm(artist))
       setFullName(artist.displayName || profile?.full_name || '')
     }
   }, [artist, profile?.full_name])
@@ -271,34 +270,46 @@ export default function Account() {
     }
   }
 
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !profile?.id) return
+
+    setAvatarBusy(true)
+    setError('')
+    try {
+      if (!isSupabaseConfigured || !supabase) {
+        throw new Error('Avatar upload is unavailable in demo mode.')
+      }
+      const { mediaUrl } = await uploadAvatar(profile.id, file)
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          avatar_url: mediaUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', profile.id)
+      if (updateError) throw updateError
+      await fetchProfile?.(profile.id)
+    } catch (err) {
+      setError(err.message || 'Could not upload profile photo')
+    } finally {
+      setAvatarBusy(false)
+    }
+  }
+
   const handleSave = async () => {
     setIsSaving(true)
     setSaved(false)
     setError('')
 
-    if (isApprovedArtist) {
-      const { error: saveError } = await saveArtistProfile({
-        profileId: profile.id,
-        fullName,
-        form: artistForm,
-        existingArtist: artist,
-      })
-
-      if (saveError) {
-        setError(saveError.message || 'Failed to save profile')
-        setIsSaving(false)
-        return
-      }
-
-      await refetchArtist()
-      await fetchProfile?.(profile.id)
-    } else if (profile?.id) {
+    if (profile?.id) {
       if (isSupabaseConfigured) {
         const patch = {
           full_name: fullName.trim(),
           updated_at: new Date().toISOString(),
         }
-        if (profile.role !== 'artist') {
+        if (profile.role === 'artist') {
           Object.assign(patch, {
             company_name: companyName.trim() || null,
             business_type: businessType.trim() || null,
@@ -307,10 +318,9 @@ export default function Account() {
             billing_region: billingRegion.trim() || null,
             billing_postal: billingPostal.trim() || null,
             billing_country: 'US',
-            tax_onboarding_completed_at:
-              companyName.trim() && taxDocs.length
-                ? profile.tax_onboarding_completed_at || new Date().toISOString()
-                : profile.tax_onboarding_completed_at || null,
+            tax_onboarding_completed_at: taxDocs.some((d) => d.doc_type === 'w9')
+              ? profile.tax_onboarding_completed_at || new Date().toISOString()
+              : profile.tax_onboarding_completed_at || null,
           })
         }
         const { error: profileError } = await supabase
@@ -323,7 +333,7 @@ export default function Account() {
           setIsSaving(false)
           return
         }
-      } else {
+      } else if (isMockMode) {
         localStorage.setItem('mock_user_name', fullName)
       }
       await fetchProfile?.(profile.id)
@@ -381,15 +391,59 @@ export default function Account() {
           {activeTab === 'profile' && (
             <div className="slide-up">
               <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: 32 }}>
-                <div className="avatar" style={{ width: 80, height: 80, fontSize: 32, position: 'relative' }}>
-                  {(fullName || 'U').split(' ').map(n => n[0]).join('').slice(0, 2)}
-                  <button type="button" className="btn-icon" style={{ position: 'absolute', bottom: -4, right: -4, width: 32, height: 32, background: 'var(--accent)', color: 'white', borderColor: 'transparent' }}>
-                    <Camera size={16} />
+                <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
+                  <div
+                    className="avatar"
+                    style={{
+                      width: 80,
+                      height: 80,
+                      fontSize: 32,
+                      overflow: 'hidden',
+                      background: profile?.avatar_url
+                        ? `url(${profile.avatar_url}) center/cover no-repeat`
+                        : undefined,
+                      color: profile?.avatar_url ? 'transparent' : undefined,
+                    }}
+                    aria-label="Profile photo"
+                  >
+                    {!profile?.avatar_url && (fullName || 'U').split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  </div>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    hidden
+                    onChange={handleAvatarUpload}
+                  />
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    disabled={avatarBusy || !profile?.id}
+                    onClick={() => avatarInputRef.current?.click()}
+                    aria-label="Upload profile photo"
+                    title="Upload profile photo"
+                    style={{
+                      position: 'absolute',
+                      bottom: -4,
+                      right: -4,
+                      width: 32,
+                      height: 32,
+                      background: 'var(--accent)',
+                      color: 'white',
+                      borderColor: 'transparent',
+                      opacity: avatarBusy ? 0.7 : 1,
+                      zIndex: 1,
+                    }}
+                  >
+                    {avatarBusy ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
                   </button>
                 </div>
                 <div>
                   <h3 style={{ margin: 0 }}>{fullName || 'User'}</h3>
                   <p style={{ color: 'var(--text-muted)', margin: '4px 0 0 0' }}>{user?.email}</p>
+                  <p style={{ color: 'var(--text-muted)', margin: '6px 0 0 0', fontSize: 12 }}>
+                    JPG, PNG, WebP, or GIF · max 5MB
+                  </p>
                 </div>
               </div>
 
@@ -420,18 +474,18 @@ export default function Account() {
                 </div>
               </div>
 
-              {profile?.role !== 'artist' && (
+              {profile?.role === 'artist' && (
                 <>
                   <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
-                  <h3 style={{ marginBottom: 8 }}>Business & tax</h3>
+                  <h3 style={{ marginBottom: 8 }}>Tax info (W-9)</h3>
                   <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20 }}>
-                    Optional for first payments. Store company details and upload W-9 / 1099 agreements for your records.
+                    Required before payouts. Add your legal name or business entity and upload a completed W-9 so hirers can issue 1099s.
                     The Callsheet does not file taxes for you.
                   </p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                     <div className="form-group">
-                      <label className="form-label">Company / legal entity</label>
-                      <input className="filter-select" style={{ width: '100%' }} value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Acme Productions LLC" />
+                      <label className="form-label">Legal name / business entity</label>
+                      <input className="filter-select" style={{ width: '100%' }} value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Jane Doe or Doe Creative LLC" />
                     </div>
                     <div className="form-group">
                       <label className="form-label">Business type</label>
@@ -486,6 +540,16 @@ export default function Account() {
                             try {
                               const row = await uploadTaxDocument(profile.id, file, { docType: taxDocType })
                               setTaxDocs((prev) => [row, ...prev])
+                              if (taxDocType === 'w9' && isSupabaseConfigured && supabase && !profile.tax_onboarding_completed_at) {
+                                await supabase
+                                  .from('profiles')
+                                  .update({
+                                    tax_onboarding_completed_at: new Date().toISOString(),
+                                    updated_at: new Date().toISOString(),
+                                  })
+                                  .eq('id', profile.id)
+                                await fetchProfile?.(profile.id)
+                              }
                             } catch (err) {
                               setError(err.message || 'Upload failed — run employer-tax-vault.sql in Supabase if missing')
                             } finally {
@@ -548,16 +612,11 @@ export default function Account() {
               {isApprovedArtist && (
                 <>
                   <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
-                  <h3 style={{ marginBottom: 24 }}>Artist Profile Details</h3>
+                  <h3 style={{ marginBottom: 12 }}>Artist profile</h3>
                   <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
-                    For header image, portfolio layout, and Spotlight visibility, use{' '}
-                    <Link to="/dashboard" state={{ artistDashTab: 'profile' }}>Dashboard → My profile</Link>.
+                    Header image, portfolio, reels, and database listing visibility are edited from{' '}
+                    <Link to={artist?.id ? `/artist/${artist.id}` : '/dashboard'}>My profile</Link> in the sidebar.
                   </p>
-                  {artistLoading ? (
-                    <p style={{ color: 'var(--text-muted)' }}>Loading artist profile…</p>
-                  ) : (
-                    <ArtistFormFields form={artistForm} onChange={setArtistForm} />
-                  )}
                 </>
               )}
 
@@ -629,7 +688,7 @@ export default function Account() {
                   type="button"
                   className="btn btn-primary"
                   onClick={handleSave}
-                  disabled={isSaving || (isApprovedArtist && artistLoading) || appLoading}
+                  disabled={isSaving || appLoading}
                 >
                   {isSaving ? 'Saving...' : 'Save Changes'}
                 </button>

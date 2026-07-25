@@ -81,8 +81,12 @@ export function ArtistFormFields({ form, onChange, showAccountFields = false, di
           placeholder="e.g. AI Visual Artist, Motion Designer"
           value={form.roleTitle}
           onChange={set('roleTitle')}
+          maxLength={80}
           required
         />
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>
+          One short line for your specialty — put longer background in your bio below.
+        </span>
       </div>
 
       <div className="form-group">
@@ -99,7 +103,7 @@ export function ArtistFormFields({ form, onChange, showAccountFields = false, di
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
         <div className="form-group">
-          <label className="form-label">Core Skills (comma separated)</label>
+          <label className="form-label">Technical Expertise (comma separated)</label>
           <input
             className="form-input"
             placeholder="Midjourney, Stable Diffusion, Runway"
@@ -107,6 +111,9 @@ export function ArtistFormFields({ form, onChange, showAccountFields = false, di
             onChange={set('skills')}
             required
           />
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, display: 'block' }}>
+            Shown on your public profile under Technical Expertise.
+          </span>
         </div>
         <div className="form-group">
           <label className="form-label">Location</label>
@@ -127,42 +134,6 @@ export function ArtistFormFields({ form, onChange, showAccountFields = false, di
             placeholder="Nike, Apple, Spotify"
             value={form.brands}
             onChange={set('brands')}
-          />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Hourly Rate (USD, private)</label>
-          <input
-            className="form-input"
-            type="number"
-            min="0"
-            placeholder="e.g. 450"
-            value={form.hourlyRate}
-            onChange={set('hourlyRate')}
-          />
-          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, display: 'block' }}>
-            Not shown on your public profile or Spotlight — used when you negotiate fees.
-          </span>
-        </div>
-        <div className="form-group">
-          <label className="form-label">Day Rate (USD, private)</label>
-          <input
-            className="form-input"
-            type="number"
-            min="0"
-            placeholder="e.g. 2800"
-            value={form.dailyRate}
-            onChange={set('dailyRate')}
-          />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Flat Project Rate (USD, private)</label>
-          <input
-            className="form-input"
-            type="number"
-            min="0"
-            placeholder="e.g. 12000"
-            value={form.projectFlatRate}
-            onChange={set('projectFlatRate')}
           />
         </div>
       </div>
@@ -190,7 +161,7 @@ export function ArtistFormFields({ form, onChange, showAccountFields = false, di
       <div className="form-group">
         <label className="form-label">Video Reels</label>
         <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 10px' }}>
-          Add a title and YouTube or Vimeo link for each reel.
+          Add a title and YouTube or Vimeo link for each reel. Optional cover image replaces the default thumbnail until play.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {rows.map((row, index) => (
@@ -224,12 +195,21 @@ export function ArtistFormFields({ form, onChange, showAccountFields = false, di
                   onChange={(e) => setVideoReelAt(index, { url: e.target.value })}
                   aria-label={`Video reel URL ${index + 1}`}
                 />
+                <input
+                  className="form-input"
+                  type="url"
+                  inputMode="url"
+                  placeholder="Cover image URL (optional — custom poster before play)"
+                  value={row.thumbnail || ''}
+                  onChange={(e) => setVideoReelAt(index, { thumbnail: e.target.value })}
+                  aria-label={`Video reel cover image ${index + 1}`}
+                />
               </div>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
                 onClick={() => removeVideoReel(index)}
-                disabled={rows.length === 1 && !row.url.trim() && !row.title.trim()}
+                disabled={rows.length === 1 && !row.url.trim() && !row.title.trim() && !row.thumbnail?.trim()}
                 aria-label={`Remove video reel ${index + 1}`}
                 title="Remove"
                 style={{ flexShrink: 0, padding: '8px 10px' }}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Heart, Star, Calendar, TrendingUp, Users, DollarSign, FileText, ArrowUpRight, BarChart3, PieChart, Activity, User, MapPin, ChevronRight, Loader2 } from '../components/icons'
 import { useArtists } from '../hooks/useData'
 import { buildOpenBriefCards } from '../lib/openBriefs'
@@ -10,9 +10,8 @@ import { useApp } from '../context/AppContext'
 import { demoArtistPersona } from '../lib/roleView'
 import { buildMonthlySeries, buildMonthlyCounts, parseRowDate } from '../lib/analytics'
 import { artistReleasedAmount } from '../lib/fees'
-import { bookingSubtotal } from '../lib/pricing'
+import { bookingSubtotal, formatBudgetRange } from '../lib/pricing'
 import ArtistAvailabilityEditor from '../components/ArtistAvailabilityEditor'
-import ArtistMyProfileEditor from '../components/ArtistMyProfileEditor'
 import { stripeConnect } from '../lib/api'
 import { isSupabaseConfigured } from '../lib/supabase'
 
@@ -86,9 +85,66 @@ function Sparkline({ data, color = 'var(--accent)', height = 40 }) {
   )
 }
 
+function OpenBriefsSection({ projects, emptyMessage }) {
+  return (
+    <section className="spotlight-projects slide-up" style={{ marginBottom: 32 }}>
+      <div className="spotlight-projects__head">
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20 }}>Your open briefs</h2>
+        <p className="spotlight-projects__sub">
+          Live booking requests and contract offers — budgets are for reference; final fees are negotiated in thread.
+        </p>
+      </div>
+      <div className="spotlight-projects__grid">
+        {projects.length === 0 ? (
+          <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
+            {emptyMessage}
+          </div>
+        ) : (
+          projects.map((proj) => (
+            <article
+              key={proj.id}
+              className="spotlight-project-card card slide-up"
+              style={proj.isOffer ? { borderColor: 'var(--accent)', borderWidth: 1, borderStyle: 'solid' } : undefined}
+            >
+              {proj.isOffer && (
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                  Contract offer
+                </div>
+              )}
+              <div className="spotlight-project-card__top">
+                <div>
+                  <h3 className="spotlight-project-card__title">{proj.title}</h3>
+                  <div className="spotlight-project-card__meta">
+                    <span className="spotlight-project-card__client">{proj.client}</span>
+                    <span className="spotlight-project-card__posted">Posted {proj.posted}</span>
+                  </div>
+                </div>
+                <div className="spotlight-project-card__budget" title="Budget for this brief">
+                  <DollarSign size={18} aria-hidden />
+                  <span>{formatBudgetRange(proj.budgetMin, proj.budgetMax)}</span>
+                </div>
+              </div>
+              <div className="spotlight-project-card__row">
+                <span className="spotlight-project-card__label"><MapPin size={14} aria-hidden /> {proj.location}</span>
+                <span className="spotlight-project-card__label">Timeline: {proj.timeline}</span>
+              </div>
+              {proj.skills.length > 0 && (
+                <div className="artist-skills" style={{ marginTop: 10 }}>
+                  {proj.skills.map((s) => (
+                    <span key={s} className="skill-tag">{s}</span>
+                  ))}
+                </div>
+              )}
+            </article>
+          ))
+        )}
+      </div>
+    </section>
+  )
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { profile, effectiveRole, isAuthenticated } = useAuth()
   const { favorites, localProjects, bookings: allBookings } = useApp()
   const { artists } = useArtists()
@@ -99,15 +155,6 @@ export default function Dashboard() {
   const favArtists = artists.filter((a) => favorites.includes(a.id))
   const [timeRange, setTimeRange] = useState('6m')
   const [payoutReady, setPayoutReady] = useState(null)
-  const [artistDashTab, setArtistDashTab] = useState(
-    location.state?.artistDashTab === 'profile' ? 'profile' : 'overview'
-  )
-
-  useEffect(() => {
-    if (location.state?.artistDashTab === 'profile') {
-      setArtistDashTab('profile')
-    }
-  }, [location.state])
 
   useEffect(() => {
     if (!isArtist || !isSupabaseConfigured) {
@@ -286,31 +333,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="tabs" style={{ marginBottom: 28 }}>
-          <button
-            type="button"
-            className={`tab ${artistDashTab === 'overview' ? 'active' : ''}`}
-            onClick={() => setArtistDashTab('overview')}
-          >
-            Overview
-          </button>
-          <button
-            type="button"
-            className={`tab ${artistDashTab === 'profile' ? 'active' : ''}`}
-            onClick={() => setArtistDashTab('profile')}
-          >
-            My profile
-          </button>
-        </div>
-
-        {artistDashTab === 'profile' ? (
-          <ArtistMyProfileEditor
-            artistId={me.id}
-            onUpdated={() => refetchMyArtist?.()}
-          />
-        ) : (
-        <>
-
         {payoutReady === null && isSupabaseConfigured && (
           <div className="stripe-prompt stripe-prompt--action slide-up" style={{ padding: '16px 22px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -484,57 +506,10 @@ export default function Dashboard() {
           )}
         </div>
 
-        <section className="spotlight-projects" style={{ padding: 0 }}>
-          <div className="spotlight-projects__head">
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20 }}>Available projects</h2>
-            <p className="spotlight-projects__sub">
-              Client-listed budgets for scope reference — final compensation is always negotiated in your thread.
-            </p>
-          </div>
-          <div className="spotlight-projects__grid">
-            {[...contractOffers, ...openBriefs].length === 0 ? (
-              <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
-                No open projects yet — contract offers and booking requests will appear here.
-              </div>
-            ) : (
-            [...contractOffers, ...openBriefs].map((proj) => (
-              <article key={proj.id} className="spotlight-project-card card slide-up" style={proj.isOffer ? { borderColor: 'var(--accent)', borderWidth: 1, borderStyle: 'solid' } : undefined}>
-                {proj.isOffer && (
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-                    Contract offer
-                  </div>
-                )}
-                <div className="spotlight-project-card__top">
-                  <div>
-                    <h3 className="spotlight-project-card__title">{proj.title}</h3>
-                    <div className="spotlight-project-card__meta">
-                      <span className="spotlight-project-card__client">{proj.client}</span>
-                      <span className="spotlight-project-card__posted">Posted {proj.posted}</span>
-                    </div>
-                  </div>
-                  <div className="spotlight-project-card__budget" title="Client budget range for this brief">
-                    <DollarSign size={18} aria-hidden />
-                    <span>{formatBudgetRange(proj.budgetMin, proj.budgetMax)}</span>
-                  </div>
-                </div>
-                <div className="spotlight-project-card__row">
-                  <span className="spotlight-project-card__label"><MapPin size={14} aria-hidden /> {proj.location}</span>
-                  <span className="spotlight-project-card__label">Timeline: {proj.timeline}</span>
-                </div>
-                {proj.skills.length > 0 && (
-                  <div className="artist-skills" style={{ marginTop: 10 }}>
-                    {proj.skills.map((s) => (
-                      <span key={s} className="skill-tag">{s}</span>
-                    ))}
-                  </div>
-                )}
-              </article>
-            ))
-            )}
-          </div>
-        </section>
-        </>
-        )}
+        <OpenBriefsSection
+          projects={[...contractOffers, ...openBriefs]}
+          emptyMessage="No open briefs yet. Pending bookings and active contracts appear here."
+        />
       </div>
     )
   }
@@ -646,30 +621,15 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <OpenBriefsSection
+        projects={openBriefs}
+        emptyMessage="No open briefs yet. Pending bookings and active contracts appear here."
+      />
+
       {/* Projects in Phases */}
       <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 20 }}>Your Projects</h2>
       
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 32 }}>
-        {/* Open Projects */}
-        <div className="card" style={{ padding: 20 }}>
-          <h3 style={{ fontSize: 15, marginBottom: 16, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} /> Open Briefs
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {openBriefs.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No open briefs — pending bookings and contracts appear here.</p>
-            ) : (
-            openBriefs.slice(0, 2).map(p => (
-              <div key={p.id} className="project-phase-card">
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{p.title}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.posted} · {p.location}</div>
-              </div>
-            ))
-            )}
-            <button type="button" className="btn btn-ghost btn-sm" style={{ width: '100%', marginTop: 8 }} onClick={() => navigate('/bookings')}>View bookings</button>
-          </div>
-        </div>
-
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
         {/* In Progress Projects */}
         <div className="card" style={{ padding: 20 }}>
           <h3 style={{ fontSize: 15, marginBottom: 16, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -709,7 +669,7 @@ export default function Dashboard() {
       {favArtists.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)', marginBottom: 32 }}>
           <Heart size={32} style={{ marginBottom: 8, opacity: 0.5 }} />
-          <p>No favorites yet. Browse Artist Spotlight to add artists.</p>
+          <p>No favorites yet. Browse the Artist Database to add artists.</p>
           <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => navigate('/')}>Browse Artists</button>
         </div>
       ) : (

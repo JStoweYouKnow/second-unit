@@ -11,7 +11,7 @@ function sanitizeFilename(name) {
 }
 
 /**
- * Upload a private tax document for the signed-in hirer.
+ * Upload a private tax document (W-9, etc.) for the signed-in user.
  * Path: {userId}/{timestamp}-{filename}
  */
 export async function uploadTaxDocument(userId, file, { docType = 'other', notes = '' } = {}) {

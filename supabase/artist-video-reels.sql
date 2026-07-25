@@ -1,4 +1,4 @@
--- Named video reels: jsonb [{ "url": "...", "title": "..." }]
+-- Named video reels: jsonb [{ "url": "...", "title": "...", "thumbnail": "..." }]
 -- Keeps legacy video_links text[] in sync (URLs only) for older readers.
 -- Run after artist-featured-header.sql / artist-applications.sql
 
@@ -9,9 +9,9 @@ alter table public.artist_applications
   add column if not exists video_reels jsonb not null default '[]'::jsonb;
 
 comment on column public.artists.video_reels is
-  'Portfolio video reels as [{url, title}]. video_links mirrors URLs for compatibility.';
+  'Portfolio video reels as [{url, title, thumbnail?}]. video_links mirrors URLs for compatibility.';
 comment on column public.artist_applications.video_reels is
-  'Application video reels as [{url, title}].';
+  'Application video reels as [{url, title, thumbnail?}].';
 
 -- Backfill from legacy URL arrays
 update public.artists

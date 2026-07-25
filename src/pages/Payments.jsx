@@ -718,7 +718,7 @@ https://thecallsheet.ai
         </div>
       )}
 
-      {!isArtist && profile && (!profile.company_name || !profile.tax_onboarding_completed_at) && (
+      {isArtist && profile && !profile.tax_onboarding_completed_at && (
         <div
           className="slide-up"
           style={{
@@ -738,10 +738,9 @@ https://thecallsheet.ai
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
             <FileText size={16} style={{ marginTop: 2, flexShrink: 0, color: 'var(--text-muted)' }} />
             <div>
-              <strong>Hirer business profile</strong>
+              <strong>W-9 required for payouts</strong>
               <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 13 }}>
-                Optional before first paid jobs: add company details and upload W-9 / 1099 agreements in Account.
-                Card checkout still works without this.
+                Add your legal name or business entity and upload a completed W-9 in Account before receiving paid work.
               </p>
             </div>
           </div>

@@ -14,6 +14,12 @@ export const MOCK_ARTIST_PROFILE_KEY = 'mock_artist_profile'
 export const MOCK_APPLICATIONS_QUEUE_KEY = 'mock_applications_queue'
 
 export function parseCommaList(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === 'string' ? item : item?.name || ''))
+      .map((s) => String(s).trim())
+      .filter(Boolean)
+  }
   if (!value || typeof value !== 'string') return []
   return value
     .split(',')
@@ -22,8 +28,13 @@ export function parseCommaList(value) {
 }
 
 export function joinCommaList(items) {
+  if (typeof items === 'string') return items
   if (!Array.isArray(items)) return ''
-  return items.filter(Boolean).join(', ')
+  return items
+    .map((item) => (typeof item === 'string' ? item : item?.name || ''))
+    .map((s) => String(s).trim())
+    .filter(Boolean)
+    .join(', ')
 }
 
 export function emptyArtistForm() {
@@ -95,7 +106,6 @@ export function artistRecordToForm(artist) {
 
 export function formToApplicationPayload(form, profileId, email) {
   // Only columns on artist_applications (see supabase/artist-applications.sql).
-  // day_rate / project_flat_rate belong on artists, not applications.
   const videoPayload = videoReelsToPayload(form.videoLinks)
   return {
     profile_id: profileId,
@@ -104,7 +114,7 @@ export function formToApplicationPayload(form, profileId, email) {
     role_title: form.roleTitle.trim(),
     bio: form.bio.trim() || null,
     location: form.location.trim() || null,
-    hourly_rate: form.hourlyRate ? parseInt(form.hourlyRate, 10) || 0 : 0,
+    hourly_rate: 0,
     skills: parseCommaList(form.skills),
     brands: parseCommaList(form.brands),
     website: normalizeSocialUrl(form.website, 'website'),
@@ -126,9 +136,6 @@ export function formToArtistPayload(form) {
     role_title: form.roleTitle.trim(),
     bio: form.bio.trim() || null,
     location: form.location.trim() || null,
-    hourly_rate: form.hourlyRate ? parseInt(form.hourlyRate, 10) || 0 : 0,
-    day_rate: form.dailyRate ? parseInt(form.dailyRate, 10) || null : null,
-    project_flat_rate: form.projectFlatRate ? parseInt(form.projectFlatRate, 10) || null : null,
     website: normalizeSocialUrl(form.website, 'website'),
     twitter: normalizeSocialUrl(form.twitter, 'twitter'),
     instagram: normalizeSocialUrl(form.instagram, 'instagram'),

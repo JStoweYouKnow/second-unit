@@ -38,6 +38,8 @@ export const FEATURE_MIGRATIONS = [
   'artist-video-reels.sql',
   'artist-timezone.sql',
   'artist-profile-public.sql',
+  'avatars-storage.sql',
+  'artist-skills-brands-sync-rpc.sql',
 ]
 
 /** Tracking table bootstrap — apply once before recording other migrations. */

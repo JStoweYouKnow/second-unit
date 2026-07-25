@@ -9,7 +9,7 @@ import { useArtist } from '../hooks/useData'
 import { useArtistProfile, saveArtistProfile } from '../hooks/useArtistProfile'
 import { useArtistReviews } from '../hooks/useArtistReviews'
 import { useAuth } from '../context/AuthContext'
-import { artistRecordToForm, emptyArtistForm } from '../lib/artistProfile'
+import { artistRecordToForm, emptyArtistForm, parseCommaList } from '../lib/artistProfile'
 import { portfolio as portfolioApi } from '../lib/api'
 import { uploadPortfolioMedia, uploadHeaderImage, deletePortfolioStoragePath } from '../lib/portfolioMedia'
 import { resolveProfileHero } from '../lib/profileHero'
@@ -30,7 +30,7 @@ function mapPortfolioRow(p) {
 }
 
 /**
- * Artist Dashboard “My profile” — edit public layout, header, portfolio, and listing.
+ * Sidebar “My profile” — edit public layout, header, portfolio, and listing.
  */
 export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
   const { profile } = useAuth()
@@ -102,7 +102,7 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
     setError('')
     try {
       await patchArtist({ is_public: next })
-      setStatus(next ? 'Profile listed on Artist Spotlight' : 'Profile hidden from Spotlight')
+      setStatus(next ? 'Profile listed in Artist Database' : 'Profile hidden from database')
       onUpdated?.()
       setTimeout(() => setStatus(''), 2500)
     } catch (err) {
@@ -160,7 +160,7 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
     try {
       const { error: saveError } = await saveArtistProfile({
         profileId: profile.id,
-        fullName: profile.full_name || form.displayName,
+        fullName: form.fullName || profile.full_name || artist?.name || '',
         form,
         existingArtist: artistRecord,
       })
@@ -259,7 +259,7 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
         <div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, margin: '0 0 6px' }}>My profile</h2>
           <p style={{ margin: 0, fontSize: 14, color: 'var(--text-muted)' }}>
-            Edit how your public page looks. Hirers see this layout on Artist Spotlight.
+            Edit how your public page looks. Hirers see this layout in the Artist Database.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -270,9 +270,9 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
             aria-pressed={isPublic}
           >
             {isPublic ? <Eye size={14} /> : <EyeOff size={14} />}
-            {isPublic ? ' Public on Spotlight' : ' Hidden from Spotlight'}
+            {isPublic ? ' Listed in database' : ' Hidden from database'}
           </button>
-          <Link to={`/artist/${artistId}`} className="btn btn-secondary btn-sm">
+          <Link to={`/artist/${artistId}?view=public`} className="btn btn-secondary btn-sm">
             <ExternalLink size={14} /> View public page
           </Link>
         </div>
@@ -290,11 +290,8 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
           External preview
         </div>
         <div
-          className={`profile-hero${heroImg || heroVideo ? ' profile-hero--visual' : ''}`}
-          style={{
-            minHeight: 180,
-            ...(heroImg && !heroVideo ? { backgroundImage: `url(${heroImg})` } : {}),
-          }}
+          className={`profile-hero profile-hero--editor-preview${heroImg || heroVideo ? ' profile-hero--visual' : ''}`}
+          style={heroImg && !heroVideo ? { backgroundImage: `url(${heroImg})` } : undefined}
         >
           {heroVideo && (
             <video className="profile-hero__bg-video" autoPlay muted loop playsInline>
@@ -302,13 +299,20 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
             </video>
           )}
           {(heroImg || heroVideo) && <div className="profile-hero__gradient" />}
-          <div className="profile-hero-content" style={{ padding: '28px 24px' }}>
+          <div className="profile-hero-content">
             {!heroImg && !heroVideo && (
               <div className="avatar avatar-lg">{artist.avatar}</div>
             )}
             <div className="profile-details">
-              <h1 style={{ fontSize: 28 }}>{form.displayName || artist.name}</h1>
+              <h1 style={{ fontSize: 28 }}>{form.fullName || artist.name}</h1>
               <div className="role">{form.roleTitle || artist.role}</div>
+              {parseCommaList(form.skills).length > 0 && (
+                <div className="artist-skills" style={{ marginTop: 12 }}>
+                  {parseCommaList(form.skills).map((s) => (
+                    <span key={s} className="skill-tag" style={{ fontSize: 12, padding: '4px 10px' }}>{s}</span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -345,16 +349,9 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>JPG, PNG, WebP, GIF — max 50MB</span>
         </div>
         {headerImageUrl && (
-          <div
-            style={{
-              marginTop: 16,
-              height: 120,
-              borderRadius: 10,
-              background: `url(${headerImageUrl}) center/cover no-repeat`,
-              border: '1px solid var(--border)',
-            }}
-            aria-label="Current header preview"
-          />
+          <div className="profile-header-image-preview" aria-label="Current header preview">
+            <img src={headerImageUrl} alt="" />
+          </div>
         )}
       </div>
 
@@ -474,7 +471,7 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
               ))}
             </ul>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
-              Edit reel URLs and titles in Profile details above, then Save details.
+              Edit reel URLs, titles, and optional cover images in Profile details above, then Save details.
             </p>
           </div>
         )}

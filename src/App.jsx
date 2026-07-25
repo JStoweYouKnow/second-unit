@@ -207,7 +207,7 @@ function AppShell() {
         { path: '/admin/applications', icon: FileText, label: 'Applications', badge: pendingApplicationCount || null },
         { path: '/admin/disputes', icon: Shield, label: 'Disputes', badge: openDisputeCount || null },
         { path: '/admin/invites', icon: UserPlus, label: 'Invites', badge: activeInviteCount || null },
-        { path: '/home', icon: Trophy, label: 'Artist Spotlight' },
+        { path: '/home', icon: Trophy, label: 'Artist Database' },
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
         { path: '/bookings', icon: Calendar, label: 'Bookings' },
@@ -232,7 +232,7 @@ function AppShell() {
       return items
     }
     return [
-      { path: '/', icon: Trophy, label: 'Artist Spotlight' },
+      { path: '/', icon: Trophy, label: 'Artist Database' },
       { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
       { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
       { path: '/bookings', icon: Calendar, label: 'Bookings' },
@@ -437,8 +437,11 @@ function AppShell() {
                 onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = 'transparent'}
               >
-                <div className="avatar avatar-sm">
-                  {(profile?.full_name || 'U').split(' ').map(n => n[0]).join('').slice(0, 2)}
+                <div className="avatar avatar-sm" style={profile?.avatar_url ? {
+                  background: `url(${profile.avatar_url}) center/cover no-repeat`,
+                  color: 'transparent',
+                } : undefined}>
+                  {!profile?.avatar_url && (profile?.full_name || 'U').split(' ').map(n => n[0]).join('').slice(0, 2)}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

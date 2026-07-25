@@ -18,44 +18,8 @@ import {
   videoReelTitle,
   videoReelUrl,
 } from '../lib/videoReels'
-function VideoPlayer({ url }) {
-  const getEmbedUrl = (url) => {
-    if (!url) return null;
-    if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
-      let id = '';
-      if (url.includes('v=')) id = new URL(url).searchParams.get('v');
-      else id = url.split('/').pop();
-      return `https://www.youtube.com/embed/${id}`;
-    }
-    if (url.includes('vimeo.com')) {
-      const id = url.split('/').pop();
-      return `https://player.vimeo.com/video/${id}`;
-    }
-    return null;
-  };
-
-  const embedUrl = getEmbedUrl(url);
-
-  if (embedUrl) {
-    return (
-      <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', background: '#000' }}>
-        <iframe
-          src={embedUrl}
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
-          allow="autoplay; fullscreen; picture-in-picture"
-          allowFullScreen
-        />
-      </div>
-    );
-  }
-
-  return (
-    <video controls style={{ width: '100%', display: 'block', background: '#000' }}>
-      <source src={url} type="video/mp4" />
-      Your browser does not support the video tag.
-    </video>
-  );
-}
+import VideoPlayer from '../components/VideoPlayer'
+import ArtistMyProfileEditor from '../components/ArtistMyProfileEditor'
 
 
 export default function ArtistProfile() {
@@ -68,7 +32,7 @@ export default function ArtistProfile() {
   const [activeTab, setActiveTab] = useState('portfolio')
   const [brandBusy, setBrandBusy] = useState(null)
   const [localBrands, setLocalBrands] = useState(null)
-  const { artist, loading: artistLoading } = useArtist(id)
+  const { artist, loading: artistLoading, refetch: refetchArtist } = useArtist(id)
   const reviewState = useArtistReviews(id)
 
   useEffect(() => {
@@ -77,6 +41,7 @@ export default function ArtistProfile() {
 
   const isOwnProfile = isArtistProfile(profile) && artist?.profileId === profile?.id
   const isHirer = profile && !isArtistProfile(profile)
+  const viewAsPublic = searchParams.get('view') === 'public'
 
   useEffect(() => {
     setLocalBrands(null)
@@ -137,6 +102,17 @@ export default function ArtistProfile() {
 
   if (artist.isPublic === false && !isOwnProfile && !isAdmin) {
     return <div className="page-container"><p>Artist not found.</p></div>
+  }
+
+  if (isOwnProfile && !viewAsPublic) {
+    return (
+      <div className="page-container">
+        <ArtistMyProfileEditor
+          artistId={artist.id}
+          onUpdated={() => refetchArtist?.()}
+        />
+      </div>
+    )
   }
 
   const {
@@ -200,64 +176,113 @@ export default function ArtistProfile() {
         )}
         {hasHeroVisual && <div className="profile-hero__gradient" />}
         <div className="profile-hero-content">
-          {!hasHeroVisual && <div className="avatar avatar-lg">{artist.avatar}</div>}
-          <div className="profile-details">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <h1>{artist.name}</h1>
-              {artist.available && (
-                <span style={{ padding: '4px 12px', borderRadius: 20, background: 'var(--success-muted-bg)', color: 'var(--success)', fontSize: 12, fontWeight: 600 }}>
-                  ● Available
-                </span>
-              )}
-            </div>
-            <div className="role">{artist.role}</div>
-            <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-              {heroRating != null && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--gold)', fontSize: 14, fontWeight: 600 }}>
-                  <Star size={14} fill="var(--gold)" />
-                  {heroRating}
-                  <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
-                    ({heroReviewCount} public review{heroReviewCount === 1 ? '' : 's'})
+          <div className="profile-hero-main">
+            {!hasHeroVisual && <div className="avatar avatar-lg">{artist.avatar}</div>}
+            <div className="profile-details">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <h1>{artist.name}</h1>
+                {artist.available && (
+                  <span style={{ padding: '4px 12px', borderRadius: 20, background: 'var(--success-muted-bg)', color: 'var(--success)', fontSize: 12, fontWeight: 600 }}>
+                    ● Available
                   </span>
+                )}
+              </div>
+              <div className="role">{artist.role}</div>
+              <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                {heroRating != null && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--gold)', fontSize: 14, fontWeight: 600 }}>
+                    <Star size={14} fill="var(--gold)" />
+                    {heroRating}
+                    <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
+                      ({heroReviewCount} public review{heroReviewCount === 1 ? '' : 's'})
+                    </span>
+                  </span>
+                )}
+                {isHirer && !reviewSettings.showReviewsOnProfile && (
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Reviews not shown publicly</span>
+                )}
+                <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{artist.projects} projects</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-secondary)', fontSize: 14 }}>
+                  <MapPin size={14} /> {artist.location}
                 </span>
-              )}
-              {isHirer && !reviewSettings.showReviewsOnProfile && (
-                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Reviews not shown publicly</span>
-              )}
-              <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{artist.projects} projects</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-secondary)', fontSize: 14 }}>
-                <MapPin size={14} /> {artist.location}
-              </span>
+              </div>
+              <div className="profile-socials">
+                {[
+                  { value: artist.socials?.twitter, platform: 'twitter', title: 'X (Twitter)', Icon: IconX },
+                  { value: artist.socials?.instagram, platform: 'instagram', title: 'Instagram', Icon: Instagram },
+                  { value: artist.socials?.linkedin, platform: 'linkedin', title: 'LinkedIn', Icon: LinkedIn },
+                  { value: artist.socials?.website, platform: 'website', title: 'Website', Icon: Globe },
+                ]
+                  .map((item) => ({ ...item, href: normalizeSocialUrl(item.value, item.platform) }))
+                  .filter(({ href }) => href)
+                  .map(({ href, title, Icon }) => (
+                    <a
+                      key={title}
+                      href={href}
+                      className="social-btn"
+                      title={title}
+                      aria-label={title}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Icon size={16} />
+                    </a>
+                  ))}
+              </div>
             </div>
-            <div className="profile-socials">
-              {[
-                { value: artist.socials?.twitter, platform: 'twitter', title: 'X (Twitter)', Icon: IconX },
-                { value: artist.socials?.instagram, platform: 'instagram', title: 'Instagram', Icon: Instagram },
-                { value: artist.socials?.linkedin, platform: 'linkedin', title: 'LinkedIn', Icon: LinkedIn },
-                { value: artist.socials?.website, platform: 'website', title: 'Website', Icon: Globe },
-              ]
-                .map((item) => ({ ...item, href: normalizeSocialUrl(item.value, item.platform) }))
-                .filter(({ href }) => href)
-                .map(({ href, title, Icon }) => (
-                  <a
-                    key={title}
-                    href={href}
-                    className="social-btn"
-                    title={title}
-                    aria-label={title}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Icon size={16} />
-                  </a>
-                ))}
+          </div>
+
+          <div className="profile-hero-meta">
+            {displayBrands.length > 0 && (
+              <div className="profile-hero-brands">
+                <span className="profile-hero-meta-label">Brands & Clients</span>
+                <div className="profile-hero-brands-list">
+                  {displayBrands.map((b) => (
+                    <BrandChip
+                      key={typeof b === 'string' ? b : b.name}
+                      brand={b}
+                      onVerify={isAdmin ? handleVerifyBrand : undefined}
+                      verifyBusy={brandBusy === (typeof b === 'string' ? b : b.name)}
+                    />
+                  ))}
+                </div>
+                {isAdmin && (
+                  <p className="profile-hero-meta-hint">Admin: verify credits after confirming client work.</p>
+                )}
+              </div>
+            )}
+            <div className="profile-hero-stats">
+                <div className="profile-hero-stat">
+                  <span className="profile-hero-stat-label">Projects</span>
+                  <span className="profile-hero-stat-value">{artist.projects}</span>
+                </div>
+                {(showRatingToHirer || (isOwnProfile && publicReviews.length > 0)) && (
+                  <div className="profile-hero-stat">
+                    <span className="profile-hero-stat-label">Public rating</span>
+                    <span className="profile-hero-stat-value profile-hero-stat-value--gold">
+                      {publicAverage ?? artist.rating} ★
+                    </span>
+                  </div>
+                )}
+                {isOwnProfile && (
+                  <div className="profile-hero-stat">
+                    <span className="profile-hero-stat-label">Reviews</span>
+                    <span className="profile-hero-stat-value">{allReviews.length}</span>
+                  </div>
+                )}
+                <div className="profile-hero-stat">
+                  <span className="profile-hero-stat-label">Member since</span>
+                  <span className="profile-hero-stat-value">
+                    {new Date(artist.joined).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
       <div className="page-container" style={{ paddingTop: 8 }}>
-      {isOwnProfile && (
+      {isOwnProfile && viewAsPublic && (
         <div
           className="card slide-up"
           style={{
@@ -273,10 +298,10 @@ export default function ArtistProfile() {
           }}
         >
           <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-            You’re viewing your public page. Edit header, portfolio, and listing from Dashboard → My profile.
+            Public preview — this is what hirers see.
           </span>
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate('/dashboard', { state: { artistDashTab: 'profile' } })}>
-            Edit My profile
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate(`/artist/${artist.id}`)}>
+            Back to edit
           </button>
         </div>
       )}
@@ -296,7 +321,7 @@ export default function ArtistProfile() {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 24 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         <div>
           <div className="tabs">
             {['portfolio', 'about', 'reviews'].map((t) => (
@@ -380,7 +405,7 @@ export default function ArtistProfile() {
               {videoLinks.length > 0 && (
                 <div className="video-reel-list" style={{ marginTop: 28 }}>
                   <h3 style={{ marginBottom: 16 }}>Video Reels</h3>
-                  <div className="video-reel-stack">
+                  <div className="video-reel-scroll" role="list" aria-label="Video reels">
                     {videoLinks.map((reel, i) => {
                       const url = videoReelUrl(reel)
                       const label = videoReelTitle(reel, i)
@@ -388,16 +413,15 @@ export default function ArtistProfile() {
                         <div
                           key={url || `reel-${i}`}
                           className="card video-reel-item"
+                          role="listitem"
                           style={{ padding: 0, overflow: 'hidden' }}
                         >
-                          <VideoPlayer url={url} />
-                          <div style={{
-                            padding: '12px 16px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 8,
-                            borderTop: '1px solid var(--border)',
-                          }}>
+                          <VideoPlayer
+                            url={url}
+                            thumbnail={reel.thumbnail}
+                            title={label}
+                          />
+                          <div className="video-player__caption">
                             <Play size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                             <span style={{ fontWeight: 500, fontSize: 14 }}>{label}</span>
                           </div>
@@ -433,54 +457,6 @@ export default function ArtistProfile() {
               />
             </div>
           )}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="card">
-            <h3 style={{ marginBottom: 16 }}>Brands & Clients</h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {displayBrands.map((b) => (
-                <BrandChip
-                  key={typeof b === 'string' ? b : b.name}
-                  brand={b}
-                  onVerify={isAdmin ? handleVerifyBrand : undefined}
-                  verifyBusy={brandBusy === (typeof b === 'string' ? b : b.name)}
-                />
-              ))}
-            </div>
-            {isAdmin && (
-              <p style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
-                Admin: verify credits after confirming client work.
-              </p>
-            )}
-          </div>
-          <div className="card">
-            <h3 style={{ marginBottom: 16 }}>Quick Stats</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Projects</span>
-                <span style={{ fontWeight: 600 }}>{artist.projects}</span>
-              </div>
-              {(showRatingToHirer || (isOwnProfile && publicReviews.length > 0)) && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Public rating</span>
-                  <span style={{ fontWeight: 600, color: 'var(--gold)' }}>
-                    {publicAverage ?? artist.rating} ★
-                  </span>
-                </div>
-              )}
-              {isOwnProfile && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Reviews</span>
-                  <span style={{ fontWeight: 600 }}>{allReviews.length}</span>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Member Since</span>
-                <span style={{ fontWeight: 600 }}>{new Date(artist.joined).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 

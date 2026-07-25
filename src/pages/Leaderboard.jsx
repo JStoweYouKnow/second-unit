@@ -1,22 +1,13 @@
 import { useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Calendar, Heart, Play, Star, Filter, DollarSign, MapPin, Globe, IconX, Instagram, LinkedIn, X } from '../components/icons'
+import { Search, Calendar, Heart, Play, Star, Filter, Globe, IconX, Instagram, LinkedIn, X } from '../components/icons'
 import { normalizeSocialUrl } from '../lib/socialLinks'
-import { videoReelUrl } from '../lib/videoReels'
-import { buildOpenBriefCards } from '../lib/openBriefs'
+import { videoReelUrl, getDefaultVideoPoster, videoReelThumbnail, resolveVideoPoster } from '../lib/videoReels'
 import { brandName } from '../lib/brands'
+import { collectRoleFilterOptions, artistMatchesRoleFilter } from '../lib/roleFilters'
 import { useArtists } from '../hooks/useData'
 import { useApp } from '../context/AppContext'
-import { useAuth } from '../context/AuthContext'
-import { useArtistProfile } from '../hooks/useArtistProfile'
-import { isArtistProfile } from '../lib/roleView'
 import CalendarModal from '../components/CalendarModal'
-
-function formatBudgetRange(min, max) {
-  const a = Number(min) || 0
-  const b = Number(max) || 0
-  return `$${a.toLocaleString()} – $${b.toLocaleString()}`
-}
 
 function toggleInSet(set, key) {
   const next = new Set(set)
@@ -43,28 +34,11 @@ function getEmbedUrl(url) {
   return url
 }
 
-function getVideoThumbnail(url) {
-  if (!url) return null
-  if (url.includes('vimeo.com')) {
-    const id = url.split('/').pop()
-    return `https://vumbnail.com/${id}.jpg`
-  }
-  if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    let id = ''
-    if (url.includes('v=')) {
-      id = url.split('v=')[1].split('&')[0]
-    } else {
-      id = url.split('/').pop().split('?')[0]
-    }
-    return id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : null
-  }
-  return null
-}
-
 function getArtistTileThumb(artist) {
-  const firstReel = videoReelUrl(artist.videoLinks?.[0])
+  const first = artist.videoLinks?.[0]
+  const firstReel = videoReelUrl(first)
   if (firstReel) {
-    return getVideoThumbnail(firstReel)
+    return resolveVideoPoster(firstReel, videoReelThumbnail(first)) || getDefaultVideoPoster(firstReel)
   }
   if (artist.avatarUrl) return artist.avatarUrl
   return null
@@ -72,11 +46,7 @@ function getArtistTileThumb(artist) {
 
 export default function Leaderboard() {
   const navigate = useNavigate()
-  const { favorites, toggleFavorite, localProjects, bookings } = useApp()
-  const { profile, isAuthenticated } = useAuth()
-  const { artist: myArtist } = useArtistProfile(profile?.id)
-  const isArtist = isArtistProfile(profile)
-  const me = isArtist ? myArtist : null
+  const { favorites, toggleFavorite } = useApp()
   const [search, setSearch] = useState('')
   const [calendarArtist, setCalendarArtist] = useState(null)
   const [hoveredId, setHoveredId] = useState(null)
@@ -98,10 +68,7 @@ export default function Leaderboard() {
   const [availableOnly, setAvailableOnly] = useState(false)
   const [availableDate, setAvailableDate] = useState('')
   const [showFilters, setShowFilters] = useState(false)
-  const roleOptions = useMemo(
-    () => [...new Set(artists.map(a => a.role))].sort(),
-    [artists]
-  )
+  const roleOptions = useMemo(() => collectRoleFilterOptions(artists), [artists])
   const skillOptions = useMemo(() => {
     const s = new Set()
     artists.forEach(a => a.skills.forEach(x => s.add(x)))
@@ -115,7 +82,7 @@ export default function Leaderboard() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     const filteredArray = artists.filter((a) => {
-      if (selectedRoles.size > 0 && !selectedRoles.has(a.role)) return false
+      if (selectedRoles.size > 0 && !artistMatchesRoleFilter(a.role, selectedRoles)) return false
 
       if (selectedSkills.size > 0) {
         const skills = selectedSkills
@@ -167,19 +134,6 @@ export default function Leaderboard() {
     setAvailableDate('')
   }, [])
 
-  const openBriefs = useMemo(
-    () =>
-      isAuthenticated
-        ? buildOpenBriefCards({
-            bookings,
-            contracts: localProjects,
-            isArtist,
-            artistId: me?.id,
-          })
-        : [],
-    [isAuthenticated, bookings, localProjects, isArtist, me?.id]
-  )
-
   return (
     <div className="page-container">
       {showHero && (
@@ -194,7 +148,7 @@ export default function Leaderboard() {
           </button>
           <h2 className="spotlight-hero__title">Hire exceptional AI-native creative talent</h2>
           <p className="spotlight-hero__lede">
-            Browse verified talent, review open projects with transparent client budgets, and agree fees directly with the client before you book.
+            Browse verified talent, agree fees directly in thread, and manage open briefs from your dashboard.
           </p>
           <div className="spotlight-hero__trust">
             <span><strong>Stripe</strong> — secure checkout</span>
@@ -207,7 +161,7 @@ export default function Leaderboard() {
       <div className="page-header">
         <div className="page-header-row">
           <div>
-            <h1>Artist Spotlight</h1>
+            <h1>Artist Database</h1>
             <p>Discover and hire the world's top AI artists and creators</p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
@@ -342,62 +296,6 @@ export default function Leaderboard() {
         </section>
       </div>
 
-      {isAuthenticated && (
-        <section className="spotlight-projects slide-up" style={{ marginBottom: 32 }}>
-          <div className="spotlight-projects__head">
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20 }}>Your open briefs</h2>
-            <p className="spotlight-projects__sub">
-              Live booking requests and contract offers from your account — budgets are for reference; final fees are negotiated in thread.
-            </p>
-          </div>
-          <div className="spotlight-projects__grid">
-            {openBriefs.length === 0 ? (
-              <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
-                No open briefs yet. Pending bookings and active contracts appear here.
-              </div>
-            ) : (
-              openBriefs.map((proj) => (
-                <article
-                  key={proj.id}
-                  className="spotlight-project-card card"
-                  style={proj.isOffer ? { borderColor: 'var(--accent)', borderWidth: 1, borderStyle: 'solid' } : undefined}
-                >
-                  {proj.isOffer && (
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-                      Contract offer
-                    </div>
-                  )}
-                  <div className="spotlight-project-card__top">
-                    <div>
-                      <h3 className="spotlight-project-card__title">{proj.title}</h3>
-                      <div className="spotlight-project-card__meta">
-                        <span className="spotlight-project-card__client">{proj.client}</span>
-                        <span className="spotlight-project-card__posted">Posted {proj.posted}</span>
-                      </div>
-                    </div>
-                    <div className="spotlight-project-card__budget" title="Budget for this brief">
-                      <DollarSign size={18} aria-hidden />
-                      <span>{formatBudgetRange(proj.budgetMin, proj.budgetMax)}</span>
-                    </div>
-                  </div>
-                  <div className="spotlight-project-card__row">
-                    <span className="spotlight-project-card__label"><MapPin size={14} aria-hidden /> {proj.location}</span>
-                    <span className="spotlight-project-card__label">Timeline: {proj.timeline}</span>
-                  </div>
-                  {proj.skills.length > 0 && (
-                    <div className="artist-skills" style={{ marginTop: 10 }}>
-                      {proj.skills.map((s) => (
-                        <span key={s} className="skill-tag">{s}</span>
-                      ))}
-                    </div>
-                  )}
-                </article>
-              ))
-            )}
-          </div>
-        </section>
-      )}
-
       <div className="artist-gallery-grid">
         {artistsLoading && (
           <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
@@ -417,10 +315,7 @@ export default function Leaderboard() {
               onMouseLeave={() => setHoveredId(null)}
             >
               
-              <div 
-                className="artist-tile__media-container"
-                style={{ position: 'relative', width: '100%', height: '100%' }}
-              >
+              <div className="artist-tile__media-container">
                 {thumbUrl && (
                   <img 
                     src={thumbUrl} 
@@ -438,7 +333,6 @@ export default function Leaderboard() {
                         loop
                         muted
                         playsInline
-                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
                       />
                     ) : (
                       <iframe
@@ -446,7 +340,6 @@ export default function Leaderboard() {
                         frameBorder="0"
                         allow="autoplay; fullscreen; picture-in-picture"
                         allowFullScreen
-                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
                         title={`${artist.name} reel`}
                       />
                     )}

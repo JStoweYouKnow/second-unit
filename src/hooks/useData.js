@@ -196,6 +196,7 @@ export function useArtists({ search = '', roleFilter = 'all' } = {}) {
 export function useArtist(id) {
   const [artist, setArtist] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (!id) return
@@ -207,7 +208,10 @@ export function useArtist(id) {
       return
     }
 
+    let cancelled = false
+
     async function fetch() {
+      setLoading(true)
       const { data, error } = await supabase
         .from('artists')
         .select(`
@@ -219,6 +223,8 @@ export function useArtist(id) {
         `)
         .eq('id', id)
         .maybeSingle()
+
+      if (cancelled) return
 
       if (error) {
         console.error('[useArtist]', error.message || error)
@@ -233,6 +239,7 @@ export function useArtist(id) {
           .from('google_busy_blocks')
           .select('artist_id, date, start_time, end_time')
           .eq('artist_id', data.id)
+        if (cancelled) return
         busyRows = busy || []
       }
 
@@ -278,9 +285,10 @@ export function useArtist(id) {
     }
 
     fetch()
-  }, [id])
+    return () => { cancelled = true }
+  }, [id, reloadKey])
 
-  return { artist, loading }
+  return { artist, loading, refetch: () => setReloadKey((k) => k + 1) }
 }
 
 /**

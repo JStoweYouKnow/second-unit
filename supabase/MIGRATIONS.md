@@ -65,7 +65,9 @@ npm run verify:migrations                      # includes product features
 | 27 | `artist-featured-header.sql` | Artist-chosen profile header media |
 | 28 | `artist-video-reels.sql` | Named video reels (`video_reels` jsonb) |
 | 29 | `artist-timezone.sql` | Artist working timezone for availability |
-| 30 | `artist-profile-public.sql` | Dedicated header image URL + Spotlight public toggle |
+| 30 | `artist-profile-public.sql` | Dedicated header image URL + Artist Database public toggle |
+| 31 | `avatars-storage.sql` | Profile avatar uploads (`avatars` bucket) |
+| 32 | `artist-skills-brands-sync-rpc.sql` | Artist-owned RPC to sync skills/brands (expertise) |
 
 ## Ad-hoc fixes (run only if needed)
 

@@ -8,43 +8,89 @@ import {
   writeMockJson,
 } from '../lib/artistProfile'
 
+async function ensureNamedRow(table, name) {
+  const trimmed = String(name || '').trim()
+  if (!trimmed) return null
+
+  const { data: existing, error: selectError } = await supabase
+    .from(table)
+    .select('id')
+    .eq('name', trimmed)
+    .maybeSingle()
+  if (selectError) throw selectError
+  if (existing?.id) return existing.id
+
+  const { data: created, error: insertError } = await supabase
+    .from(table)
+    .insert({ name: trimmed })
+    .select('id')
+    .single()
+
+  if (insertError) {
+    // Concurrent insert — fetch again
+    const { data: raced, error: raceError } = await supabase
+      .from(table)
+      .select('id')
+      .eq('name', trimmed)
+      .maybeSingle()
+    if (raceError) throw raceError
+    if (raced?.id) return raced.id
+    throw insertError
+  }
+
+  return created?.id || null
+}
+
 async function syncSkillNames(artistId, skillNames) {
-  const names = skillNames.map((s) => s.trim()).filter(Boolean)
-  await supabase.from('artist_skills').delete().eq('artist_id', artistId)
+  const names = [...new Set(parseCommaList(skillNames))]
+
+  const { error: rpcError } = await supabase.rpc('sync_artist_skill_names', {
+    p_artist_id: artistId,
+    p_skill_names: names,
+  })
+  if (!rpcError) return
+
+  // Fallback when RPC is not granted yet — avoid upsert (no UPDATE RLS on skills).
+  const { error: deleteError } = await supabase
+    .from('artist_skills')
+    .delete()
+    .eq('artist_id', artistId)
+  if (deleteError) throw deleteError
 
   for (const name of names) {
-    const { data: skillRow } = await supabase
-      .from('skills')
-      .upsert({ name }, { onConflict: 'name' })
-      .select('id')
-      .single()
+    const skillId = await ensureNamedRow('skills', name)
+    if (!skillId) continue
 
-    if (skillRow?.id) {
-      await supabase.from('artist_skills').upsert(
-        { artist_id: artistId, skill_id: skillRow.id },
-        { onConflict: 'artist_id,skill_id' }
-      )
-    }
+    const { error: linkError } = await supabase
+      .from('artist_skills')
+      .insert({ artist_id: artistId, skill_id: skillId })
+    if (linkError && !/duplicate|unique/i.test(linkError.message || '')) throw linkError
   }
 }
 
 async function syncBrandNames(artistId, brandNames) {
-  const names = brandNames.map((s) => s.trim()).filter(Boolean)
-  await supabase.from('artist_brands').delete().eq('artist_id', artistId)
+  const names = [...new Set(parseCommaList(brandNames))]
+
+  const { error: rpcError } = await supabase.rpc('sync_artist_brand_names', {
+    p_artist_id: artistId,
+    p_brand_names: names,
+  })
+  if (!rpcError) return
+
+  const { error: deleteError } = await supabase
+    .from('artist_brands')
+    .delete()
+    .eq('artist_id', artistId)
+  if (deleteError) throw deleteError
 
   for (const name of names) {
-    const { data: brandRow } = await supabase
-      .from('brands')
-      .upsert({ name }, { onConflict: 'name' })
-      .select('id')
-      .single()
+    const brandId = await ensureNamedRow('brands', name)
+    if (!brandId) continue
 
-    if (brandRow?.id) {
-      await supabase.from('artist_brands').upsert(
-        { artist_id: artistId, brand_id: brandRow.id },
-        { onConflict: 'artist_id,brand_id' }
-      )
-    }
+    const { error: linkError } = await supabase
+      .from('artist_brands')
+      .insert({ artist_id: artistId, brand_id: brandId })
+    if (linkError && !/duplicate|unique/i.test(linkError.message || '')) throw linkError
   }
 }
 
@@ -184,8 +230,15 @@ export async function saveArtistProfile({ profileId, fullName, form, existingArt
     return { data: null, error: artistError }
   }
 
-  await syncSkillNames(existingArtist.id, parseCommaList(form.skills))
-  await syncBrandNames(existingArtist.id, parseCommaList(form.brands))
+  try {
+    await syncSkillNames(existingArtist.id, parseCommaList(form.skills))
+    await syncBrandNames(existingArtist.id, parseCommaList(form.brands))
+  } catch (syncError) {
+    return {
+      data: null,
+      error: syncError?.message ? syncError : { message: syncError?.message || 'Could not save skills or brands' },
+    }
+  }
 
   const { error: profileError } = await profileUpdate
   if (profileError) {

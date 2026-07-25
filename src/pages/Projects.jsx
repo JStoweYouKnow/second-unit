@@ -548,6 +548,27 @@ https://thecallsheet.ai
     else openPrintablePdf(html, `${contract.title || 'Contract'} — Invoice`)
   }
 
+  const [w9Busy, setW9Busy] = useState(false)
+  const [w9Error, setW9Error] = useState('')
+  const handleDownloadArtistW9 = async (contract) => {
+    setW9Error('')
+    setW9Busy(true)
+    try {
+      const { url, fileName } = await contractsApi.artistTaxDoc(contract.id)
+      if (!url) throw new Error('W-9 is not available')
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName || 'artist-w9'
+      a.rel = 'noopener'
+      a.target = '_blank'
+      a.click()
+    } catch (err) {
+      setW9Error(err.message || 'Could not fetch the artist W-9')
+    } finally {
+      setW9Busy(false)
+    }
+  }
+
   const handleCopyLink = (contract) => {
     navigator.clipboard.writeText(`${window.location.origin}/contracts/${contract.id}`)
     setCopied(contract.id)
@@ -1079,6 +1100,14 @@ ${divider}
                 <button type="button" className="btn btn-secondary" onClick={() => handleDownloadAttachment(showView)}>
                   <Download size={16} /> Original file
                 </button>
+              )}
+              {!isArtist && (
+                <button type="button" className="btn btn-secondary" onClick={() => handleDownloadArtistW9(showView)} disabled={w9Busy}>
+                  <FileText size={16} /> {w9Busy ? 'Fetching…' : 'Artist W-9'}
+                </button>
+              )}
+              {w9Error && (
+                <span style={{ fontSize: 12, color: 'var(--danger)', alignSelf: 'center' }}>{w9Error}</span>
               )}
               {!isArtist && showView.type === 'custom' && isSupabaseConfigured && (
                 <>

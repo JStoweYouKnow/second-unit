@@ -328,6 +328,8 @@ export const contracts = {
     }),
 
   listMilestones: (contractId) => request(`/api/contracts/${contractId}/milestones`),
+
+  artistTaxDoc: (contractId) => request(`/api/contracts/${contractId}/artist-tax-doc`),
 }
 
 // ---- Notifications ----

@@ -1080,6 +1080,43 @@ app.get('/api/contracts/:id/milestones', async (req, res) => {
   }
 })
 
+app.get('/api/contracts/:id/artist-tax-doc', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const { data: contract, error } = await database
+      .from('contracts')
+      .select('id, employer_id, artist_id, status')
+      .eq('id', req.params.id)
+      .maybeSingle()
+    if (error) return res.status(500).json({ error: error.message })
+    if (!contract) return res.status(404).json({ error: 'Contract not found' })
+    if (contract.employer_id !== user.id) {
+      return res.status(403).json({ error: 'Only the client on this contract can view the artist W-9' })
+    }
+    const { data: artist } = await database
+      .from('artists').select('profile_id').eq('id', contract.artist_id).maybeSingle()
+    if (!artist?.profile_id) return res.status(404).json({ error: 'Artist profile not found' })
+    const { data: docs } = await database
+      .from('tax_documents')
+      .select('file_name, storage_path, created_at')
+      .eq('owner_id', artist.profile_id)
+      .eq('doc_type', 'w9')
+      .order('created_at', { ascending: false })
+      .limit(1)
+    const doc = docs?.[0]
+    if (!doc) return res.status(404).json({ error: 'The artist has not uploaded a W-9 yet' })
+    const { data: signed, error: signError } = await database.storage
+      .from('employer-tax-docs').createSignedUrl(doc.storage_path, 300)
+    if (signError) return res.status(500).json({ error: signError.message })
+    res.json({ url: signed?.signedUrl ?? null, fileName: doc.file_name })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.post('/api/contracts/:id/milestones/:milestoneId/pay', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return

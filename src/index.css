@@ -177,7 +177,10 @@ input, textarea, select { font-family: inherit; }
   /* visible so notification popover isn't clipped; scroll lives on .sidebar-nav */
   overflow: visible;
 }
-.main-content { flex: 1; margin-left: 264px; min-height: 100vh; }
+/* min-width:0 lets this flex item shrink to the viewport so wide children
+   (e.g. the video-reel row) scroll inside their own overflow-x container
+   instead of pushing the whole page sideways. */
+.main-content { flex: 1; min-width: 0; margin-left: 264px; min-height: 100vh; }
 .page-container { max-width: 1400px; margin: 0 auto; padding: 32px 40px; }
 
 /* ===== Logo ===== */

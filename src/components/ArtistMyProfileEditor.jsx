@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Upload, Loader2, Trash2, ChevronUp, ChevronDown, Eye, EyeOff, ExternalLink, Image,
+  Upload, Loader2, Trash2, ChevronUp, ChevronDown, Eye, EyeOff, ExternalLink,
 } from './icons'
 import { ArtistFormFields } from './ArtistFormFields'
 import ArtistReviewSettings from './ArtistReviewSettings'
@@ -334,7 +334,7 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
             disabled={headerBusy}
             onClick={() => headerInputRef.current?.click()}
           >
-            {headerBusy ? <Loader2 className="animate-spin" size={14} /> : <Image size={14} />}
+            {headerBusy ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />}
             {headerBusy ? ' Uploading…' : headerImageUrl ? ' Replace header image' : ' Upload header image'}
           </button>
           {headerImageUrl && (

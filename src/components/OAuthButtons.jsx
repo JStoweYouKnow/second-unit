@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext'
 const PROVIDERS = [
   { id: 'google', label: 'Google' },
   { id: 'github', label: 'GitHub' },
-  { id: 'linkedin_oidc', label: 'LinkedIn' },
 ]
 
 export default function OAuthButtons({ disabled = false }) {

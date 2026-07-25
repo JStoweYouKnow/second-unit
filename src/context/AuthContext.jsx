@@ -267,7 +267,7 @@ export function AuthProvider({ children }) {
   }
 
   /**
-   * @param {'google' | 'github' | 'linkedin_oidc'} provider Supabase Auth provider id
+   * @param {'google' | 'github'} provider Supabase Auth provider id
    */
   async function signInWithOAuth(provider) {
     if (!isSupabaseConfigured) {

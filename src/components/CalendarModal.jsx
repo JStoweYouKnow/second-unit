@@ -49,7 +49,7 @@ export default function CalendarModal({ artist, onClose, onBook }) {
   const openDateKeys = useMemo(() => datesWithOpenSlots(availability), [availability])
   const openDateSet = useMemo(() => new Set(openDateKeys), [openDateKeys])
 
-  const weeks = useMemo(
+  const { weekdayLabels, weeks } = useMemo(
     () => buildMonthWeeks(currentMonth, { timeZone, hidePastDays: true }),
     [currentMonth, timeZone]
   )
@@ -327,24 +327,13 @@ END:VCALENDAR`
         </div>
 
         <div className="calendar-grid" style={{ marginBottom: 4 }}>
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+          {weekdayLabels.map((d) => (
             <div key={d} className="calendar-header">{d}</div>
           ))}
         </div>
         {weeks.map((week) => (
           <div key={week[0].dateKey} className="calendar-grid">
             {week.map((cell) => {
-              if (cell.hide) {
-                return (
-                  <div
-                    key={cell.dateKey}
-                    className="calendar-day"
-                    style={{ visibility: 'hidden', pointerEvents: 'none' }}
-                    aria-hidden
-                  />
-                )
-              }
-
               const hasOpen = openDateSet.has(cell.dateKey)
               const isSelectedHours = mode === 'hours' && selectedDateStr === cell.dateKey
               const inDayRange = mode === 'days' && (

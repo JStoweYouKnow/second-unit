@@ -159,6 +159,31 @@ export function isMonthFullyPast(monthDate, timeZone) {
 
 const WEEKDAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+function dateFromKey(dateKey) {
+  const [y, m, d] = dateKey.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function weekdayLabelsFromDate(date) {
+  return Array.from({ length: 7 }, (_, i) => WEEKDAY_ABBR[(date.getDay() + i) % 7])
+}
+
+/** Drop days before today and repack into rows of 7 starting at the first visible day. */
+function repackWeeksFromToday(cells, timeZone) {
+  const todayKey = todayKeyInZone(timeZone)
+  const visible = cells.filter((c) => c.dateKey >= todayKey)
+  if (!visible.length) {
+    return { weekdayLabels: WEEKDAY_ABBR, weeks: [] }
+  }
+
+  const weekdayLabels = weekdayLabelsFromDate(visible[0].date)
+  const weeks = []
+  for (let i = 0; i < visible.length; i += 7) {
+    weeks.push(visible.slice(i, i + 7))
+  }
+  return { weekdayLabels, weeks }
+}
+
 /**
  * A rolling calendar fragment that STARTS at today (no leading blank cells) and
  * runs forward for `weeks` rows of 7 consecutive days. The weekday header labels
@@ -166,11 +191,9 @@ const WEEKDAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
  */
 export function buildForwardWeeks(weeks = 6, { timeZone } = {}) {
   const todayKey = todayKeyInZone(timeZone)
-  // Local "today" for rendering; date comparisons use the timezone-aware key.
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
+  const start = dateFromKey(todayKey)
 
-  const weekdayLabels = Array.from({ length: 7 }, (_, i) => WEEKDAY_ABBR[(start.getDay() + i) % 7])
+  const weekdayLabels = weekdayLabelsFromDate(start)
 
   const rows = []
   let day = start
@@ -195,8 +218,8 @@ export function buildForwardWeeks(weeks = 6, { timeZone } = {}) {
 }
 
 /**
- * Build month grid weeks. Past days in the current month are placeholders
- * (hidden from booking) so the weekday columns stay aligned.
+ * Build month grid weeks. When hidePastDays is true, days before today are removed
+ * (not hidden placeholders) and the grid starts on the current date.
  */
 export function buildMonthWeeks(monthDate, { timeZone, hidePastDays = true } = {}) {
   const monthStart = startOfMonth(monthDate)
@@ -215,14 +238,13 @@ export function buildMonthWeeks(monthDate, { timeZone, hidePastDays = true } = {
       const dateKey = format(d, 'yyyy-MM-dd')
       const inMonth = isSameMonth(d, monthStart)
       const past = hidePastDays && dateKey < todayKey
-      const hide = past && inMonth
 
       days.push({
         date: d,
         dateKey,
         inMonth,
         past,
-        hide,
+        hide: false,
         isToday: dateKey === todayKey,
       })
       day = addDays(day, 1)
@@ -230,7 +252,11 @@ export function buildMonthWeeks(monthDate, { timeZone, hidePastDays = true } = {
     weeks.push(days)
   }
 
-  return weeks
+  if (!hidePastDays) {
+    return { weekdayLabels: WEEKDAY_ABBR, weeks }
+  }
+
+  return repackWeeksFromToday(weeks.flat(), timeZone)
 }
 
 /**

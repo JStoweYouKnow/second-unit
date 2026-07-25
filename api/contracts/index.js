@@ -21,6 +21,7 @@ const ContractSchema = z.object({
   attachmentName: z.string().optional().nullable(),
   attachmentMime: z.string().optional().nullable(),
   milestoneAmounts: z.array(z.number().int().nonnegative()).length(3).optional(),
+  milestoneDescriptions: z.array(z.string().max(500)).length(3).optional(),
 })
 
 export default async function handler(req, res) {
@@ -53,9 +54,10 @@ export default async function handler(req, res) {
         .single()
 
       // Older DBs may lack milestone_amounts / attachment columns — retry without optional fields.
-      if (error && /milestone_amounts|attachment_|client_name|column .* does not exist/i.test(error.message || '')) {
+      if (error && /milestone_amounts|milestone_descriptions|attachment_|client_name|column .* does not exist/i.test(error.message || '')) {
         const {
           milestone_amounts: _m,
+          milestone_descriptions: _md,
           attachment_url: _au,
           attachment_name: _an,
           attachment_mime: _am,

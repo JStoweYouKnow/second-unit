@@ -76,6 +76,7 @@ export function mapContractToClient(row) {
     bookingId: row.booking_id ?? null,
     milestones: row.milestones ?? [],
     milestoneAmounts: row.milestone_amounts ?? null,
+    milestoneDescriptions: row.milestone_descriptions ?? null,
     createdAt: row.created_at,
   }
 }
@@ -103,6 +104,9 @@ export function mapContractToDb(payload, employerId) {
     signed_by_artist: false,
     milestone_amounts: Array.isArray(payload.milestoneAmounts) && payload.milestoneAmounts.length === 3
       ? payload.milestoneAmounts.map((n) => Math.round(Number(n) || 0))
+      : null,
+    milestone_descriptions: Array.isArray(payload.milestoneDescriptions) && payload.milestoneDescriptions.length === 3
+      ? payload.milestoneDescriptions.map((d) => String(d ?? '').slice(0, 500))
       : null,
   }
 }

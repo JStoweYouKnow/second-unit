@@ -60,6 +60,7 @@ export default function Projects() {
   const [newProject, setNewProject] = useState({
     title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: '',
     milestone1: '', milestone2: '', milestone3: '',
+    deliverable1: '', deliverable2: '', deliverable3: '',
   })
   const [useCustomMilestones, setUseCustomMilestones] = useState(false)
   /** Pending upload in the modal only (blob URL revoked on discard). On create, URL is kept on the contract row. */
@@ -215,6 +216,7 @@ export default function Projects() {
     setNewProject({
       title: '', artistId: '', startDate: '', endDate: '', value: '', customTerms: '',
       milestone1: '', milestone2: '', milestone3: '',
+      deliverable1: '', deliverable2: '', deliverable3: '',
     })
     setShowNew(false)
   }
@@ -304,6 +306,13 @@ export default function Projects() {
       return
     }
 
+    const milestoneDescriptions = [
+      newProject.deliverable1,
+      newProject.deliverable2,
+      newProject.deliverable3,
+    ].map((d) => (d || '').trim().slice(0, 500))
+    const hasAnyDeliverable = milestoneDescriptions.some((d) => d.length > 0)
+
     setCreating(true)
     try {
       const created = await createContract({
@@ -320,6 +329,7 @@ export default function Projects() {
         attachmentName,
         attachmentMime,
         milestoneAmounts,
+        ...(hasAnyDeliverable ? { milestoneDescriptions } : {}),
       })
 
       if (pendingFile && created?.id && isSupabaseConfigured) {
@@ -806,6 +816,23 @@ ${divider}
                 )}
               </div>
 
+              <div className="form-group">
+                <label className="form-label">Expected deliverables per milestone <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(what the artist must deliver — optional, visible to both parties)</span></label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6 }}>
+                  {DEFAULT_MILESTONE_TITLES.map((m, i) => (
+                    <div key={m.title}>
+                      <label className="form-label" style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.title}</label>
+                      <input
+                        className="form-input"
+                        placeholder={`e.g. ${i === 0 ? 'Kickoff brief & moodboard' : i === 1 ? 'First-draft renders for review' : 'Final files + source, delivered'}`}
+                        value={newProject[`deliverable${i + 1}`]}
+                        onChange={(e) => setNewProject((p) => ({ ...p, [`deliverable${i + 1}`]: e.target.value }))}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {projectType === 'custom' && (
                 <>
                   <div className="form-group">
@@ -936,6 +963,27 @@ ${divider}
             {milestoneError && (
               <div className="auth-error" style={{ marginBottom: 16 }}>{milestoneError}</div>
             )}
+
+            {/* Expected deliverables (shown before activation, when milestone rows don't exist yet) */}
+            {(!showView.milestones || showView.milestones.length === 0) &&
+              Array.isArray(showView.milestoneDescriptions) &&
+              showView.milestoneDescriptions.some((d) => (d || '').trim()) && (
+                <div style={{ marginBottom: 24 }}>
+                  <h3 style={{ fontSize: 14, marginBottom: 12, color: 'var(--text-secondary)' }}>Expected deliverables</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {DEFAULT_MILESTONE_TITLES.map((m, i) => {
+                      const d = (showView.milestoneDescriptions?.[i] || '').trim()
+                      if (!d) return null
+                      return (
+                        <div key={m.title} style={{ padding: 12, background: 'var(--surface)', borderRadius: 'var(--radius-sm)' }}>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>{m.title}</div>
+                          <div style={{ fontSize: 14 }}>{d}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
             {/* Terms */}
             <div style={{ marginBottom: 24 }}>

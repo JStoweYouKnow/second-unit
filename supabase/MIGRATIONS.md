@@ -68,6 +68,7 @@ npm run verify:migrations                      # includes product features
 | 30 | `artist-profile-public.sql` | Dedicated header image URL + Artist Database public toggle |
 | 31 | `avatars-storage.sql` | Profile avatar uploads (`avatars` bucket) |
 | 32 | `artist-skills-brands-sync-rpc.sql` | Artist-owned RPC to sync skills/brands (expertise) |
+| 33 | `contract-milestone-descriptions.sql` | Hirer-set expected deliverable per milestone (`contracts.milestone_descriptions`) |
 
 ## Ad-hoc fixes (run only if needed)
 

@@ -40,6 +40,7 @@ export const FEATURE_MIGRATIONS = [
   'artist-profile-public.sql',
   'avatars-storage.sql',
   'artist-skills-brands-sync-rpc.sql',
+  'contract-milestone-descriptions.sql',
 ]
 
 /** Tracking table bootstrap — apply once before recording other migrations. */

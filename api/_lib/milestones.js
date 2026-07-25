@@ -61,16 +61,21 @@ export function mapMilestoneToClient(row) {
   }
 }
 
-export function buildDefaultMilestoneRows(contractId, totalValue, customAmounts = null) {
+export function buildDefaultMilestoneRows(contractId, totalValue, customAmounts = null, customDescriptions = null) {
   const amounts = splitMilestoneAmounts(totalValue, customAmounts)
-  return DEFAULT_MILESTONE_TITLES.map((m, i) => ({
-    contract_id: contractId,
-    sort_order: i,
-    title: m.title,
-    description: m.description,
-    amount: amounts[i],
-    status: 'awaiting_payment',
-  }))
+  const descriptions = Array.isArray(customDescriptions) ? customDescriptions : null
+  return DEFAULT_MILESTONE_TITLES.map((m, i) => {
+    const custom = descriptions?.[i]
+    return {
+      contract_id: contractId,
+      sort_order: i,
+      title: m.title,
+      // Hirer's expected deliverable when provided, otherwise the default blurb.
+      description: custom && String(custom).trim() ? String(custom).trim() : m.description,
+      amount: amounts[i],
+      status: 'awaiting_payment',
+    }
+  })
 }
 
 export async function updateMilestoneAmounts(db, contractId, userId, amounts) {
@@ -127,7 +132,12 @@ export async function ensureContractMilestones(db, contract) {
     return listMilestonesForContract(db, contract.id)
   }
 
-  const rows = buildDefaultMilestoneRows(contract.id, contract.total_value, contract.milestone_amounts)
+  const rows = buildDefaultMilestoneRows(
+    contract.id,
+    contract.total_value,
+    contract.milestone_amounts,
+    contract.milestone_descriptions
+  )
   const { data, error } = await db.from('contract_milestones').insert(rows).select()
   if (error) throw error
   return (data || []).map(mapMilestoneToClient)

@@ -15,6 +15,17 @@ import ArtistAvailabilityEditor from '../components/ArtistAvailabilityEditor'
 import { stripeConnect } from '../lib/api'
 import { isSupabaseConfigured } from '../lib/supabase'
 
+function formatActivityTime(when) {
+  const d = new Date(when)
+  if (Number.isNaN(d.getTime())) return ''
+  const diff = Date.now() - d.getTime()
+  const day = 86_400_000
+  if (diff < day) return 'Today'
+  if (diff < 2 * day) return 'Yesterday'
+  if (diff < 7 * day) return `${Math.floor(diff / day)}d ago`
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
 // Simple bar chart component (pure CSS)
 function BarChart({ data, height = 160 }) {
   const max = Math.max(...data.map(d => d.value), 1)
@@ -152,7 +163,7 @@ export default function Dashboard() {
   const { profile, effectiveRole, isAuthenticated } = useAuth()
   const { favorites, localProjects, bookings: allBookings } = useApp()
   const { artists } = useArtists()
-  const { artist: myArtistRecord, refetch: refetchMyArtist } = useArtistProfile(profile?.id)
+  const { artist: myArtistRecord, refetch: refetchMyArtist, loading: myArtistLoading } = useArtistProfile(profile?.id)
   const { payments: allPayments } = usePayments(isAuthenticated)
   const isArtist = effectiveRole === 'artist'
   const me = demoArtistPersona(profile, myArtistRecord)
@@ -243,8 +254,44 @@ export default function Dashboard() {
 
   const recentActivity = []
 
-  const artistRecentActivity = []
+  // Real weekly booking activity for the artist (replaces the old sample data).
+  const artistBookingTrend = useMemo(
+    () => buildMonthlyCounts(myBookings, rangeMonths, parseRowDate),
+    [myBookings, rangeMonths]
+  )
 
+  // Real recent-activity feed from the artist's own bookings, projects and payouts.
+  const artistRecentActivity = useMemo(() => {
+    const items = []
+    for (const b of myBookings) {
+      items.push({
+        when: b.createdAt || b.date,
+        text: `${b.status === 'confirmed' ? 'Confirmed booking' : 'Booking request'} · ${b.type || 'Session'}`,
+        color: b.status === 'confirmed' ? 'var(--success)' : 'var(--warning)',
+      })
+    }
+    for (const c of localProjects) {
+      if (me && String(c.artistId) !== String(me.id)) continue
+      items.push({
+        when: c.createdAt,
+        text: `Project ${c.status}: ${c.title}`,
+        color: c.status === 'active' ? 'var(--success)' : 'var(--accent)',
+      })
+    }
+    for (const p of myPayments) {
+      if (p.status !== 'paid') continue
+      items.push({
+        when: p.createdAt || p.date,
+        text: `Payout ${p.payoutStatus === 'paid' ? 'released' : 'held in escrow'} · $${Number(artistReleasedAmount(p)).toLocaleString()}`,
+        color: 'var(--success)',
+      })
+    }
+    return items
+      .filter((it) => it.when)
+      .sort((a, b) => new Date(b.when) - new Date(a.when))
+      .slice(0, 6)
+      .map((it) => ({ ...it, time: formatActivityTime(it.when) }))
+  }, [myBookings, localProjects, myPayments, me])
 
 
   const acceptedGigs = useMemo(
@@ -319,11 +366,35 @@ export default function Dashboard() {
 
   if (isArtist) {
     if (!me) {
+      if (myArtistLoading) {
+        return (
+          <div className="page-container">
+            <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
+              <Loader2 size={28} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+              <p>Loading your dashboard…</p>
+            </div>
+          </div>
+        )
+      }
       return (
         <div className="page-container">
           <div className="page-header">
-            <h1>Dashboard</h1>
-            <p>Complete your artist profile to get started.</p>
+            <h1>Welcome to The Callsheet</h1>
+            <p>Let’s finish setting up your artist profile so clients can find and book you.</p>
+          </div>
+          <div className="card" style={{ padding: 28, maxWidth: 640 }}>
+            <h3 style={{ fontSize: 16, marginBottom: 12 }}>Get started</h3>
+            <ul style={{ margin: '0 0 20px', paddingLeft: 20, color: 'var(--text-secondary)', lineHeight: 2 }}>
+              <li>Add your bio, expertise and social links</li>
+              <li>Upload portfolio pieces and video reels</li>
+              <li>Set your availability so clients can book time</li>
+              <li>Connect Stripe to receive payouts</li>
+            </ul>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <Link to="/account" className="btn btn-primary">Complete your profile</Link>
+              <Link to="/payments" className="btn btn-secondary">Set up payouts</Link>
+              <button type="button" className="btn btn-ghost" onClick={() => refetchMyArtist?.()}>Refresh</button>
+            </div>
           </div>
         </div>
       )
@@ -391,7 +462,7 @@ export default function Dashboard() {
           <div className="stat-card">
             <span className="stat-label"><FileText size={14} /> Projects</span>
             <span className="stat-value">{myProjects.length}</span>
-            <span className="stat-change">{myProjects.filter((p) => p.contractStatus === 'active').length} active</span>
+            <span className="stat-change">{myProjects.filter((p) => p.status === 'active').length} active</span>
           </div>
           <div className="stat-card">
             <span className="stat-label"><Star size={14} /> Rating</span>
@@ -443,10 +514,10 @@ export default function Dashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
           <div className="card slide-up" style={{ padding: 24 }}>
             <h3 style={{ fontSize: 16, fontFamily: 'var(--font-display)', marginBottom: 4 }}>
-              <Activity size={16} style={{ marginRight: 6, color: 'var(--accent)' }} /> Inquiry volume
+              <Activity size={16} style={{ marginRight: 6, color: 'var(--accent)' }} /> Booking activity
             </h3>
-            <span style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 16 }}>Last 12 weeks (sample)</span>
-            <Sparkline data={[2, 3, 2, 4, 5, 4, 6, 5, 7, 6, 8, 7]} height={60} />
+            <span style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 16 }}>Requests &amp; confirmations over the selected period</span>
+            <Sparkline data={artistBookingTrend} height={60} />
           </div>
           <div className="card slide-up" style={{ padding: 24 }}>
             <h3 style={{ fontSize: 16, fontFamily: 'var(--font-display)', marginBottom: 16 }}>

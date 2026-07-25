@@ -64,11 +64,22 @@ export default function NotificationPanel() {
         <div className="notif-panel slide-up">
           <div className="notif-panel-header">
             <h3>Notifications</h3>
-            {unreadCount > 0 && (
-              <button className="btn btn-ghost btn-sm" onClick={markAllRead}>
-                <CheckCheck size={14} /> Mark all read
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {unreadCount > 0 && (
+                <button className="btn btn-ghost btn-sm" onClick={markAllRead}>
+                  <CheckCheck size={14} /> Mark all read
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn-icon"
+                aria-label="Close notifications"
+                title="Close"
+                onClick={() => setOpen(false)}
+              >
+                <X size={16} />
               </button>
-            )}
+            </div>
           </div>
 
           <div className="notif-panel-body">

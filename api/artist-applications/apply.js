@@ -21,7 +21,18 @@ const ApplySchema = z.object({
     twitter: z.string().optional(),
     instagram: z.string().optional(),
     linkedin: z.string().optional(),
-    videoLinks: z.string().optional(),
+    videoLinks: z
+      .union([
+        z.string(),
+        z.array(z.string()),
+        z.array(
+          z.object({
+            url: z.string().optional(),
+            title: z.string().optional(),
+          })
+        ),
+      ])
+      .optional(),
   }),
 })
 

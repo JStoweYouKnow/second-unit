@@ -89,6 +89,65 @@ export default function Bookings() {
     return () => { cancelled = true }
   }, [searchParams, refetch, setSearchParams])
 
+  // Prefill create form from availability calendar handoff
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return
+    const artistId = searchParams.get('artistId')
+    if (!artistId) return
+
+    const durationUnitRaw = searchParams.get('durationUnit') || 'hours'
+    const durationUnit = ['hours', 'days', 'project'].includes(durationUnitRaw)
+      ? durationUnitRaw
+      : 'hours'
+    const durationNum = Number(searchParams.get('duration'))
+    const duration = Number.isFinite(durationNum) && durationNum > 0
+      ? durationNum
+      : durationUnit === 'days'
+        ? 1
+        : 2
+
+    setNewBooking((p) => ({
+      ...p,
+      artistId,
+      date: searchParams.get('date') || '',
+      time: searchParams.get('time') || '09:00',
+      duration,
+      durationUnit,
+    }))
+    setShowNew(true)
+
+    const next = new URLSearchParams(searchParams)
+    ;['new', 'artistId', 'date', 'time', 'duration', 'durationUnit'].forEach((k) => next.delete(k))
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  const hourDurationOptions = useMemo(() => {
+    const base = [0.5, 1, 2, 3, 4, 6, 8]
+    const d = Number(newBooking.duration)
+    if (newBooking.durationUnit === 'hours' && Number.isFinite(d) && d > 0 && !base.includes(d)) {
+      return [...base, d].sort((a, b) => a - b)
+    }
+    return base
+  }, [newBooking.duration, newBooking.durationUnit])
+
+  const dayDurationOptions = useMemo(() => {
+    const base = [1, 2, 3, 4, 5, 6, 7, 10, 14]
+    const d = Number(newBooking.duration)
+    if (newBooking.durationUnit === 'days' && Number.isFinite(d) && d > 0 && !base.includes(d)) {
+      return [...base, d].sort((a, b) => a - b)
+    }
+    return base
+  }, [newBooking.duration, newBooking.durationUnit])
+
+  const bookingArtists = useMemo(() => {
+    const available = artists.filter((a) => a.available)
+    const selected = artists.find((a) => String(a.id) === String(newBooking.artistId))
+    if (selected && !available.some((a) => String(a.id) === String(selected.id))) {
+      return [selected, ...available]
+    }
+    return available
+  }, [artists, newBooking.artistId])
+
   const roleBookings = useMemo(() => {
     // API already returns bookings where this user is employer OR assigned artist.
     // Don't hide employer-created bookings just because the user also has an artists row.
@@ -460,9 +519,12 @@ export default function Bookings() {
                 <label className="form-label">Artist</label>
                 <select className="form-input" value={newBooking.artistId} onChange={e => setNewBooking(p => ({ ...p, artistId: e.target.value }))} required>
                   <option value="">Select an artist...</option>
-                  {artists.filter(a => a.available).map(a => (
+                  {bookingArtists.map(a => (
                     <option key={a.id} value={a.id}>{a.name} — {a.role}</option>
                   ))}
+                  {newBooking.artistId && !bookingArtists.some((a) => String(a.id) === String(newBooking.artistId)) && (
+                    <option value={newBooking.artistId}>Selected artist</option>
+                  )}
                 </select>
               </div>
                 <div className="form-group">
@@ -511,7 +573,7 @@ export default function Bookings() {
                 <div className="form-group">
                   <label className="form-label">Duration (hours)</label>
                   <select className="form-input" value={newBooking.duration} onChange={e => setNewBooking(p => ({ ...p, duration: Number(e.target.value) }))}>
-                    {[0.5, 1, 2, 3, 4, 6, 8].map((d) => (
+                    {hourDurationOptions.map((d) => (
                       <option key={d} value={d}>{d}h</option>
                     ))}
                   </select>
@@ -521,7 +583,7 @@ export default function Bookings() {
                 <div className="form-group">
                   <label className="form-label">Duration (days)</label>
                   <select className="form-input" value={newBooking.duration} onChange={e => setNewBooking(p => ({ ...p, duration: Number(e.target.value) }))}>
-                    {[1, 2, 3, 4, 5, 6, 7, 10, 14].map((d) => (
+                    {dayDurationOptions.map((d) => (
                       <option key={d} value={d}>{d} {d === 1 ? 'day' : 'days'}</option>
                     ))}
                   </select>

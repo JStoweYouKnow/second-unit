@@ -34,6 +34,9 @@ export const FEATURE_MIGRATIONS = [
   'brand-verification.sql',
   'portfolio-storage.sql',
   'employer-tax-vault.sql',
+  'artist-featured-header.sql',
+  'artist-video-reels.sql',
+  'artist-timezone.sql',
 ]
 
 /** Tracking table bootstrap — apply once before recording other migrations. */

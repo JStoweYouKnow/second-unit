@@ -64,13 +64,14 @@ function normalizeArtist(row, skills = [], brands = []) {
     twitter: row.twitter,
     instagram: row.instagram,
     linkedin: row.linkedin,
-    videoLinks: row.video_links || [],
+    videoLinks: row.video_reels || row.video_links || [],
     skills,
     brands,
     stripeAccountId: row.stripe_account_id ?? null,
     available: row.available,
     rating: row.rating,
     totalProjects: row.total_projects,
+    timezone: row.timezone || null,
   }
 }
 
@@ -152,7 +153,7 @@ export async function saveArtistProfile({ profileId, fullName, form, existingArt
       twitter: artistPayload.twitter,
       instagram: artistPayload.instagram,
       linkedin: artistPayload.linkedin,
-      videoLinks: artistPayload.video_links,
+      videoLinks: artistPayload.video_reels || artistPayload.video_links,
       skills: parseCommaList(form.skills),
       brands: parseCommaList(form.brands),
     }

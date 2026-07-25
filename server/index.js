@@ -13,6 +13,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { validateInviteToken } from '../api/_lib/validateInvite.js'
 import { applyWithArtistInvite } from '../api/_lib/inviteApply.js'
+import { signupHirer } from '../api/_lib/hirerSignup.js'
 import { db, dbUsesServiceRole } from '../api/_lib/db.js'
 import { requireAuth } from '../api/_lib/auth.js'
 import {
@@ -879,6 +880,27 @@ app.post('/api/artist-applications/apply', async (req, res) => {
   }
 })
 
+app.post('/api/auth/signup', async (req, res) => {
+  const database = db
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const { email, password, fullName, role } = req.body || {}
+    if (role && role !== 'employer') {
+      return res.status(400).json({ error: 'Artists must apply via an invite link' })
+    }
+    const result = await signupHirer(database, { email, password, fullName })
+    res.json({
+      ok: true,
+      ...result,
+      message: 'Account created. You can sign in now.',
+    })
+  } catch (err) {
+    const msg = err.message || 'Sign up failed'
+    const status = /already exists|Password|email|name|required/i.test(msg) ? 400 : 500
+    res.status(status).json({ error: msg })
+  }
+})
+
 app.get('/api/conversations', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
@@ -1458,7 +1480,10 @@ app.post('/api/calendar/connect', async (req, res) => {
   const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   if (!isGoogleCalendarConfigured()) {
-    return res.status(503).json({ error: 'Google Calendar OAuth is not configured' })
+    return res.status(503).json({
+      error:
+        'Google Calendar OAuth is not configured. Set GOOGLE_CALENDAR_CLIENT_ID and GOOGLE_CALENDAR_CLIENT_SECRET on the server, with redirect URI {FRONTEND_URL}/api/calendar/callback in Google Cloud Console.',
+    })
   }
   try {
     const state = await createOAuthState(database, user.id)

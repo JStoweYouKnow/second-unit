@@ -17,7 +17,10 @@ export default async function handler(req, res) {
   if (!db) return res.status(503).json({ error: 'Database not configured' })
 
   if (!isGoogleCalendarConfigured()) {
-    return res.status(503).json({ error: 'Google Calendar OAuth is not configured' })
+    return res.status(503).json({
+      error:
+        'Google Calendar OAuth is not configured. Set GOOGLE_CALENDAR_CLIENT_ID and GOOGLE_CALENDAR_CLIENT_SECRET on the server (Vercel), with redirect URI {FRONTEND_URL}/api/calendar/callback in Google Cloud Console.',
+    })
   }
 
   if (req.method !== 'POST') {

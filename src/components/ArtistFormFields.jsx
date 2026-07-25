@@ -1,5 +1,24 @@
+import PasswordInput from './PasswordInput'
+import { Plus, Trash2 } from './icons'
+import { emptyVideoReelRow, videoReelsToFormRows } from '../lib/videoReels'
+
 export function ArtistFormFields({ form, onChange, showAccountFields = false, disabledAccountFields = false, lockEmail = false }) {
   const set = (field) => (e) => onChange({ ...form, [field]: e.target.value })
+  const rows = videoReelsToFormRows(form?.videoLinks)
+
+  const setVideoReelAt = (index, patch) => {
+    const next = rows.map((row, i) => (i === index ? { ...row, ...patch } : row))
+    onChange({ ...form, videoLinks: next })
+  }
+
+  const addVideoReel = () => {
+    onChange({ ...form, videoLinks: [...rows, emptyVideoReelRow()] })
+  }
+
+  const removeVideoReel = (index) => {
+    const next = rows.filter((_, i) => i !== index)
+    onChange({ ...form, videoLinks: next.length ? next : [emptyVideoReelRow()] })
+  }
 
   return (
     <>
@@ -40,9 +59,8 @@ export function ArtistFormFields({ form, onChange, showAccountFields = false, di
           {!disabledAccountFields && (
             <div className="form-group">
               <label className="form-label">Password</label>
-              <input
-                className="form-input"
-                type="password"
+              <PasswordInput
+                variant="plain"
                 name="password"
                 autoComplete="new-password"
                 placeholder="Min 8 characters"
@@ -167,13 +185,65 @@ export function ArtistFormFields({ form, onChange, showAccountFields = false, di
       </div>
 
       <div className="form-group">
-        <label className="form-label">Video Reels (YouTube/Vimeo URLs, comma separated)</label>
-        <input
-          className="form-input"
-          placeholder="https://youtube.com/..., https://vimeo.com/..."
-          value={form.videoLinks}
-          onChange={set('videoLinks')}
-        />
+        <label className="form-label">Video Reels</label>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 10px' }}>
+          Add a title and YouTube or Vimeo link for each reel.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {rows.map((row, index) => (
+            <div
+              key={index}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1fr) auto',
+                gap: 8,
+                alignItems: 'start',
+                padding: 12,
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                background: 'var(--surface)',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+                <input
+                  className="form-input"
+                  placeholder={`Title (e.g. Brand Campaign Reel)`}
+                  value={row.title}
+                  onChange={(e) => setVideoReelAt(index, { title: e.target.value })}
+                  aria-label={`Video reel title ${index + 1}`}
+                />
+                <input
+                  className="form-input"
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://youtube.com/watch?v=… or https://vimeo.com/…"
+                  value={row.url}
+                  onChange={(e) => setVideoReelAt(index, { url: e.target.value })}
+                  aria-label={`Video reel URL ${index + 1}`}
+                />
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => removeVideoReel(index)}
+                disabled={rows.length === 1 && !row.url.trim() && !row.title.trim()}
+                aria-label={`Remove video reel ${index + 1}`}
+                title="Remove"
+                style={{ flexShrink: 0, padding: '8px 10px' }}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={addVideoReel}
+          style={{ marginTop: 10 }}
+        >
+          <Plus size={14} /> Add another reel
+        </button>
       </div>
     </>
   )

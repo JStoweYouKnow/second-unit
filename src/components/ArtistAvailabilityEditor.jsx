@@ -1,31 +1,45 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   format,
-  startOfMonth,
-  endOfMonth,
-  startOfWeek,
-  endOfWeek,
-  addDays,
-  isSameMonth,
-  isToday,
-  isSameDay,
   addMonths,
   subMonths,
+  isSameDay,
 } from 'date-fns'
 import { ChevronLeft, ChevronRight, Clock, Loader2, CheckCircle } from './icons'
 import { useArtistAvailability } from '../hooks/useArtistAvailability'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import {
   STANDARD_SLOT_LABELS,
+  SLOT_PRESETS,
   isPastDate,
+  isMonthFullyPast,
+  buildMonthWeeks,
   sortSlotLabels,
+  detectBrowserTimeZone,
+  listTimeZones,
+  formatTimeZoneLabel,
 } from '../lib/availability'
 
-export default function ArtistAvailabilityEditor({ artistId, artistName }) {
+export default function ArtistAvailabilityEditor({
+  artistId,
+  artistName,
+  initialTimeZone = null,
+  onTimeZoneChange,
+}) {
   const { availability, loading, saving, error, updateDayAvailability } = useArtistAvailability(artistId)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(null)
   const [draftSlots, setDraftSlots] = useState([])
   const [saveStatus, setSaveStatus] = useState('')
+  const [timeZone, setTimeZone] = useState(initialTimeZone || detectBrowserTimeZone())
+  const [tzSaving, setTzSaving] = useState(false)
+  const [tzStatus, setTzStatus] = useState('')
+
+  const timeZones = useMemo(() => listTimeZones(), [])
+
+  useEffect(() => {
+    if (initialTimeZone) setTimeZone(initialTimeZone)
+  }, [initialTimeZone])
 
   const availableDates = useMemo(() => availability.map((a) => a.date), [availability])
 
@@ -42,55 +56,35 @@ export default function ArtistAvailabilityEditor({ artistId, artistName }) {
     setSaveStatus('')
   }, [selectedDateStr, dayEntry])
 
-  const monthStart = startOfMonth(currentMonth)
-  const monthEnd = endOfMonth(monthStart)
-  const startDate = startOfWeek(monthStart)
-  const endDate = endOfWeek(monthEnd)
+  const weeks = useMemo(
+    () => buildMonthWeeks(currentMonth, { timeZone, hidePastDays: true }),
+    [currentMonth, timeZone]
+  )
 
-  const rows = []
-  let days = []
-  let day = startDate
+  const canGoPrev = !isMonthFullyPast(subMonths(currentMonth, 1), timeZone)
 
-  while (day <= endDate) {
-    for (let i = 0; i < 7; i++) {
-      const d = day
-      const dateStr = format(d, 'yyyy-MM-dd')
-      const hasSlots = availableDates.includes(dateStr)
-      const past = isPastDate(d)
-      const isSelected = selectedDate && isSameDay(d, selectedDate)
-
-      days.push(
-        <button
-          key={d.toString()}
-          type="button"
-          disabled={past}
-          className={`calendar-day ${!isSameMonth(d, monthStart) ? 'other-month' : ''} ${isToday(d) ? 'today' : ''} ${hasSlots ? 'has-event' : ''} ${isSelected ? 'calendar-day--selected' : ''}`}
-          onClick={() => {
-            if (past) return
-            setSelectedDate(d)
-            setSaveStatus('')
-          }}
-          style={{
-            opacity: past ? 0.35 : 1,
-            cursor: past ? 'default' : 'pointer',
-            border: 'none',
-            background: isSelected ? 'var(--accent)' : 'transparent',
-            color: isSelected ? 'white' : undefined,
-          }}
-          aria-label={format(d, 'EEEE, MMMM d, yyyy')}
-          aria-pressed={isSelected}
-        >
-          {format(d, 'd')}
-        </button>
-      )
-      day = addDays(day, 1)
+  const persistTimeZone = async (nextTz) => {
+    setTimeZone(nextTz)
+    setTzStatus('')
+    if (!artistId || !isSupabaseConfigured || !supabase) {
+      onTimeZoneChange?.(nextTz)
+      return
     }
-    rows.push(
-      <div key={day.toString()} className="calendar-grid">
-        {days}
-      </div>
-    )
-    days = []
+    setTzSaving(true)
+    try {
+      const { error: tzErr } = await supabase
+        .from('artists')
+        .update({ timezone: nextTz, updated_at: new Date().toISOString() })
+        .eq('id', artistId)
+      if (tzErr) throw tzErr
+      onTimeZoneChange?.(nextTz)
+      setTzStatus('saved')
+      setTimeout(() => setTzStatus(''), 2000)
+    } catch (err) {
+      setTzStatus(err.message || 'Could not save timezone')
+    } finally {
+      setTzSaving(false)
+    }
   }
 
   const toggleSlot = (label) => {
@@ -134,7 +128,7 @@ export default function ArtistAvailabilityEditor({ artistId, artistName }) {
             Availability calendar
           </h2>
           <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: 0, maxWidth: 520 }}>
-            Set the hours you&apos;re open for bookings. Clients see this on your profile and spotlight listing.
+            Set open hours in your working timezone. Clients book hour-long segments; booked slots stay locked.
           </p>
         </div>
         {loading && (
@@ -146,8 +140,41 @@ export default function ArtistAvailabilityEditor({ artistId, artistName }) {
 
       {error && <div className="auth-error" style={{ marginBottom: 16 }}>{error}</div>}
 
+      <div className="form-group" style={{ marginBottom: 20, maxWidth: 420 }}>
+        <label className="form-label" htmlFor="artist-timezone">Working timezone</label>
+        <select
+          id="artist-timezone"
+          className="form-input"
+          value={timeZone}
+          onChange={(e) => persistTimeZone(e.target.value)}
+          disabled={tzSaving}
+        >
+          {!timeZones.includes(timeZone) && timeZone && (
+            <option value={timeZone}>{formatTimeZoneLabel(timeZone)}</option>
+          )}
+          {timeZones.map((tz) => (
+            <option key={tz} value={tz}>{formatTimeZoneLabel(tz)}</option>
+          ))}
+        </select>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, display: 'block' }}>
+          Past dates are hidden using this timezone. Hours you set are wall-clock times in {formatTimeZoneLabel(timeZone)}.
+          {tzSaving && ' Saving…'}
+          {tzStatus === 'saved' && ' Saved.'}
+          {tzStatus && tzStatus !== 'saved' && (
+            <span style={{ color: 'var(--danger)' }}> {tzStatus}</span>
+          )}
+        </span>
+      </div>
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <button type="button" className="btn-icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} aria-label="Previous month">
+        <button
+          type="button"
+          className="btn-icon"
+          onClick={() => canGoPrev && setCurrentMonth(subMonths(currentMonth, 1))}
+          aria-label="Previous month"
+          disabled={!canGoPrev}
+          style={{ opacity: canGoPrev ? 1 : 0.35 }}
+        >
           <ChevronLeft size={16} />
         </button>
         <span style={{ fontWeight: 600, fontFamily: 'var(--font-display)', fontSize: 16 }}>
@@ -163,29 +190,77 @@ export default function ArtistAvailabilityEditor({ artistId, artistName }) {
           <div key={d} className="calendar-header">{d}</div>
         ))}
       </div>
-      {rows}
+      {weeks.map((week) => (
+        <div key={week[0].dateKey} className="calendar-grid">
+          {week.map((cell) => {
+            if (cell.hide) {
+              return (
+                <div
+                  key={cell.dateKey}
+                  className="calendar-day"
+                  style={{ visibility: 'hidden', pointerEvents: 'none' }}
+                  aria-hidden
+                />
+              )
+            }
 
-      {selectedDate && (
+            const hasSlots = availableDates.includes(cell.dateKey)
+            const isSelected = selectedDate && isSameDay(cell.date, selectedDate)
+            const disabled = cell.past || !cell.inMonth
+
+            return (
+              <button
+                key={cell.dateKey}
+                type="button"
+                disabled={disabled}
+                className={`calendar-day ${!cell.inMonth ? 'other-month' : ''} ${cell.isToday ? 'today' : ''} ${hasSlots ? 'has-event' : ''} ${isSelected ? 'calendar-day--selected' : ''}`}
+                onClick={() => {
+                  if (disabled) return
+                  setSelectedDate(cell.date)
+                  setSaveStatus('')
+                }}
+                style={{
+                  opacity: !cell.inMonth ? 0.35 : 1,
+                  cursor: disabled ? 'default' : 'pointer',
+                  border: 'none',
+                  background: isSelected ? 'var(--accent)' : 'transparent',
+                  color: isSelected ? 'white' : undefined,
+                }}
+                aria-label={format(cell.date, 'EEEE, MMMM d, yyyy')}
+                aria-pressed={isSelected}
+              >
+                {format(cell.date, 'd')}
+              </button>
+            )
+          })}
+        </div>
+      ))}
+
+      {selectedDate && !isPastDate(selectedDate, timeZone) && (
         <div className="slide-up" style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border)' }}>
           <h3 style={{ fontSize: 15, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
             <Clock size={16} style={{ color: 'var(--accent)' }} />
             {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+            <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: 13 }}>
+              · {formatTimeZoneLabel(timeZone)}
+            </span>
           </h3>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => applyPreset(STANDARD_SLOT_LABELS)}
-            >
-              Full day (9 AM – 5 PM)
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => applyPreset(SLOT_PRESETS.fullDay)}>
+              Full day (24h)
             </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => applyPreset(STANDARD_SLOT_LABELS.filter((_, i) => i < 4))}
-            >
-              Morning only
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => applyPreset(SLOT_PRESETS.business)}>
+              Business (9 AM – 5 PM)
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => applyPreset(SLOT_PRESETS.morning)}>
+              Morning
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => applyPreset(SLOT_PRESETS.afternoon)}>
+              Afternoon
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => applyPreset(SLOT_PRESETS.evening)}>
+              Evening
             </button>
             <button
               type="button"
@@ -196,7 +271,22 @@ export default function ArtistAvailabilityEditor({ artistId, artistName }) {
             </button>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 10px' }}>
+            Tap hours to open them for booking. Leave hours off to block that segment of the day.
+          </p>
+
+          <div
+            className="availability-slot-grid"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+              gap: 8,
+              marginBottom: 20,
+              maxHeight: 280,
+              overflowY: 'auto',
+              paddingRight: 4,
+            }}
+          >
             {STANDARD_SLOT_LABELS.map((slot) => {
               const active = draftSlots.includes(slot)
               const locked = bookedOnDay.includes(slot)
@@ -207,10 +297,11 @@ export default function ArtistAvailabilityEditor({ artistId, artistName }) {
                   className={`btn btn-sm ${active ? 'btn-primary' : 'btn-secondary'}`}
                   onClick={() => toggleSlot(slot)}
                   disabled={locked}
-                  title={locked ? 'Booked — cannot remove' : undefined}
+                  title={locked ? 'Booked — cannot remove' : active ? 'Open — click to block' : 'Blocked — click to open'}
+                  style={{ justifyContent: 'center' }}
                 >
                   {slot}
-                  {locked && ' · booked'}
+                  {locked ? ' · booked' : ''}
                 </button>
               )
             })}
@@ -253,7 +344,7 @@ export default function ArtistAvailabilityEditor({ artistId, artistName }) {
       <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', fontSize: 13, color: 'var(--text-muted)' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
-          Dot = day has availability · Booked slots stay locked
+          Dot = day has availability · Past dates hidden · Booked slots stay locked
         </span>
       </div>
     </div>

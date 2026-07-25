@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Heart, Star, Calendar, TrendingUp, Users, DollarSign, FileText, ArrowUpRight, BarChart3, PieChart, Activity, User, MapPin } from '../components/icons'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Heart, Star, Calendar, TrendingUp, Users, DollarSign, FileText, ArrowUpRight, BarChart3, PieChart, Activity, User, MapPin, ChevronRight, Loader2 } from '../components/icons'
 import { useArtists } from '../hooks/useData'
 import { buildOpenBriefCards } from '../lib/openBriefs'
 import { useArtistProfile } from '../hooks/useArtistProfile'
@@ -12,6 +12,8 @@ import { buildMonthlySeries, buildMonthlyCounts, parseRowDate } from '../lib/ana
 import { artistReleasedAmount } from '../lib/fees'
 import { bookingSubtotal } from '../lib/pricing'
 import ArtistAvailabilityEditor from '../components/ArtistAvailabilityEditor'
+import { stripeConnect } from '../lib/api'
+import { isSupabaseConfigured } from '../lib/supabase'
 
 // Simple bar chart component (pure CSS)
 function BarChart({ data, height = 160 }) {
@@ -88,12 +90,31 @@ export default function Dashboard() {
   const { profile, effectiveRole, isAuthenticated } = useAuth()
   const { favorites, localProjects, bookings: allBookings } = useApp()
   const { artists } = useArtists()
-  const { artist: myArtistRecord } = useArtistProfile(profile?.id)
+  const { artist: myArtistRecord, refetch: refetchMyArtist } = useArtistProfile(profile?.id)
   const { payments: allPayments } = usePayments(isAuthenticated)
   const isArtist = effectiveRole === 'artist'
   const me = demoArtistPersona(profile, myArtistRecord)
   const favArtists = artists.filter((a) => favorites.includes(a.id))
   const [timeRange, setTimeRange] = useState('6m')
+  const [payoutReady, setPayoutReady] = useState(null)
+
+  useEffect(() => {
+    if (!isArtist || !isSupabaseConfigured) {
+      setPayoutReady(null)
+      return
+    }
+    let cancelled = false
+    setPayoutReady(null)
+    stripeConnect
+      .getStatus(myArtistRecord?.stripeAccountId)
+      .then((status) => {
+        if (!cancelled) setPayoutReady(!!status?.payoutsEnabled)
+      })
+      .catch(() => {
+        if (!cancelled) setPayoutReady(false)
+      })
+    return () => { cancelled = true }
+  }, [isArtist, myArtistRecord?.stripeAccountId])
 
   const myBookings = useMemo(() => {
     if (!isArtist) return []
@@ -164,18 +185,24 @@ export default function Dashboard() {
 
 
 
+  const acceptedGigs = useMemo(
+    () => myBookings.filter((b) => b.status === 'confirmed'),
+    [myBookings]
+  )
+
   const gigMix = useMemo(() => {
     const counts = {}
-    for (const b of myBookings) {
-      counts[b.type] = (counts[b.type] || 0) + 1
+    for (const b of acceptedGigs) {
+      const type = b.type || 'Other'
+      counts[type] = (counts[type] || 0) + 1
     }
     const colors = ['var(--accent)', 'var(--text-primary)', 'var(--border-hover)', 'var(--accent2)', 'var(--danger)']
-    const entries = Object.entries(counts)
-    if (entries.length === 0) {
-      return [{ label: 'No gigs yet', value: 1, color: 'var(--text-muted)' }]
-    }
-    return entries.map(([label, value], i) => ({ label, value, color: colors[i % colors.length] }))
-  }, [myBookings])
+    return Object.entries(counts).map(([label, value], i) => ({
+      label,
+      value,
+      color: colors[i % colors.length],
+    }))
+  }, [acceptedGigs])
 
 
 
@@ -224,7 +251,7 @@ export default function Dashboard() {
       return (
         <div className="page-container">
           <div className="page-header">
-            <h1>Studio</h1>
+            <h1>Dashboard</h1>
             <p>Complete your artist profile to get started.</p>
           </div>
         </div>
@@ -236,7 +263,7 @@ export default function Dashboard() {
         <div className="page-header">
           <div className="page-header-row">
           <div>
-            <h1>Studio</h1>
+            <h1>Dashboard</h1>
             <p>Your bookings, projects, and payouts in one place</p>
           </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -247,6 +274,37 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {payoutReady === null && isSupabaseConfigured && (
+          <div className="stripe-prompt stripe-prompt--action slide-up" style={{ padding: '16px 22px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Loader2 size={18} className="animate-spin" />
+              <span className="stripe-prompt__body">Checking payout account…</span>
+            </div>
+          </div>
+        )}
+
+        {payoutReady === false && (
+          <div className="stripe-prompt stripe-prompt--warn slide-up">
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center', minWidth: 0 }}>
+              <div className="stripe-prompt__icon" aria-hidden>
+                <DollarSign size={24} />
+              </div>
+              <div>
+                <div className="stripe-prompt__eyebrow">Required to get paid</div>
+                <div className="stripe-prompt__title">Connect Stripe to receive payouts</div>
+                <div className="stripe-prompt__body">
+                  Earnings stay in escrow until your Stripe payout account is connected and enabled.
+                </div>
+              </div>
+            </div>
+            <div className="stripe-prompt__actions">
+              <Link to="/payments" className="btn btn-primary btn-lg">
+                Set up payouts <ChevronRight size={18} />
+              </Link>
+            </div>
+          </div>
+        )}
 
         <div className="stats-grid slide-up" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           <div className="stat-card">
@@ -271,7 +329,14 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 32 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: gigMix.length > 0 ? '2fr 1fr' : '1fr',
+            gap: 20,
+            marginBottom: 32,
+          }}
+        >
           <div className="card slide-up" style={{ padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div>
@@ -283,23 +348,25 @@ export default function Dashboard() {
             </div>
             <BarChart data={artistIncomeData} height={180} />
           </div>
-          <div className="card slide-up" style={{ padding: 24 }}>
-            <h3 style={{ fontSize: 16, fontFamily: 'var(--font-display)', marginBottom: 20 }}>
-              <PieChart size={16} style={{ marginRight: 6, color: 'var(--accent)' }} /> Gigs by type
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
-              <DonutChart segments={gigMix} size={130} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-                {gigMix.map((s) => (
-                  <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-                    <span style={{ flex: 1, color: 'var(--text-secondary)' }}>{s.label}</span>
-                    <span style={{ fontWeight: 600 }}>{s.value}</span>
-                  </div>
-                ))}
+          {gigMix.length > 0 && (
+            <div className="card slide-up" style={{ padding: 24 }}>
+              <h3 style={{ fontSize: 16, fontFamily: 'var(--font-display)', marginBottom: 20 }}>
+                <PieChart size={16} style={{ marginRight: 6, color: 'var(--accent)' }} /> Gigs by type
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+                <DonutChart segments={gigMix} size={130} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+                  {gigMix.map((s) => (
+                    <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                      <span style={{ flex: 1, color: 'var(--text-secondary)' }}>{s.label}</span>
+                      <span style={{ fontWeight: 600 }}>{s.value}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
@@ -332,7 +399,12 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <ArtistAvailabilityEditor artistId={me.id} artistName={me.name} />
+        <ArtistAvailabilityEditor
+          artistId={me.id}
+          artistName={me.name}
+          initialTimeZone={me.timezone || myArtistRecord?.timezone || null}
+          onTimeZoneChange={() => refetchMyArtist?.()}
+        />
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, margin: 0 }}>Your public profile</h2>

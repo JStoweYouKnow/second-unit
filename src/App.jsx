@@ -37,6 +37,8 @@ const NotFound = lazy(() => import('./pages/NotFound'))
 const Landing = lazy(() => import('./pages/Landing'))
 const Terms = lazy(() => import('./pages/Terms'))
 const Privacy = lazy(() => import('./pages/Privacy'))
+const About = lazy(() => import('./pages/About'))
+const Help = lazy(() => import('./pages/Help'))
 const ArtistApply = lazy(() => import('./pages/ArtistApply'))
 const ApplicationStatus = lazy(() => import('./pages/ApplicationStatus'))
 const AdminApplications = lazy(() => import('./pages/AdminApplications'))
@@ -448,6 +450,17 @@ function AppShell() {
                 </div>
               </div>
               <ThemeToggle showLabel />
+              <div className="sidebar-doc-links">
+                <button type="button" className="nav-link" onClick={() => goNav('/help')}>
+                  Help
+                </button>
+                <button type="button" className="nav-link" onClick={() => goNav('/about')}>
+                  About
+                </button>
+                <button type="button" className="nav-link" onClick={() => goNav('/terms')}>
+                  Terms
+                </button>
+              </div>
               <button
                 type="button"
                 className="nav-link sign-out-btn"
@@ -554,6 +567,8 @@ function App() {
               <Route path="/update-password" element={<UpdatePassword />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/help" element={<Help />} />
               <Route path="/*" element={<AppShell />} />
             </Routes>
           </Suspense>

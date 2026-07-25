@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { availabilityDatesFromRows } from '../lib/discoveryAvailability'
 import { normalizeBrands } from '../lib/brands'
 import { groupSlotsByDate } from '../lib/availability'
+import { normalizeVideoReels } from '../lib/videoReels'
 
 const MOCK_ARTISTS = [
   {
@@ -31,6 +32,8 @@ const MOCK_ARTISTS = [
       website: 'https://example.com',
     },
     joined: '2026-01-15',
+    featuredPortfolioItemId: null,
+    featuredVideoLink: null,
     availabilitySlots: ['2026-06-15', '2026-06-16', '2026-06-18'],
     portfolio: [
       { id: 'p1', title: 'Neo-Tokyo Dreams', image: '', video: '', colorIdx: 0 },
@@ -66,6 +69,8 @@ const MOCK_ARTISTS = [
       website: 'https://example.com',
     },
     joined: '2026-02-10',
+    featuredPortfolioItemId: null,
+    featuredVideoLink: null,
     availabilitySlots: ['2026-06-15', '2026-06-17', '2026-06-19'],
     portfolio: [
       { id: 'p4', title: 'Chrono-Shift Trailer', image: '', video: '', colorIdx: 3 },
@@ -155,7 +160,8 @@ export function useArtists({ search = '', roleFilter = 'all' } = {}) {
         brands: normalizeBrands(
           a.brands?.map((b) => ({ name: b.brand?.name, verified: b.verified })).filter((b) => b.name) || []
         ),
-        videoLinks: a.video_links || [],
+        videoLinks: normalizeVideoReels(a.video_reels || a.video_links || []),
+        timezone: a.timezone || null,
         availabilitySlots: availabilityDatesFromRows(
           a.availability || [],
           busyByArtist.get(a.id) || []
@@ -243,7 +249,10 @@ export function useArtist(id) {
           brands: normalizeBrands(
             data.brands?.map((b) => ({ name: b.brand?.name, verified: b.verified })).filter((b) => b.name) || []
           ),
-          videoLinks: data.video_links || [],
+          videoLinks: normalizeVideoReels(data.video_reels || data.video_links || []),
+          featuredPortfolioItemId: data.featured_portfolio_item_id || null,
+          featuredVideoLink: data.featured_video_link || null,
+          timezone: data.timezone || null,
           socials: {
             twitter: data.twitter || '#',
             instagram: data.instagram || '#',

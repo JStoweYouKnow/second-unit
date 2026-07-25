@@ -1,6 +1,8 @@
 import { useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Calendar, Heart, Play, Star, Filter, DollarSign, MapPin, Globe, AtSign, X } from '../components/icons'
+import { Search, Calendar, Heart, Play, Star, Filter, DollarSign, MapPin, Globe, IconX, Instagram, LinkedIn, X } from '../components/icons'
+import { normalizeSocialUrl } from '../lib/socialLinks'
+import { videoReelUrl } from '../lib/videoReels'
 import { buildOpenBriefCards } from '../lib/openBriefs'
 import { brandName } from '../lib/brands'
 import ArtistRateCard from '../components/ArtistRateCard'
@@ -61,8 +63,9 @@ function getVideoThumbnail(url) {
 }
 
 function getArtistTileThumb(artist) {
-  if (artist.videoLinks?.length > 0) {
-    return getVideoThumbnail(artist.videoLinks[0])
+  const firstReel = videoReelUrl(artist.videoLinks?.[0])
+  if (firstReel) {
+    return getVideoThumbnail(firstReel)
   }
   if (artist.avatarUrl) return artist.avatarUrl
   return null
@@ -427,11 +430,11 @@ export default function Leaderboard() {
                   />
                 )}
                 
-                {hoveredId === artist.id && artist.videoLinks?.length > 0 && (
+                {hoveredId === artist.id && videoReelUrl(artist.videoLinks?.[0]) && (
                   <div className="artist-tile__video-wrapper">
-                    {artist.videoLinks[0].endsWith('.mp4') ? (
+                    {videoReelUrl(artist.videoLinks[0]).endsWith('.mp4') ? (
                       <video
-                        src={artist.videoLinks[0]}
+                        src={videoReelUrl(artist.videoLinks[0])}
                         autoPlay
                         loop
                         muted
@@ -440,7 +443,7 @@ export default function Leaderboard() {
                       />
                     ) : (
                       <iframe
-                        src={getEmbedUrl(artist.videoLinks[0])}
+                        src={getEmbedUrl(videoReelUrl(artist.videoLinks[0]))}
                         frameBorder="0"
                         allow="autoplay; fullscreen; picture-in-picture"
                         allowFullScreen
@@ -461,16 +464,29 @@ export default function Leaderboard() {
                 <div className="artist-tile__name">{artist.name}</div>
                 
                 <div className="artist-tile__links" onClick={(e) => e.stopPropagation()}>
-                  {artist.socials?.website && (
-                    <a href={artist.socials.website} target="_blank" rel="noopener noreferrer" className="artist-tile__link-icon" title="Website">
-                      <Globe size={18} />
-                    </a>
-                  )}
-                  <a href="#" className="artist-tile__link-icon" title="Socials">
-                    <AtSign size={18} />
-                  </a>
-                  {artist.videoLinks?.length > 0 && (
-                    <a href={artist.videoLinks[0]} target="_blank" rel="noopener noreferrer" className="artist-tile__link-icon" title="Reel">
+                  {[
+                    { value: artist.socials?.twitter, platform: 'twitter', title: 'X (Twitter)', Icon: IconX },
+                    { value: artist.socials?.instagram, platform: 'instagram', title: 'Instagram', Icon: Instagram },
+                    { value: artist.socials?.linkedin, platform: 'linkedin', title: 'LinkedIn', Icon: LinkedIn },
+                    { value: artist.socials?.website, platform: 'website', title: 'Website', Icon: Globe },
+                  ]
+                    .map((item) => ({ ...item, href: normalizeSocialUrl(item.value, item.platform) }))
+                    .filter(({ href }) => href)
+                    .map(({ href, title, Icon }) => (
+                      <a
+                        key={title}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="artist-tile__link-icon"
+                        title={title}
+                        aria-label={title}
+                      >
+                        <Icon size={18} />
+                      </a>
+                    ))}
+                  {videoReelUrl(artist.videoLinks?.[0]) && (
+                    <a href={videoReelUrl(artist.videoLinks[0])} target="_blank" rel="noopener noreferrer" className="artist-tile__link-icon" title="Reel">
                       <Play size={18} />
                     </a>
                   )}

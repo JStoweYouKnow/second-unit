@@ -24,5 +24,6 @@ export function demoArtistPersona(profile, artistRecord = null) {
     role: artistRecord.roleTitle || 'AI Visual Artist',
     avatar,
     rating: artistRecord.rating != null ? parseFloat(artistRecord.rating) : undefined,
+    timezone: artistRecord.timezone || null,
   }
 }

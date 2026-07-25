@@ -10,6 +10,7 @@ import {
   getTaxDocumentSignedUrl,
   deleteTaxDocument,
 } from '../lib/taxDocuments'
+import PasswordInput from '../components/PasswordInput'
 import { ArtistFormFields } from '../components/ArtistFormFields'
 import ThemeToggle from '../components/ThemeToggle'
 import { MfaSettings } from '../components/MfaSettings'
@@ -639,18 +640,41 @@ export default function Account() {
               <div style={{ display: 'grid', gap: 20, maxWidth: 500 }}>
                 <div className="form-group">
                   <label className="form-label">Current Password</label>
-                  <input className="filter-select" type="password" style={{ width: '100%' }} placeholder="••••••••"
-                    value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+                  <PasswordInput
+                    variant="plain"
+                    className="filter-select"
+                    style={{ width: '100%' }}
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                  />
                 </div>
                 <div className="form-group">
                   <label className="form-label">New Password</label>
-                  <input className="filter-select" type="password" style={{ width: '100%' }} placeholder="••••••••"
-                    value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+                  <PasswordInput
+                    variant="plain"
+                    className="filter-select"
+                    style={{ width: '100%' }}
+                    name="newPassword"
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Confirm New Password</label>
-                  <input className="filter-select" type="password" style={{ width: '100%' }} placeholder="••••••••"
-                    value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                  <PasswordInput
+                    variant="plain"
+                    className="filter-select"
+                    style={{ width: '100%' }}
+                    name="confirmPassword"
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
                 </div>
                 <div>
                   {passwordMsg && (

@@ -436,6 +436,15 @@ export const artistApplications = {
     }),
 }
 
+/** Hirer signup — server creates confirmed account (no confirmation email SMTP). */
+export const authApi = {
+  signupHirer: ({ email, password, fullName }) =>
+    request('/api/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, fullName, role: 'employer' }),
+    }),
+}
+
 // ---- Admin test helpers ----
 export const adminApi = {
   ensureArtistPersona: () =>

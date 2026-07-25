@@ -336,7 +336,7 @@ export default function ArtistApply() {
     <div className="auth-page">
       <div className="auth-container auth-container--wide slide-up">
         <div className="auth-header">
-          <div className="logo" style={{ justifyContent: 'center', borderBottom: 'none', paddingBottom: 0, marginBottom: 16 }}>
+          <div className="logo">
             <BrandLogo variant="auth" />
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 14px', background: 'rgba(245, 197, 66, 0.1)', border: '1px solid rgba(245, 197, 66, 0.2)', borderRadius: 30, color: 'var(--gold)', fontSize: 13, fontWeight: 600, marginBottom: 16 }}>

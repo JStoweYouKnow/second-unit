@@ -62,6 +62,9 @@ npm run verify:migrations                      # includes product features
 | 24 | `brand-verification.sql` | Verified client credits |
 | 25 | `portfolio-storage.sql` | Portfolio media bucket |
 | 26 | `employer-tax-vault.sql` | Hirer company fields + tax doc vault |
+| 27 | `artist-featured-header.sql` | Artist-chosen profile header media |
+| 28 | `artist-video-reels.sql` | Named video reels (`video_reels` jsonb) |
+| 29 | `artist-timezone.sql` | Artist working timezone for availability |
 
 ## Ad-hoc fixes (run only if needed)
 

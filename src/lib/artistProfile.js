@@ -1,3 +1,6 @@
+import { normalizeSocialUrl } from './socialLinks.js'
+import { videoReelsToFormRows, videoReelsToPayload } from './videoReels.js'
+
 /** @typedef {import('./artistProfileTypes').ArtistFormData} ArtistFormData */
 
 export const APPLICATION_STATUSES = {
@@ -23,10 +26,6 @@ export function joinCommaList(items) {
   return items.filter(Boolean).join(', ')
 }
 
-export function parseVideoLinks(value) {
-  return parseCommaList(value)
-}
-
 export function emptyArtistForm() {
   return {
     fullName: '',
@@ -44,7 +43,7 @@ export function emptyArtistForm() {
     twitter: '',
     instagram: '',
     linkedin: '',
-    videoLinks: '',
+    videoLinks: videoReelsToFormRows([]),
   }
 }
 
@@ -66,7 +65,7 @@ export function applicationToForm(app) {
     twitter: app.twitter || '',
     instagram: app.instagram || '',
     linkedin: app.linkedin || '',
-    videoLinks: joinCommaList(app.video_links || app.videoLinks),
+    videoLinks: videoReelsToFormRows(app.video_reels || app.video_links || app.videoLinks),
   }
 }
 
@@ -90,13 +89,14 @@ export function artistRecordToForm(artist) {
     twitter: artist.twitter || '',
     instagram: artist.instagram || '',
     linkedin: artist.linkedin || '',
-    videoLinks: joinCommaList(artist.video_links || artist.videoLinks),
+    videoLinks: videoReelsToFormRows(artist.video_reels || artist.video_links || artist.videoLinks),
   }
 }
 
 export function formToApplicationPayload(form, profileId, email) {
   // Only columns on artist_applications (see supabase/artist-applications.sql).
   // day_rate / project_flat_rate belong on artists, not applications.
+  const videoPayload = videoReelsToPayload(form.videoLinks)
   return {
     profile_id: profileId,
     email,
@@ -107,11 +107,12 @@ export function formToApplicationPayload(form, profileId, email) {
     hourly_rate: form.hourlyRate ? parseInt(form.hourlyRate, 10) || 0 : 0,
     skills: parseCommaList(form.skills),
     brands: parseCommaList(form.brands),
-    website: form.website.trim() || null,
-    twitter: form.twitter.trim() || null,
-    instagram: form.instagram.trim() || null,
-    linkedin: form.linkedin.trim() || null,
-    video_links: parseVideoLinks(form.videoLinks),
+    website: normalizeSocialUrl(form.website, 'website'),
+    twitter: normalizeSocialUrl(form.twitter, 'twitter'),
+    instagram: normalizeSocialUrl(form.instagram, 'instagram'),
+    linkedin: normalizeSocialUrl(form.linkedin, 'linkedin'),
+    video_links: videoPayload.video_links,
+    video_reels: videoPayload.video_reels,
     status: APPLICATION_STATUSES.PENDING,
     rejection_reason: null,
     updated_at: new Date().toISOString(),
@@ -119,6 +120,7 @@ export function formToApplicationPayload(form, profileId, email) {
 }
 
 export function formToArtistPayload(form) {
+  const videoPayload = videoReelsToPayload(form.videoLinks)
   return {
     display_name: form.fullName.trim(),
     role_title: form.roleTitle.trim(),
@@ -127,11 +129,12 @@ export function formToArtistPayload(form) {
     hourly_rate: form.hourlyRate ? parseInt(form.hourlyRate, 10) || 0 : 0,
     day_rate: form.dailyRate ? parseInt(form.dailyRate, 10) || null : null,
     project_flat_rate: form.projectFlatRate ? parseInt(form.projectFlatRate, 10) || null : null,
-    website: form.website.trim() || null,
-    twitter: form.twitter.trim() || null,
-    instagram: form.instagram.trim() || null,
-    linkedin: form.linkedin.trim() || null,
-    video_links: parseVideoLinks(form.videoLinks),
+    website: normalizeSocialUrl(form.website, 'website'),
+    twitter: normalizeSocialUrl(form.twitter, 'twitter'),
+    instagram: normalizeSocialUrl(form.instagram, 'instagram'),
+    linkedin: normalizeSocialUrl(form.linkedin, 'linkedin'),
+    video_links: videoPayload.video_links,
+    video_reels: videoPayload.video_reels,
     updated_at: new Date().toISOString(),
   }
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Lock, LogIn, Clock } from '../components/icons'
+import { Clock } from '../components/icons'
+import PasswordInput from '../components/PasswordInput'
 import { useAuth } from '../context/AuthContext'
 import BrandLogo from '../components/BrandLogo'
 import { establishRecoverySession } from '../lib/authRecovery'
@@ -94,7 +95,7 @@ export default function UpdatePassword() {
     <div className="auth-page">
       <div className="auth-container slide-up">
         <div className="auth-header">
-          <div className="logo" style={{ justifyContent: 'center', borderBottom: 'none', paddingBottom: 0, marginBottom: 16 }}>
+          <div className="logo">
             <BrandLogo variant="auth" />
           </div>
           <h1>Update Password</h1>
@@ -120,38 +121,28 @@ export default function UpdatePassword() {
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label">New Password</label>
-            <div className="auth-input-wrapper">
-              <Lock size={16} />
-              <input
-                className="form-input"
-                type="password"
-                name="password"
-                autoComplete="new-password"
-                placeholder="Min 8 characters"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                minLength={8}
-                required
-              />
-            </div>
+            <PasswordInput
+              name="password"
+              autoComplete="new-password"
+              placeholder="Min 8 characters"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              minLength={8}
+              required
+            />
           </div>
 
           <div className="form-group">
             <label className="form-label">Confirm Password</label>
-            <div className="auth-input-wrapper">
-              <Lock size={16} />
-              <input
-                className="form-input"
-                type="password"
-                name="confirmPassword"
-                autoComplete="new-password"
-                placeholder="Min 8 characters"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                minLength={8}
-                required
-              />
-            </div>
+            <PasswordInput
+              name="confirmPassword"
+              autoComplete="new-password"
+              placeholder="Min 8 characters"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              minLength={8}
+              required
+            />
           </div>
 
           <button

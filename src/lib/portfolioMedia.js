@@ -45,7 +45,15 @@ export async function uploadPortfolioMedia(artistId, file) {
     contentType: file.type || undefined,
   })
 
-  if (error) throw error
+  if (error) {
+    const msg = error.message || String(error)
+    if (/bucket not found|not found/i.test(msg)) {
+      throw new Error(
+        'Portfolio storage is not set up yet. In the Supabase SQL Editor, run supabase/portfolio-storage.sql, then try again.'
+      )
+    }
+    throw new Error(msg)
+  }
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
   const mediaType = file.type.startsWith('video/') ? 'video' : 'image'

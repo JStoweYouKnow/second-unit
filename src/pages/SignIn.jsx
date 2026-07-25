@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Mail, Lock, LogIn, ArrowRight } from '../components/icons'
+import { Mail, LogIn, ArrowRight } from '../components/icons'
+import PasswordInput from '../components/PasswordInput'
 import { useAuth } from '../context/AuthContext'
 import { PENDING_APPLY_KEY } from '../hooks/useArtistApplication'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
@@ -126,7 +127,7 @@ export default function SignIn() {
       <ThemeToggle variant="compact" className="auth-theme-toggle" />
       <div className="auth-container slide-up">
         <div className="auth-header">
-          <div className="logo" style={{ justifyContent: 'center', borderBottom: 'none', paddingBottom: 0, marginBottom: 16 }}>
+          <div className="logo">
             <BrandLogo variant="auth" />
           </div>
           <h1>{view === 'mfa' ? 'Two-factor authentication' : view === 'sign-in' ? 'Welcome back' : view === 'forgot-password-success' ? 'Check your email' : 'Reset your password'}</h1>
@@ -191,19 +192,14 @@ export default function SignIn() {
                   <label className="form-label" style={{ marginBottom: 0 }}>Password</label>
                   <button type="button" className="btn-link" onClick={() => setView('forgot-password')} style={{ background: 'none', border: 'none', color: 'var(--gold)', fontSize: 13, cursor: 'pointer', padding: 0 }}>Forgot?</button>
                 </div>
-                <div className="auth-input-wrapper">
-                  <Lock size={16} />
-                  <input
-                    className="form-input"
-                    type="password"
-                    name="password"
-                    autoComplete="current-password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    required={!isMockMode}
-                  />
-                </div>
+                <PasswordInput
+                  name="password"
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required={!isMockMode}
+                />
               </div>
             )}
 

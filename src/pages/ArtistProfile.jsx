@@ -1,5 +1,5 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Heart, Star, MapPin, Calendar, Play, Globe, AtSign, Camera, Briefcase, Send, ChevronUp, ChevronDown } from '../components/icons'
+import { ArrowLeft, Heart, Star, MapPin, Calendar, Play, Globe, IconX, Instagram, LinkedIn, Send, ChevronUp, ChevronDown } from '../components/icons'
 import { useApp } from '../context/AppContext'
 import { useState, useEffect, useRef } from 'react'
 import CalendarModal from '../components/CalendarModal'
@@ -12,11 +12,19 @@ import { useArtist } from '../hooks/useData'
 import { useArtistReviews } from '../hooks/useArtistReviews'
 import { portfolio as portfolioApi } from '../lib/api'
 import { uploadPortfolioMedia, deletePortfolioStoragePath } from '../lib/portfolioMedia'
-import { isSupabaseConfigured } from '../lib/supabase'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { Upload, Loader2, Trash2 } from '../components/icons'
 import HirerReviewForm from '../components/HirerReviewForm'
 import ArtistReviewSettings from '../components/ArtistReviewSettings'
 import ReviewList from '../components/ReviewList'
+import { resolveProfileHero } from '../lib/profileHero'
+import { normalizeSocialUrl } from '../lib/socialLinks'
+import {
+  normalizeVideoReels,
+  videoReelTitle,
+  videoReelUrl,
+  videoReelsToPayload,
+} from '../lib/videoReels'
 function VideoPlayer({ url }) {
   const getEmbedUrl = (url) => {
     if (!url) return null;
@@ -105,10 +113,12 @@ export default function ArtistProfile() {
 
   const [portfolioItems, setPortfolioItems] = useState([])
   const [videoLinks, setVideoLinks] = useState([])
+  const [featuredPortfolioItemId, setFeaturedPortfolioItemId] = useState(null)
+  const [featuredVideoLink, setFeaturedVideoLink] = useState(null)
   const [portfolioBusy, setPortfolioBusy] = useState(false)
   const [portfolioError, setPortfolioError] = useState('')
+  const [featureBusy, setFeatureBusy] = useState(false)
   const portfolioInputRef = useRef(null)
-  const carouselRef = useRef(null)
 
   function mapPortfolioRow(p) {
     const url = p.media_url || p.image || p.video
@@ -123,16 +133,6 @@ export default function ArtistProfile() {
     }
   }
 
-  const scrollCarousel = (direction) => {
-    if (carouselRef.current) {
-      const scrollAmount = 310 // updated card width + gap
-      carouselRef.current.scrollBy({
-        left: direction * scrollAmount,
-        behavior: 'smooth'
-      })
-    }
-  }
-
   useEffect(() => {
     if (artist?.portfolio?.length) {
       setPortfolioItems(artist.portfolio.map(mapPortfolioRow))
@@ -140,6 +140,40 @@ export default function ArtistProfile() {
       setPortfolioItems([])
     }
   }, [artist?.portfolio])
+
+  useEffect(() => {
+    setFeaturedPortfolioItemId(artist?.featuredPortfolioItemId ?? null)
+    setFeaturedVideoLink(artist?.featuredVideoLink ?? null)
+  }, [artist?.featuredPortfolioItemId, artist?.featuredVideoLink])
+
+  const persistFeaturedHeader = async ({ portfolioItemId = null, videoLink = null }) => {
+    if (!isOwnProfile || !artist?.id) return
+    setFeatureBusy(true)
+    setPortfolioError('')
+    setFeaturedPortfolioItemId(portfolioItemId)
+    setFeaturedVideoLink(videoLink)
+    try {
+      if (isSupabaseConfigured && supabase) {
+        const { error } = await supabase
+          .from('artists')
+          .update({
+            featured_portfolio_item_id: portfolioItemId,
+            featured_video_link: videoLink,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', artist.id)
+        if (error) throw error
+      }
+    } catch (err) {
+      setFeaturedPortfolioItemId(artist.featuredPortfolioItemId ?? null)
+      setFeaturedVideoLink(artist.featuredVideoLink ?? null)
+      setPortfolioError(err.message || 'Could not update header feature')
+    } finally {
+      setFeatureBusy(false)
+    }
+  }
+
+  const clearFeaturedHeader = () => persistFeaturedHeader({ portfolioItemId: null, videoLink: null })
 
   const persistPortfolioOrder = async (nextList) => {
     setPortfolioItems(nextList)
@@ -173,6 +207,9 @@ export default function ArtistProfile() {
         await deletePortfolioStoragePath(item.storagePath)
       }
       setPortfolioItems((prev) => prev.filter((p) => p.id !== item.id))
+      if (featuredPortfolioItemId === item.id) {
+        setFeaturedPortfolioItemId(null)
+      }
     } catch (err) {
       setPortfolioError(err.message || 'Could not delete item')
     } finally {
@@ -204,17 +241,41 @@ export default function ArtistProfile() {
   }
 
   useEffect(() => {
-    if (artist?.videoLinks) setVideoLinks(artist.videoLinks)
+    if (artist?.videoLinks) setVideoLinks(normalizeVideoReels(artist.videoLinks))
   }, [artist?.videoLinks])
 
-  const moveItem = (list, setList, index, direction) => {
-    const newList = [...list]
+  const persistVideoLinks = async (next) => {
+    const normalized = normalizeVideoReels(next)
+    setVideoLinks(normalized)
+    if (!isOwnProfile || !artist?.id || !isSupabaseConfigured || !supabase) return
+    try {
+      const payload = videoReelsToPayload(normalized)
+      const { error } = await supabase
+        .from('artists')
+        .update({
+          video_reels: payload.video_reels,
+          video_links: payload.video_links,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', artist.id)
+      if (error) throw error
+      const urls = payload.video_links
+      if (featuredVideoLink && !urls.includes(featuredVideoLink)) {
+        await persistFeaturedHeader({ portfolioItemId: null, videoLink: null })
+      }
+    } catch (err) {
+      setPortfolioError(err.message || 'Could not save video order')
+    }
+  }
+
+  const moveVideoLink = (index, direction) => {
+    const newList = [...videoLinks]
     const targetIndex = index + direction
     if (targetIndex < 0 || targetIndex >= newList.length) return
     const temp = newList[index]
     newList[index] = newList[targetIndex]
     newList[targetIndex] = temp
-    setList(newList)
+    persistVideoLinks(newList)
   }
 
   if (artistLoading) return <div className="page-container" style={{ paddingTop: 80, textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
@@ -245,9 +306,15 @@ export default function ArtistProfile() {
     return null
   }
 
-  const heroVideo = portfolioItems[0]?.video || null
-  const heroImg = portfolioItems[0]?.image || getVideoThumb(videoLinks[0]) || null
+  const { heroVideo, heroImg, source: heroSource } = resolveProfileHero({
+    portfolioItems,
+    videoLinks,
+    featuredPortfolioItemId,
+    featuredVideoLink,
+    getVideoThumb,
+  })
   const hasHeroVisual = !!(heroVideo || heroImg)
+  const hasManualFeature = !!(featuredPortfolioItemId || featuredVideoLink)
 
   const isFav = favorites.includes(artist.id)
   const hirerReview = isHirer ? hirerExistingReview(profile.id) : null
@@ -311,10 +378,27 @@ export default function ArtistProfile() {
               <ArtistRateCard artist={artist} />
             )}
             <div className="profile-socials">
-              <a href={artist.socials.twitter} className="social-btn" title="Twitter"><AtSign size={16} /></a>
-              <a href={artist.socials.instagram} className="social-btn" title="Instagram"><Camera size={16} /></a>
-              <a href={artist.socials.linkedin} className="social-btn" title="LinkedIn"><Briefcase size={16} /></a>
-              <a href={artist.socials.website} className="social-btn" title="Website"><Globe size={16} /></a>
+              {[
+                { value: artist.socials?.twitter, platform: 'twitter', title: 'X (Twitter)', Icon: IconX },
+                { value: artist.socials?.instagram, platform: 'instagram', title: 'Instagram', Icon: Instagram },
+                { value: artist.socials?.linkedin, platform: 'linkedin', title: 'LinkedIn', Icon: LinkedIn },
+                { value: artist.socials?.website, platform: 'website', title: 'Website', Icon: Globe },
+              ]
+                .map((item) => ({ ...item, href: normalizeSocialUrl(item.value, item.platform) }))
+                .filter(({ href }) => href)
+                .map(({ href, title, Icon }) => (
+                  <a
+                    key={title}
+                    href={href}
+                    className="social-btn"
+                    title={title}
+                    aria-label={title}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Icon size={16} />
+                  </a>
+                ))}
             </div>
           </div>
         </div>
@@ -322,9 +406,11 @@ export default function ArtistProfile() {
 
       <div className="page-container" style={{ paddingTop: 8 }}>
       <div className="profile-actions-bar">
-        <button className="btn btn-primary btn-lg" onClick={() => startConversation(artist)}>
-          <Send size={16} /> Hire / Inquire
-        </button>
+        {!isOwnProfile && (
+          <button className="btn btn-primary btn-lg" onClick={() => startConversation(artist)}>
+            <Send size={16} /> Hire / Inquire
+          </button>
+        )}
         <button className="btn btn-secondary" onClick={() => setShowCalendar(true)}>
           <Calendar size={16} /> View Calendar
         </button>
@@ -365,6 +451,36 @@ export default function ArtistProfile() {
 
           {activeTab === 'portfolio' && (
             <div className="slide-up">
+              {isOwnProfile && (
+                <div style={{
+                  marginBottom: 16,
+                  padding: '12px 14px',
+                  borderRadius: 10,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-elevated, var(--bg-secondary))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                }}>
+                  <Star size={14} fill={hasManualFeature ? 'var(--gold)' : 'none'} color="var(--gold)" />
+                  <span style={{ fontSize: 13, color: 'var(--text-secondary)', flex: '1 1 220px' }}>
+                    {hasManualFeature
+                      ? `Header uses your featured ${heroSource === 'video_link' ? 'reel' : 'portfolio'} pick.`
+                      : 'Header auto-picks your first portfolio item. Star any image, video, or reel to feature it instead.'}
+                  </span>
+                  {hasManualFeature && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={clearFeaturedHeader}
+                      disabled={featureBusy}
+                    >
+                      Use auto header
+                    </button>
+                  )}
+                </div>
+              )}
               {isOwnProfile && isSupabaseConfigured && (
                 <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <input ref={portfolioInputRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" hidden onChange={handlePortfolioUpload} />
@@ -406,6 +522,27 @@ export default function ArtistProfile() {
                     )}
                     
                     {(!item.image && !item.video) && item.title}
+
+                    {isOwnProfile && featuredPortfolioItemId === item.id && (
+                      <span style={{
+                        position: 'absolute',
+                        top: 10,
+                        left: 10,
+                        zIndex: 2,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        background: 'rgba(0,0,0,0.65)',
+                        color: 'var(--gold)',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        border: '1px solid rgba(255,255,255,0.15)',
+                      }}>
+                        <Star size={12} fill="var(--gold)" /> Header
+                      </span>
+                    )}
                     
                     {(item.image || item.video) && (
                       <div style={{
@@ -418,9 +555,35 @@ export default function ArtistProfile() {
                         color: 'white',
                         fontWeight: 600,
                         fontSize: 13,
-                        zIndex: 1
+                        zIndex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
                       }}>
-                        {item.title}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+                        {isOwnProfile && (item.image || item.video) && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            disabled={featureBusy || portfolioBusy}
+                            onClick={() =>
+                              featuredPortfolioItemId === item.id
+                                ? clearFeaturedHeader()
+                                : persistFeaturedHeader({ portfolioItemId: item.id, videoLink: null })
+                            }
+                            style={{
+                              padding: '2px 8px',
+                              color: featuredPortfolioItemId === item.id ? 'var(--gold)' : 'white',
+                              border: '1px solid rgba(255,255,255,0.25)',
+                              flexShrink: 0,
+                            }}
+                            aria-label={featuredPortfolioItemId === item.id ? 'Unfeature from header' : 'Feature in header'}
+                          >
+                            <Star size={12} fill={featuredPortfolioItemId === item.id ? 'var(--gold)' : 'none'} />
+                            {featuredPortfolioItemId === item.id ? ' Featured' : ' Feature'}
+                          </button>
+                        )}
                       </div>
                     )}
                     
@@ -436,7 +599,8 @@ export default function ArtistProfile() {
                         padding: 4,
                         borderRadius: 8,
                         backdropFilter: 'blur(4px)',
-                        border: '1px solid rgba(255,255,255,0.1)'
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        zIndex: 2,
                       }}>
                         <button
                           type="button"
@@ -472,73 +636,131 @@ export default function ArtistProfile() {
               </div>
               )}
               {videoLinks.length > 0 && (
-                <div style={{ marginTop: 28, position: 'relative' }}>
+                <div className="video-reel-list" style={{ marginTop: 28 }}>
                   <h3 style={{ marginBottom: 16 }}>Video Reels</h3>
-                  <div className="video-carousel-wrapper">
-                    {videoLinks.length > 1 && (
-                      <button 
-                        type="button"
-                        onClick={() => scrollCarousel(-1)} 
-                        className="carousel-control-btn carousel-control-btn--left"
-                        aria-label="Scroll left"
-                      >
-                        ‹
-                      </button>
-                    )}
-                    
-                    <div 
-                      ref={carouselRef} 
-                      className="video-carousel"
-                    >
-                      {videoLinks.map((v, i) => (
-                        <div 
-                          key={i} 
-                          className="video-carousel-card"
+                  <div className="video-reel-stack">
+                    {videoLinks.map((reel, i) => {
+                      const url = videoReelUrl(reel)
+                      const label = videoReelTitle(reel, i)
+                      const isFeaturedReel = featuredVideoLink === url
+                      return (
+                        <div
+                          key={url || `reel-${i}`}
+                          className="card video-reel-item"
+                          style={{
+                            padding: 0,
+                            overflow: 'hidden',
+                            borderColor: isFeaturedReel ? 'var(--gold)' : undefined,
+                          }}
                         >
-                          <div className="card" style={{ padding: 0, overflow: 'hidden', height: '100%' }}>
-                            <VideoPlayer url={v} />
-                            <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border)' }}>
+                          <VideoPlayer url={url} />
+                          <div style={{
+                            padding: '12px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 8,
+                            borderTop: '1px solid var(--border)',
+                            flexWrap: 'wrap',
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 160px', minWidth: 0 }}>
+                              <Play size={16} style={{ color: isFeaturedReel ? 'var(--gold)' : 'var(--accent)', flexShrink: 0 }} />
+                              {isOwnProfile ? (
+                                <input
+                                  className="form-input"
+                                  value={reel.title || ''}
+                                  placeholder={`Video Reel ${i + 1}`}
+                                  onChange={(e) => {
+                                    const title = e.target.value
+                                    setVideoLinks((prev) =>
+                                      prev.map((r, idx) => (idx === i ? { ...r, title } : r))
+                                    )
+                                  }}
+                                  onBlur={(e) => {
+                                    const title = e.target.value.trim()
+                                    const next = videoLinks.map((r, idx) =>
+                                      idx === i ? { ...r, title } : r
+                                    )
+                                    persistVideoLinks(next)
+                                  }}
+                                  aria-label={`Title for video reel ${i + 1}`}
+                                  style={{
+                                    fontWeight: 500,
+                                    fontSize: 14,
+                                    padding: '6px 10px',
+                                    minWidth: 0,
+                                    flex: 1,
+                                  }}
+                                />
+                              ) : (
+                                <span style={{ fontWeight: 500, fontSize: 14 }}>
+                                  {label}
+                                  {isFeaturedReel ? ' · Header' : ''}
+                                </span>
+                              )}
+                              {isOwnProfile && isFeaturedReel && (
+                                <span style={{ fontSize: 12, color: 'var(--gold)', flexShrink: 0 }}>Header</span>
+                              )}
+                            </div>
+
+                            {isOwnProfile && (
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <Play size={16} style={{ color: 'var(--accent)' }} />
-                                <span style={{ fontWeight: 500, fontSize: 14 }}>Video Reel {i + 1}</span>
-                              </div>
-                              
-                              {isOwnProfile && (
-                                <div style={{ display: 'flex', gap: 4 }}>
-                                  <button 
-                                    className="btn btn-ghost btn-sm" 
-                                    style={{ padding: '4px 8px' }}
-                                    onClick={() => moveItem(videoLinks, setVideoLinks, i, -1)}
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  style={{
+                                    padding: '4px 8px',
+                                    color: isFeaturedReel ? 'var(--gold)' : undefined,
+                                  }}
+                                  onClick={() =>
+                                    isFeaturedReel
+                                      ? clearFeaturedHeader()
+                                      : persistFeaturedHeader({ portfolioItemId: null, videoLink: url })
+                                  }
+                                  disabled={featureBusy}
+                                  title={isFeaturedReel ? 'Remove from header' : 'Feature in header'}
+                                >
+                                  <Star size={14} fill={isFeaturedReel ? 'var(--gold)' : 'none'} />
+                                </button>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 2,
+                                    alignItems: 'center',
+                                  }}
+                                  role="group"
+                                  aria-label="Reorder video in list"
+                                >
+                                  <button
+                                    type="button"
+                                    className="btn btn-ghost btn-sm"
+                                    style={{ padding: '2px 6px', lineHeight: 1 }}
+                                    onClick={() => moveVideoLink(i, -1)}
                                     disabled={i === 0}
+                                    aria-label="Move up in list"
+                                    title="Move up"
                                   >
                                     <ChevronUp size={16} />
                                   </button>
-                                  <button 
-                                    className="btn btn-ghost btn-sm" 
-                                    style={{ padding: '4px 8px' }}
-                                    onClick={() => moveItem(videoLinks, setVideoLinks, i, 1)}
+                                  <button
+                                    type="button"
+                                    className="btn btn-ghost btn-sm"
+                                    style={{ padding: '2px 6px', lineHeight: 1 }}
+                                    onClick={() => moveVideoLink(i, 1)}
                                     disabled={i === videoLinks.length - 1}
+                                    aria-label="Move down in list"
+                                    title="Move down"
                                   >
                                     <ChevronDown size={16} />
                                   </button>
                                 </div>
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      ))}
-                    </div>
-
-                    {videoLinks.length > 1 && (
-                      <button 
-                        type="button"
-                        onClick={() => scrollCarousel(1)} 
-                        className="carousel-control-btn carousel-control-btn--right"
-                        aria-label="Scroll right"
-                      >
-                        ›
-                      </button>
-                    )}
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -627,17 +849,11 @@ export default function ArtistProfile() {
               )}
               {isOwnProfile && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Total feedback</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Reviews</span>
                   <span style={{ fontWeight: 600 }}>{allReviews.length}</span>
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Compensation</span>
-                <span style={{ fontWeight: 600, color: 'var(--text-secondary)', textAlign: 'right', fontSize: 13, maxWidth: '62%', lineHeight: 1.45 }}>
-                  Agreed per project with the client (not shown on profile).
-                </span>
-              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Member Since</span>
                 <span style={{ fontWeight: 600 }}>{new Date(artist.joined).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
@@ -649,7 +865,24 @@ export default function ArtistProfile() {
 
       </div>
 
-      {showCalendar && <CalendarModal artist={artist} onClose={() => setShowCalendar(false)} />}
+      {showCalendar && (
+        <CalendarModal
+          artist={artist}
+          onClose={() => setShowCalendar(false)}
+          onBook={({ artist: a, date, time, duration, durationUnit }) => {
+            setShowCalendar(false)
+            const params = new URLSearchParams({
+              new: '1',
+              artistId: String(a.id),
+              date,
+              time: time || '09:00',
+              duration: String(duration),
+              durationUnit: durationUnit || 'hours',
+            })
+            navigate(`/bookings?${params.toString()}`)
+          }}
+        />
+      )}
     </div>
   )
 }

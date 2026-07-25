@@ -583,6 +583,141 @@ https://thecallsheet.ai
         </div>
       </div>
 
+      {/* Stripe status — first thing on the page when action is needed */}
+      {showHirerSetupBanner && (
+        <div className="stripe-prompt stripe-prompt--action slide-up">
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center', minWidth: 0 }}>
+            <div className="stripe-prompt__icon" aria-hidden>
+              <CreditCard size={24} />
+            </div>
+            <div>
+              <div className="stripe-prompt__eyebrow">Required to hire</div>
+              <div className="stripe-prompt__title">Set up Stripe to pay artists</div>
+              <div className="stripe-prompt__body">
+                Add a payment method before milestone checkout. Card and bank transfers are handled securely by Stripe — The Callsheet never sees your full card number.
+              </div>
+            </div>
+          </div>
+          <div className="stripe-prompt__actions">
+            <button type="button" className="btn btn-primary btn-lg" onClick={() => setShowSetup(true)}>
+              Set up payments <ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showHirerPayBanner && (
+        <div className="stripe-prompt stripe-prompt--ok slide-up">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <div className="stripe-prompt__icon" aria-hidden>
+              <CheckCircle size={20} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 2 }}>Ready to pay artists</div>
+              <div className="stripe-prompt__body">
+                {stripeStatus.email} · checkout ready · {PLATFORM_FEE_PERCENT}% platform fee
+              </div>
+            </div>
+          </div>
+          <div className="stripe-prompt__actions">
+            <button type="button" className="btn btn-secondary" onClick={() => setShowSetup(true)}>
+              Manage
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showArtistConnectCard && (connectLoading || connectState === 'checking') && !connectLive && (
+        <div className="stripe-prompt stripe-prompt--action slide-up" style={{ padding: '18px 22px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Loader2 size={20} className="animate-spin" />
+            <div className="stripe-prompt__body">Checking Stripe Connect payout status…</div>
+          </div>
+        </div>
+      )}
+
+      {showArtistConnectCard && connectError && (
+        <div className="auth-error" style={{ marginBottom: 16 }}>{connectError}</div>
+      )}
+
+      {showArtistConnectCard && connectState === 'not_connected' && (
+        <div className="stripe-prompt stripe-prompt--warn slide-up">
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center', minWidth: 0 }}>
+            <div className="stripe-prompt__icon" aria-hidden>
+              <DollarSign size={24} />
+            </div>
+            <div>
+              <div className="stripe-prompt__eyebrow">Required to get paid</div>
+              <div className="stripe-prompt__title">Connect Stripe to receive payouts</div>
+              <div className="stripe-prompt__body">
+                Escrowed earnings stay locked until your Stripe account is connected and payouts are enabled. Takes a few minutes — verify identity and add your bank.
+              </div>
+            </div>
+          </div>
+          <div className="stripe-prompt__actions">
+            <button type="button" className="btn btn-primary btn-lg" onClick={() => setShowConnect(true)}>
+              Connect Stripe <ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showArtistConnectCard && connectIncomplete && (
+        <div className="stripe-prompt stripe-prompt--warn slide-up">
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center', minWidth: 0 }}>
+            <div className="stripe-prompt__icon" aria-hidden>
+              <Clock size={24} />
+            </div>
+            <div>
+              <div className="stripe-prompt__eyebrow">Action required</div>
+              <div className="stripe-prompt__title">
+                {connectState === 'restricted' ? 'Payouts not enabled yet' : 'Finish Stripe Connect setup'}
+              </div>
+              <div className="stripe-prompt__body">
+                {connectLive?.message || 'Your Stripe account exists, but onboarding is incomplete.'}
+                {connectLive?.requirementsDue?.length
+                  ? ` ${connectLive.requirementsDue.length} item(s) still required.`
+                  : ''}
+              </div>
+            </div>
+          </div>
+          <div className="stripe-prompt__actions">
+            <button type="button" className="btn btn-secondary" onClick={refreshConnectStatus} disabled={connectLoading}>
+              {connectLoading ? <Loader2 size={16} className="animate-spin" /> : 'Refresh'}
+            </button>
+            <button type="button" className="btn btn-primary btn-lg" onClick={resumeOnboarding} disabled={connectBusy}>
+              {connectBusy ? <Loader2 size={16} className="animate-spin" /> : <><ExternalLink size={16} /> Continue setup</>}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showArtistConnectCard && connectReady && (
+        <div className="stripe-prompt stripe-prompt--ok slide-up">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <div className="stripe-prompt__icon" aria-hidden>
+              <CheckCircle size={20} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 2 }}>Ready for payouts</div>
+              <div className="stripe-prompt__body">
+                Stripe Connect verified · payouts enabled
+                {connectLive?.bankLast4 ? ` · bank ···· ${connectLive.bankLast4}` : ''}
+                {' · '}transfers after milestone approval
+              </div>
+            </div>
+          </div>
+          <div className="stripe-prompt__actions">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={refreshConnectStatus} disabled={connectLoading}>
+              {connectLoading ? <Loader2 size={14} className="animate-spin" /> : 'Refresh'}
+            </button>
+            <a href="https://connect.stripe.com/express_login" target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm">
+              <ArrowUpRight size={14} /> Stripe Express
+            </a>
+          </div>
+        </div>
+      )}
+
       {!isArtist && profile && (!profile.company_name || !profile.tax_onboarding_completed_at) && (
         <div
           className="slide-up"
@@ -655,7 +790,7 @@ https://thecallsheet.ai
         <div style={{ marginBottom: 24, padding: '14px 18px', background: 'var(--accent-tint-05)', border: '1px solid var(--accent-tint-border)', borderRadius: 'var(--radius-md)', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
           <strong style={{ color: 'var(--text)' }}>Admin payment test loop</strong>
           <ol style={{ margin: '8px 0 0', paddingLeft: 18 }}>
-            <li>Connect Stripe below (Continue to Stripe) until status is <em>Ready for payouts</em>.</li>
+            <li>Connect Stripe above until status is <em>Ready for payouts</em>.</li>
             <li>Switch View as → <strong>Hirer</strong>, create a Project (or Booking) selecting your test artist, pay a milestone.</li>
             <li>Switch View as → <strong>Artist</strong>, confirm the booking if needed, then after client approval check Released vs In escrow here.</li>
           </ol>
@@ -665,129 +800,6 @@ https://thecallsheet.ai
               {myArtistRecord.displayName ? ` · ${myArtistRecord.displayName}` : ''}
             </div>
           )}
-        </div>
-      )}
-
-      {/* Stripe status banner */}
-      {showHirerSetupBanner && (
-        <div style={{ marginBottom: 24, padding: '20px 24px', background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-          <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-            <div style={{ padding: 10, borderRadius: 'var(--radius-sm)', background: 'var(--accent-tint-10)' }}>
-              <CreditCard size={22} style={{ color: 'var(--accent)' }} />
-            </div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>Set up Stripe to pay artists</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Add a payment method to send milestone payments. Secure card and bank transfers via Stripe.</div>
-            </div>
-          </div>
-          <button type="button" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={() => setShowSetup(true)}>
-            Get started <ChevronRight size={16} />
-          </button>
-        </div>
-      )}
-
-      {showHirerPayBanner && (
-        <div style={{ marginBottom: 24, padding: '16px 20px', background: 'linear-gradient(135deg, var(--success-muted-bg), var(--accent-tint-05))', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ padding: 8, borderRadius: 'var(--radius-sm)', background: 'var(--success-muted-bg)' }}>
-              <CheckCircle size={20} style={{ color: 'var(--success)' }} />
-            </div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>Ready to pay artists</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                {stripeStatus.email} · you pay at checkout (this is not artist payout setup) · {PLATFORM_FEE_PERCENT}% platform fee
-              </div>
-            </div>
-          </div>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowSetup(true)}>
-            Manage
-          </button>
-        </div>
-      )}
-
-      {showArtistConnectCard && (connectLoading || connectState === 'checking') && !connectLive && (
-        <div style={{ marginBottom: 24, padding: '16px 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Loader2 size={18} className="animate-spin" style={{ color: 'var(--accent)' }} />
-          <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>Checking Stripe Connect payout status…</div>
-        </div>
-      )}
-
-      {showArtistConnectCard && connectError && (
-        <div className="auth-error" style={{ marginBottom: 16 }}>{connectError}</div>
-      )}
-
-      {showArtistConnectCard && connectState === 'not_connected' && (
-        <div style={{ marginBottom: 24, padding: '20px 24px', background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-          <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-            <div style={{ padding: 10, borderRadius: 'var(--radius-sm)', background: 'var(--accent-tint-10)' }}>
-              <Mail size={22} style={{ color: 'var(--accent)' }} />
-            </div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>Payout account not connected</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                Connect Stripe to receive released earnings in your bank. Escrowed payments cannot be paid out until this is done.
-              </div>
-            </div>
-          </div>
-          <button type="button" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={() => setShowConnect(true)}>
-            Connect Stripe <ChevronRight size={16} />
-          </button>
-        </div>
-      )}
-
-      {showArtistConnectCard && connectIncomplete && (
-        <div style={{ marginBottom: 24, padding: '16px 20px', background: 'rgba(245,197,66,0.08)', border: '1px solid rgba(245,197,66,0.35)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ padding: 8, borderRadius: 'var(--radius-sm)', background: 'rgba(245,197,66,0.15)' }}>
-              <Clock size={20} style={{ color: 'var(--warning)' }} />
-            </div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>
-                {connectState === 'restricted' ? 'Payouts not enabled yet' : 'Finish Stripe Connect setup'}
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                {connectLive?.message || 'Your Stripe account exists, but onboarding is incomplete.'}
-                {connectLive?.accountId ? ` · ID: ${connectLive.accountId}` : myArtistRecord?.stripeAccountId ? ` · ID: ${myArtistRecord.stripeAccountId}` : ''}
-                {connectLive?.requirementsDue?.length
-                  ? ` · ${connectLive.requirementsDue.length} item(s) still required`
-                  : ''}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={refreshConnectStatus} disabled={connectLoading}>
-              {connectLoading ? <Loader2 size={14} className="animate-spin" /> : 'Refresh'}
-            </button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={resumeOnboarding} disabled={connectBusy}>
-              {connectBusy ? <Loader2 size={14} className="animate-spin" /> : <><ExternalLink size={14} /> Continue setup</>}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showArtistConnectCard && connectReady && (
-        <div style={{ marginBottom: 24, padding: '16px 20px', background: 'linear-gradient(135deg, var(--success-muted-bg), var(--accent-tint-05))', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ padding: 8, borderRadius: 'var(--radius-sm)', background: 'var(--success-muted-bg)' }}>
-              <CheckCircle size={20} style={{ color: 'var(--success)' }} />
-            </div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>Ready for payouts</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                Stripe Connect verified · payouts enabled
-                {connectLive?.bankLast4 ? ` · bank ···· ${connectLive.bankLast4}` : ''}
-                {' · '}transfers after milestone approval · ID: {connectLive.accountId}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={refreshConnectStatus} disabled={connectLoading}>
-              {connectLoading ? <Loader2 size={14} className="animate-spin" /> : 'Refresh status'}
-            </button>
-            <a href="https://connect.stripe.com/express_login" target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm">
-              <ArrowUpRight size={14} /> Stripe Express
-            </a>
-          </div>
         </div>
       )}
 

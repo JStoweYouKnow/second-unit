@@ -1,6 +1,9 @@
 import { validateInviteToken } from './validateInvite.js'
 
 function parseCommaList(value) {
+  if (Array.isArray(value)) {
+    return value.map((s) => String(s || '').trim()).filter(Boolean)
+  }
   if (!value || typeof value !== 'string') return []
   return value
     .split(',')
@@ -8,8 +11,36 @@ function parseCommaList(value) {
     .filter(Boolean)
 }
 
+/** Normalize form videoLinks (objects, URL strings, or comma string) for DB. */
+function videoReelsFromForm(value) {
+  let items = []
+  if (Array.isArray(value)) items = value
+  else if (typeof value === 'string') items = parseCommaList(value)
+
+  const reels = items
+    .map((item) => {
+      if (typeof item === 'string') {
+        const url = item.trim()
+        return url ? { url, title: '' } : null
+      }
+      if (item && typeof item === 'object') {
+        const url = String(item.url || '').trim()
+        if (!url) return null
+        return { url, title: String(item.title || '').trim() }
+      }
+      return null
+    })
+    .filter(Boolean)
+
+  return {
+    video_reels: reels,
+    video_links: reels.map((r) => r.url),
+  }
+}
+
 function formToPayload(form, profileId, email) {
   // Match artist_applications columns (hourly_rate only — day/project rates live on artists).
+  const videoPayload = videoReelsFromForm(form.videoLinks)
   return {
     profile_id: profileId,
     email,
@@ -24,7 +55,8 @@ function formToPayload(form, profileId, email) {
     twitter: String(form.twitter || '').trim() || null,
     instagram: String(form.instagram || '').trim() || null,
     linkedin: String(form.linkedin || '').trim() || null,
-    video_links: parseCommaList(form.videoLinks),
+    video_links: videoPayload.video_links,
+    video_reels: videoPayload.video_reels,
     status: 'pending',
     rejection_reason: null,
     updated_at: new Date().toISOString(),

@@ -147,18 +147,20 @@ export default function Landing() {
               <p>Join the private beta today and access the future of creative talent.</p>
               <Link to="/signup" className="btn btn-inverse btn-lg">Get Started</Link>
             </section>
-
-            <footer className="landing-footer">
-              <div>&copy; 2026 The Callsheet. All rights reserved.</div>
-              <div className="landing-footer__links">
-                <Link to="/terms">Terms</Link>
-                <Link to="/privacy">Privacy</Link>
-                <a href="mailto:support@thecallsheet.ai">Contact</a>
-              </div>
-            </footer>
           </div>
         )}
       </main>
+
+      <footer className="landing-footer">
+        <div>&copy; 2026 The Callsheet. All rights reserved.</div>
+        <div className="landing-footer__links">
+          <Link to="/about">About</Link>
+          <Link to="/help">Help</Link>
+          <Link to="/terms">Terms</Link>
+          <Link to="/privacy">Privacy</Link>
+          <a href="mailto:support@thecallsheet.ai">Contact</a>
+        </div>
+      </footer>
     </div>
   )
 }

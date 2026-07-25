@@ -7,10 +7,14 @@ import {
   rejectApplication,
   isPendingApplicant,
 } from '../hooks/useArtistApplication'
+import { normalizeSocialUrl } from '../lib/socialLinks'
 
 function ApplicationCard({ app, onApprove, onReject, busy }) {
   const [reason, setReason] = useState('')
   const [showReject, setShowReject] = useState(false)
+  const websiteHref = normalizeSocialUrl(app.website, 'website')
+  const instagramHref = normalizeSocialUrl(app.instagram, 'instagram')
+  const linkedinHref = normalizeSocialUrl(app.linkedin, 'linkedin')
 
   return (
     <article className="card" style={{ padding: 24 }}>
@@ -55,9 +59,17 @@ function ApplicationCard({ app, onApprove, onReject, busy }) {
       )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 13 }}>
-        {app.website && <a href={app.website} target="_blank" rel="noopener noreferrer" className="btn-link" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><ExternalLink size={14} /> Portfolio</a>}
-        {app.instagram && <a href={app.instagram} target="_blank" rel="noopener noreferrer" className="btn-link">Instagram</a>}
-        {app.linkedin && <a href={app.linkedin} target="_blank" rel="noopener noreferrer" className="btn-link">LinkedIn</a>}
+        {websiteHref && (
+          <a href={websiteHref} target="_blank" rel="noopener noreferrer" className="btn-link" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <ExternalLink size={14} /> Portfolio
+          </a>
+        )}
+        {instagramHref && (
+          <a href={instagramHref} target="_blank" rel="noopener noreferrer" className="btn-link">Instagram</a>
+        )}
+        {linkedinHref && (
+          <a href={linkedinHref} target="_blank" rel="noopener noreferrer" className="btn-link">LinkedIn</a>
+        )}
       </div>
 
       {isPendingApplicant(app) && (

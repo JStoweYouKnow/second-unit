@@ -85,7 +85,7 @@ function Sparkline({ data, color = 'var(--accent)', height = 40 }) {
   )
 }
 
-function OpenBriefsSection({ projects, emptyMessage }) {
+function OpenBriefsSection({ projects, emptyMessage, onOpen }) {
   return (
     <section className="spotlight-projects slide-up" style={{ marginBottom: 32 }}>
       <div className="spotlight-projects__head">
@@ -104,7 +104,11 @@ function OpenBriefsSection({ projects, emptyMessage }) {
             <article
               key={proj.id}
               className="spotlight-project-card card slide-up"
-              style={proj.isOffer ? { borderColor: 'var(--accent)', borderWidth: 1, borderStyle: 'solid' } : undefined}
+              role="button"
+              tabIndex={0}
+              onClick={() => onOpen?.(proj)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.(proj) } }}
+              style={{ cursor: 'pointer', ...(proj.isOffer ? { borderColor: 'var(--accent)', borderWidth: 1, borderStyle: 'solid' } : {}) }}
             >
               {proj.isOffer && (
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
@@ -304,6 +308,15 @@ export default function Dashboard() {
     [isArtist, myBookings, employerBookings, localProjects, me?.id]
   )
 
+  const openBrief = (proj) => {
+    const id = String(proj.id || '')
+    if (id.startsWith('contract-') || id.startsWith('offer-')) {
+      navigate(`/projects?contract_id=${id.replace(/^(contract|offer)-/, '')}`)
+    } else {
+      navigate('/bookings')
+    }
+  }
+
   if (isArtist) {
     if (!me) {
       return (
@@ -486,7 +499,7 @@ export default function Dashboard() {
                   <div>
                     <div style={{ fontWeight: 600 }}>{b.type}</div>
                     <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                      {b.date}{b.time ? ` at ${b.time}` : ''}
+                      {b.date}
                       {b.notes?.startsWith('Created from project:') ? ' · From project' : ''}
                     </div>
                   </div>
@@ -509,6 +522,7 @@ export default function Dashboard() {
         <OpenBriefsSection
           projects={[...contractOffers, ...openBriefs]}
           emptyMessage="No open briefs yet. Pending bookings and active contracts appear here."
+          onOpen={openBrief}
         />
       </div>
     )
@@ -544,9 +558,9 @@ export default function Dashboard() {
           <span className="stat-change"><ArrowUpRight size={12} /> {employerBookings.length} upcoming</span>
         </div>
         <div className="stat-card">
-          <span className="stat-label"><Users size={14} /> Active Artists</span>
+          <span className="stat-label"><Users size={14} /> Available artists</span>
           <span className="stat-value">{artists.filter((a) => a.available).length}</span>
-          <span className="stat-change">{favorites.length} favorited</span>
+          <span className="stat-change">{favorites.length} in your favorites</span>
         </div>
         <div className="stat-card">
           <span className="stat-label"><FileText size={14} /> Projects</span>
@@ -571,9 +585,10 @@ export default function Dashboard() {
 
         {/* Distribution */}
         <div className="card slide-up" style={{ padding: 24 }}>
-          <h3 style={{ fontSize: 16, fontFamily: 'var(--font-display)', marginBottom: 20 }}>
-            <PieChart size={16} style={{ marginRight: 6, color: 'var(--accent)' }} /> By Role
+          <h3 style={{ fontSize: 16, fontFamily: 'var(--font-display)', marginBottom: 4 }}>
+            <PieChart size={16} style={{ marginRight: 6, color: 'var(--accent)' }} /> Talent by role
           </h3>
+          <span style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 20 }}>Across the artist database — a discovery snapshot, not your hires</span>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
             <DonutChart segments={roleDistribution} size={130} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
@@ -624,6 +639,7 @@ export default function Dashboard() {
       <OpenBriefsSection
         projects={openBriefs}
         emptyMessage="No open briefs yet. Pending bookings and active contracts appear here."
+        onOpen={openBrief}
       />
 
       {/* Projects in Phases */}
@@ -727,7 +743,7 @@ export default function Dashboard() {
               <div>
                 <div style={{ fontWeight: 600 }}>{b.artistName}</div>
                 <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                  {b.type} · {b.date}{b.time ? ` at ${b.time}` : ''}
+                  {b.type} · {b.date}
                   {b.notes?.startsWith('Created from project:') ? ' · From project' : ''}
                 </div>
               </div>

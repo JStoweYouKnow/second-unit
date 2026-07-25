@@ -1,6 +1,14 @@
 /**
  * Map live bookings/contracts into dashboard "open brief" cards (replaces mockData).
+ *
+ * Unified model: a "project" is the contract. A booking that already has a linked
+ * contract is the *same* engagement, so we render only one card for it (the contract).
+ * Bookings without a contract are pre-contract requests and get their own card.
  */
+function bookingHasContract(b) {
+  return Boolean(b?.contractId || b?.contract?.id)
+}
+
 export function buildOpenBriefCards({ bookings = [], contracts = [], isArtist, artistId }) {
   const cards = []
 
@@ -27,6 +35,7 @@ export function buildOpenBriefCards({ bookings = [], contracts = [], isArtist, a
     for (const b of bookings) {
       if (String(b.artistId) !== String(artistId)) continue
       if (b.status !== 'pending' && b.status !== 'confirmed') continue
+      if (bookingHasContract(b)) continue // already represented by its contract card
       cards.push({
         id: `booking-${b.id}`,
         title: `${b.type || 'Booking'} request`,
@@ -46,6 +55,7 @@ export function buildOpenBriefCards({ bookings = [], contracts = [], isArtist, a
 
   for (const b of bookings) {
     if (b.status !== 'pending' && b.status !== 'confirmed') continue
+    if (bookingHasContract(b)) continue // the contract card below represents this project
     cards.push({
       id: `booking-${b.id}`,
       title: `${b.type || 'Project'} — ${b.artistName || 'Artist'}`,

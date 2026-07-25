@@ -535,13 +535,6 @@ export default function Bookings() {
                     onChange={e => setNewBooking(p => ({ ...p, date: e.target.value }))}
                     required />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Start time</label>
-                  <input className="form-input" type="time"
-                    value={newBooking.time}
-                    onChange={e => setNewBooking(p => ({ ...p, time: e.target.value }))} />
-                </div>
-
               <div className="form-group">
                 <label className="form-label">Schedule length</label>
                 <select

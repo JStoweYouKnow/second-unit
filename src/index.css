@@ -1511,7 +1511,7 @@ button.mobile-topbar-brand--home:focus-visible {
   text-transform: none; letter-spacing: normal;
 }
 .notif-panel {
-  position: absolute; bottom: calc(100% + 12px); right: -8px; width: min(360px, calc(100vw - 32px));
+  position: absolute; bottom: calc(100% + 12px); left: -8px; right: auto; width: min(360px, calc(100vw - 32px));
   background: var(--bg-card);
   color: var(--text-primary);
   border: 1px solid var(--border-strong);

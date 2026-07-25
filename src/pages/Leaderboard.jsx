@@ -2,7 +2,8 @@ import { useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Calendar, Heart, Play, Star, Filter, Globe, IconX, Instagram, LinkedIn, X } from '../components/icons'
 import { normalizeSocialUrl } from '../lib/socialLinks'
-import { videoReelUrl, getDefaultVideoPoster, videoReelThumbnail, resolveVideoPoster } from '../lib/videoReels'
+import { videoReelUrl } from '../lib/videoReels'
+import { getArtistListTileThumb } from '../lib/profileHero'
 import { brandName } from '../lib/brands'
 import { collectRoleFilterOptions, artistMatchesRoleFilter } from '../lib/roleFilters'
 import { useArtists } from '../hooks/useData'
@@ -32,16 +33,6 @@ function getEmbedUrl(url) {
     return id ? `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&controls=0&loop=1&playlist=${id}` : url
   }
   return url
-}
-
-function getArtistTileThumb(artist) {
-  const first = artist.videoLinks?.[0]
-  const firstReel = videoReelUrl(first)
-  if (firstReel) {
-    return resolveVideoPoster(firstReel, videoReelThumbnail(first)) || getDefaultVideoPoster(firstReel)
-  }
-  if (artist.avatarUrl) return artist.avatarUrl
-  return null
 }
 
 export default function Leaderboard() {
@@ -303,7 +294,7 @@ export default function Leaderboard() {
           </div>
         )}
         {!artistsLoading && filtered.map((artist, i) => {
-          const thumbUrl = getArtistTileThumb(artist)
+          const thumbUrl = getArtistListTileThumb(artist)
 
           return (
             <div
@@ -394,9 +385,13 @@ export default function Leaderboard() {
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--gold)', fontSize: 13, fontWeight: 700 }}>
-                    <Star size={14} fill="var(--gold)" /> {artist.rating}
-                  </div>
+                  {artist.rating > 0 ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--gold)', fontSize: 13, fontWeight: 700 }}>
+                      <Star size={14} fill="var(--gold)" /> {artist.rating}
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No reviews yet</span>
+                  )}
                   {artist.available && (
                     <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--success)', textTransform: 'uppercase' }}>
                       ● Available

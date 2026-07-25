@@ -55,7 +55,7 @@ function ReviewReplyForm({ reviewId, initialText, onSubmit }) {
   )
 }
 
-export default function ReviewList({ reviews, emptyMessage, isOwnProfile = false, onReply }) {
+export default function ReviewList({ reviews, emptyMessage = 'No reviews yet.', isOwnProfile = false, onReply }) {
   if (!reviews.length) {
     return (
       <div className="card" style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>

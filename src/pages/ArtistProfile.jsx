@@ -150,11 +150,8 @@ export default function ArtistProfile() {
   const isFav = favorites.includes(artist.id)
   const hirerReview = isHirer ? hirerExistingReview(profile.id) : null
   const reviewsForDisplay = isOwnProfile ? allReviews : publicReviews
-  const showRatingToHirer = isHirer && reviewSettings.showReviewsOnProfile && publicReviews.length > 0
-  const heroRating = showRatingToHirer || isOwnProfile
-    ? (publicAverage ?? artist.rating)
-    : null
-  const heroReviewCount = isOwnProfile ? publicReviews.length : publicReviews.length
+  const publicReviewCount = publicReviews.length
+  const reviewsVisibleOnProfile = reviewSettings.showReviewsOnProfile
 
   return (
     <div>
@@ -189,16 +186,20 @@ export default function ArtistProfile() {
               </div>
               <div className="role">{artist.role}</div>
               <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-                {heroRating != null && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--gold)', fontSize: 14, fontWeight: 600 }}>
-                    <Star size={14} fill="var(--gold)" />
-                    {heroRating}
-                    <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
-                      ({heroReviewCount} public review{heroReviewCount === 1 ? '' : 's'})
+                {reviewsVisibleOnProfile && (
+                  publicReviewCount > 0 ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--gold)', fontSize: 14, fontWeight: 600 }}>
+                      <Star size={14} fill="var(--gold)" />
+                      {publicAverage ?? artist.rating}
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
+                        ({publicReviewCount} public review{publicReviewCount === 1 ? '' : 's'})
+                      </span>
                     </span>
-                  </span>
+                  ) : (
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>No reviews yet</span>
+                  )
                 )}
-                {isHirer && !reviewSettings.showReviewsOnProfile && (
+                {isHirer && !reviewsVisibleOnProfile && (
                   <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Reviews not shown publicly</span>
                 )}
                 <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{artist.projects} projects</span>
@@ -256,17 +257,23 @@ export default function ArtistProfile() {
                   <span className="profile-hero-stat-label">Projects</span>
                   <span className="profile-hero-stat-value">{artist.projects}</span>
                 </div>
-                {(showRatingToHirer || (isOwnProfile && publicReviews.length > 0)) && (
-                  <div className="profile-hero-stat">
-                    <span className="profile-hero-stat-label">Public rating</span>
-                    <span className="profile-hero-stat-value profile-hero-stat-value--gold">
-                      {publicAverage ?? artist.rating} ★
-                    </span>
-                  </div>
+                {reviewsVisibleOnProfile && (
+                  <>
+                    <div className="profile-hero-stat">
+                      <span className="profile-hero-stat-label">Public rating</span>
+                      <span className={`profile-hero-stat-value${publicReviewCount > 0 ? ' profile-hero-stat-value--gold' : ''}`}>
+                        {publicReviewCount > 0 ? `${publicAverage ?? artist.rating} ★` : 'No reviews yet'}
+                      </span>
+                    </div>
+                    <div className="profile-hero-stat">
+                      <span className="profile-hero-stat-label">Reviews</span>
+                      <span className="profile-hero-stat-value">{publicReviewCount}</span>
+                    </div>
+                  </>
                 )}
                 {isOwnProfile && (
                   <div className="profile-hero-stat">
-                    <span className="profile-hero-stat-label">Reviews</span>
+                    <span className="profile-hero-stat-label">Total reviews</span>
                     <span className="profile-hero-stat-value">{allReviews.length}</span>
                   </div>
                 )}
@@ -332,7 +339,7 @@ export default function ArtistProfile() {
                 onClick={() => setActiveTab(t)}
               >
                 {t === 'reviews'
-                  ? `Reviews${!isOwnProfile && publicReviews.length ? ` (${publicReviews.length})` : ''}`
+                  ? `Reviews (${isOwnProfile ? allReviews.length : publicReviewCount})`
                   : t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
             ))}
@@ -424,6 +431,7 @@ export default function ArtistProfile() {
 
               <ReviewList
                 reviews={reviewsForDisplay}
+                emptyMessage="No reviews yet."
                 isOwnProfile={isOwnProfile}
                 onReply={isOwnProfile ? submitReviewResponse : undefined}
               />

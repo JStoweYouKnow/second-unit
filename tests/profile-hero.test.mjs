@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { resolveProfileHero } from '../src/lib/profileHero.js'
+import { getArtistListTileThumb, resolveProfileHero } from '../src/lib/profileHero.js'
 
 const getVideoThumb = (url) => (url ? `thumb:${url}` : null)
 
@@ -46,6 +46,28 @@ assert.deepEqual(
     getVideoThumb,
   }),
   { heroVideo: null, heroImg: 'https://cdn.example/header.jpg', source: 'header' }
+)
+
+assert.equal(
+  getArtistListTileThumb({
+    headerImageUrl: 'https://cdn.example/header.jpg',
+    videoLinks: [{ url: 'https://vimeo.com/9', title: 'Reel' }],
+    avatarUrl: 'https://cdn.example/avatar.jpg',
+  }),
+  'https://cdn.example/header.jpg'
+)
+
+assert.equal(
+  getArtistListTileThumb({
+    videoLinks: [{ url: 'https://www.youtube.com/watch?v=abc123', title: 'Reel' }],
+    avatarUrl: 'https://cdn.example/avatar.jpg',
+  }),
+  'https://i.ytimg.com/vi/abc123/hqdefault.jpg'
+)
+
+assert.equal(
+  getArtistListTileThumb({ avatarUrl: 'https://cdn.example/avatar.jpg' }),
+  'https://cdn.example/avatar.jpg'
 )
 
 console.log('profile-hero.test.mjs: ok')

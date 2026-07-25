@@ -1,4 +1,10 @@
-import { videoReelUrl, videoReelUrls } from './videoReels.js'
+import {
+  getDefaultVideoPoster,
+  resolveVideoPoster,
+  videoReelThumbnail,
+  videoReelUrl,
+  videoReelUrls,
+} from './videoReels.js'
 
 /**
  * Resolve profile header media.
@@ -49,4 +55,19 @@ export function resolveProfileHero({
   }
 
   return { heroVideo: null, heroImg: null, source: null }
+}
+
+/** Static thumbnail for artist database tiles. Priority: header image → reel poster → avatar. */
+export function getArtistListTileThumb(artist) {
+  if (artist?.headerImageUrl) return artist.headerImageUrl
+
+  const firstReel = videoReelUrl(artist?.videoLinks?.[0])
+  if (firstReel) {
+    return (
+      resolveVideoPoster(firstReel, videoReelThumbnail(artist?.videoLinks?.[0]))
+      || getDefaultVideoPoster(firstReel)
+    )
+  }
+
+  return artist?.avatarUrl || null
 }

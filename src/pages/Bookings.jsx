@@ -47,6 +47,9 @@ export default function Bookings() {
 
   const isEmployerOn = (b) =>
     profile?.id != null && String(b.employerId) === String(profile.id)
+
+  const hasLinkedContract = (booking) => Boolean(booking?.contractId || booking?.contract?.id)
+
   const [tab, setTab] = useState('upcoming')
   const [showNew, setShowNew] = useState(false)
   const [showPay, setShowPay] = useState(null)
@@ -347,8 +350,6 @@ export default function Bookings() {
       setLoading(null)
     }
   }
-
-  const hasLinkedContract = (booking) => Boolean(booking?.contractId || booking?.contract?.id)
 
   const contractActionLabel = (booking, forArtist) => {
     const c = booking.contract

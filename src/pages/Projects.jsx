@@ -13,6 +13,8 @@ import { isSupabaseConfigured } from '../lib/supabase'
 import { uploadContractAttachment, downloadContractAttachment } from '../lib/contractAttachments'
 import { splitMilestoneAmounts, DEFAULT_MILESTONE_TITLES } from '../lib/milestones'
 import { STANDARD_AGREEMENT_TEMPLATE, buildAgreementTerms } from '../lib/agreementTemplate'
+import { PLATFORM_FEE_PERCENT } from '../lib/fees'
+import { buildContractHtml, buildInvoiceHtml, downloadWordDoc, openPrintablePdf } from '../lib/documentExport'
 
 const MAX_CUSTOM_FILE_BYTES = 15 * 1024 * 1024 // 15MB
 
@@ -505,6 +507,24 @@ https://thecallsheet.ai
     URL.revokeObjectURL(url)
   }
 
+  const safeName = (contract) => (contract.title || 'Contract').replace(/\s+/g, '_')
+
+  const exportContract = (contract, format) => {
+    const html = buildContractHtml(contract, { clientName: profile?.full_name })
+    if (format === 'word') downloadWordDoc(html, `${safeName(contract)}_Agreement`)
+    else openPrintablePdf(html, `${contract.title || 'Contract'} — Agreement`)
+  }
+
+  const exportInvoice = (contract, format) => {
+    const html = buildInvoiceHtml(contract, {
+      clientName: profile?.full_name,
+      payments: paymentRows.filter((p) => p.contractId === contract.id),
+      platformFeePercent: PLATFORM_FEE_PERCENT,
+    })
+    if (format === 'word') downloadWordDoc(html, `${safeName(contract)}_Invoice`)
+    else openPrintablePdf(html, `${contract.title || 'Contract'} — Invoice`)
+  }
+
   const handleCopyLink = (contract) => {
     navigator.clipboard.writeText(`${window.location.origin}/contracts/${contract.id}`)
     setCopied(contract.id)
@@ -982,8 +1002,18 @@ ${divider}
                   <PenTool size={16} /> Sign Project
                 </button>
               )}
-              <button type="button" className="btn btn-secondary" onClick={() => handleDownloadPDF(showView)}><Download size={16} /> Contract (.txt)</button>
-              <button type="button" className="btn btn-secondary" onClick={() => handleDownloadContractInvoice(showView)}><Receipt size={16} /> Statement / invoice (.txt)</button>
+              <div className="doc-export-group">
+                <span className="doc-export-label"><Download size={13} /> Contract</span>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => exportContract(showView, 'pdf')}>PDF</button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => exportContract(showView, 'word')}>Word</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleDownloadPDF(showView)}>.txt</button>
+              </div>
+              <div className="doc-export-group">
+                <span className="doc-export-label"><Receipt size={13} /> Invoice</span>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => exportInvoice(showView, 'pdf')}>PDF</button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => exportInvoice(showView, 'word')}>Word</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleDownloadContractInvoice(showView)}>.txt</button>
+              </div>
               {(showView.hasAttachment || showView.attachmentUrl) && showView.attachmentName && (
                 <button type="button" className="btn btn-secondary" onClick={() => handleDownloadAttachment(showView)}>
                   <Download size={16} /> Original file

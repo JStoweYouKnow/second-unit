@@ -2726,3 +2726,23 @@ button.mobile-topbar-brand--home:focus-visible {
   gap: 8px;
   border-top: 1px solid var(--border);
 }
+
+/* Contract / invoice export groups (Projects view modal) */
+.doc-export-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.doc-export-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-right: 2px;
+}

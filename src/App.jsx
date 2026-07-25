@@ -210,7 +210,7 @@ function AppShell() {
         { path: '/home', icon: Trophy, label: 'Artist Database' },
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
-        { path: '/bookings', icon: Calendar, label: 'Bookings' },
+        { path: '/bookings', icon: Calendar, label: 'Schedule' },
         { path: '/projects', icon: FileText, label: 'Projects' },
         { path: '/payments', icon: CreditCard, label: 'Payments' },
       ]
@@ -220,7 +220,7 @@ function AppShell() {
       const items = [
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
-        { path: '/bookings', icon: Calendar, label: 'Bookings' },
+        { path: '/bookings', icon: Calendar, label: 'Schedule' },
         { path: '/disputes', icon: Shield, label: 'Disputes' },
         { path: '/projects', icon: FileText, label: 'Projects' },
         { path: '/payments', icon: CreditCard, label: 'Earnings' },
@@ -235,7 +235,7 @@ function AppShell() {
       { path: '/', icon: Trophy, label: 'Artist Database' },
       { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
       { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
-      { path: '/bookings', icon: Calendar, label: 'Bookings' },
+      { path: '/bookings', icon: Calendar, label: 'Schedule' },
       { path: '/projects', icon: FileText, label: 'Projects' },
       { path: '/payments', icon: CreditCard, label: 'Payments' },
     ]

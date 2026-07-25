@@ -380,15 +380,15 @@ export default function Bookings() {
       <div className="page-header">
         <div className="page-header-row">
           <div>
-            <h1>{isArtist ? 'Your bookings' : 'Bookings'}</h1>
+            <h1>{isArtist ? 'Your schedule' : 'Schedule'}</h1>
             <p>
               {isArtist
-                ? 'Sessions clients scheduled with you — amounts reflect fees agreed in your thread.'
-                : 'Schedule sessions after you and the artist align on scope and fee in Messages.'}
+                ? 'The calendar view of your projects — confirm dates here; the contract, signing and milestones live in the linked Project.'
+                : 'The calendar view of your projects. Each entry links to its Project, where the agreement, signing, milestones and documents live.'}
             </p>
           </div>
           {!isArtist && (
-            <button type="button" className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New Booking</button>
+            <Link to="/projects?new=1" className="btn btn-primary"><Plus size={16} /> New project</Link>
           )}
         </div>
       </div>
@@ -427,7 +427,10 @@ export default function Bookings() {
       ) : filtered.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
           <Calendar size={32} style={{ marginBottom: 8, opacity: 0.5 }} />
-          <p>{isArtist ? 'No bookings on your calendar yet.' : 'No bookings yet.'}</p>
+          <p style={{ marginBottom: isArtist ? 0 : 12 }}>{isArtist ? 'No scheduled projects on your calendar yet.' : 'No scheduled projects yet.'}</p>
+          {!isArtist && (
+            <Link to="/projects?new=1" className="btn btn-primary btn-sm"><Plus size={14} /> New project</Link>
+          )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

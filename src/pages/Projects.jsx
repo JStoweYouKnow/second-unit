@@ -105,6 +105,19 @@ export default function Projects() {
     return () => { cancelled = true }
   }, [searchParams])
 
+  // Single creation entry point: /projects?new=1 (optionally &artistId=…) opens
+  // the New Project modal. This is where Schedule's "New project" button lands.
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return
+    const artistId = searchParams.get('artistId')
+    setShowNew(true)
+    if (artistId) setNewProject((p) => ({ ...p, artistId }))
+    const next = new URLSearchParams(searchParams)
+    next.delete('new')
+    next.delete('artistId')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
+
   const handlePayMilestone = async (contract, milestone) => {
     setMilestoneError('')
     setMilestoneBusy(milestone.id)
@@ -603,7 +616,7 @@ ${divider}
         <div className="page-header-row">
           <div>
             <h1>Projects</h1>
-            <p>{isArtist ? 'Engagements clients have sent you' : 'Create a project to send an agreement and booking request to your artist'}</p>
+            <p>{isArtist ? 'Engagements clients have sent you — agreement, schedule, milestones and documents' : 'Each project holds the agreement, schedule, milestones and documents for one engagement'}</p>
           </div>
           {!isArtist && (
             <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New Project</button>
@@ -708,7 +721,7 @@ ${divider}
             </div>
 
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.5 }}>
-              Creating a project also sends a pending booking to the artist. They confirm the booking, then both of you sign the agreement.
+              Creating a project adds it to your Schedule and asks the artist to confirm the dates. Once confirmed, both of you sign the agreement and pay by milestone.
             </p>
 
             <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>

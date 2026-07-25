@@ -160,6 +160,36 @@ export const bookings = {
     })
   },
 
+  update: async (bookingId, patch) => {
+    if (!isSupabaseConfigured) {
+      const saved = localStorage.getItem('mock_bookings')
+      let list = saved ? JSON.parse(saved) : []
+      let updated = null
+      list = list.map(b => {
+        if (String(b.id) === String(bookingId)) {
+          updated = {
+            ...b,
+            ...(patch.date != null ? { date: patch.date } : {}),
+            ...(patch.type != null ? { type: patch.type } : {}),
+            ...(patch.notes !== undefined ? { notes: patch.notes } : {}),
+            ...(patch.duration != null ? { duration: patch.duration } : {}),
+            ...(patch.durationUnit != null ? { durationUnit: patch.durationUnit } : {}),
+            ...(patch.agreedTotal != null ? { agreedTotal: patch.agreedTotal } : {}),
+            ...(patch.artistId != null ? { artistId: patch.artistId, artistName: patch.artistName ?? b.artistName } : {}),
+          }
+          return updated
+        }
+        return b
+      })
+      localStorage.setItem('mock_bookings', JSON.stringify(list))
+      return updated
+    }
+    return request(`/api/bookings/${bookingId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    })
+  },
+
   payForBooking: async (bookingId) => {
     if (!isSupabaseConfigured) {
       const saved = localStorage.getItem('mock_bookings')

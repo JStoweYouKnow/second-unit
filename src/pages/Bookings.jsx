@@ -61,6 +61,10 @@ export default function Bookings() {
     notes: '',
   })
   const [showComplete, setShowComplete] = useState(null)
+  const [showDetail, setShowDetail] = useState(null) // booking to view/edit
+  const [editForm, setEditForm] = useState(null)
+  const [editBusy, setEditBusy] = useState(false)
+  const [editError, setEditError] = useState('')
   const [loading, setLoading] = useState(null)
   const [error, setError] = useState(null)
 
@@ -262,6 +266,54 @@ export default function Bookings() {
     setShowPay(booking)
   }
 
+  const openDetail = (booking) => {
+    setEditError('')
+    setShowDetail(booking)
+    setEditForm({
+      artistId: booking.artistId || '',
+      date: booking.date || '',
+      type: booking.type || 'Consultation',
+      notes: booking.notes || '',
+      agreedTotal: String(booking.agreedTotal ?? bookingSubtotal(booking) ?? ''),
+    })
+  }
+
+  const detailIsEmployer = showDetail ? isEmployerOn(showDetail) : false
+  const detailEditable = showDetail?.status === 'pending' && detailIsEmployer
+  const detailFeeLocked = hasLinkedContract(showDetail)
+  const detailArtistLocked =
+    !!showDetail?.contract && (showDetail.contract.signedByEmployer || showDetail.contract.signedByArtist)
+
+  const handleSaveEdit = async () => {
+    if (!showDetail || !editForm) return
+    setEditError('')
+    setEditBusy(true)
+    try {
+      const patch = {
+        date: editForm.date,
+        type: editForm.type,
+        notes: editForm.notes,
+      }
+      if (!detailArtistLocked && String(editForm.artistId) !== String(showDetail.artistId)) {
+        patch.artistId = editForm.artistId
+        const a = artists.find((x) => String(x.id) === String(editForm.artistId))
+        if (a) patch.artistName = a.name
+      }
+      if (!detailFeeLocked) {
+        const agreed = Math.round(Number(String(editForm.agreedTotal).replace(/,/g, '')))
+        if (Number.isFinite(agreed) && agreed > 0) patch.agreedTotal = agreed
+      }
+      await bookingsApi.update(showDetail.id, patch)
+      await refetch()
+      setShowDetail(null)
+      setEditForm(null)
+    } catch (err) {
+      setEditError(err.message || 'Could not save changes.')
+    } finally {
+      setEditBusy(false)
+    }
+  }
+
   const handleComplete = async () => {
     if (!showComplete) return
     setError(null)
@@ -385,7 +437,14 @@ export default function Bookings() {
             const isProcessing = loading === b.id
             return (
               <div key={b.id} className="card slide-up" style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 16, opacity: isProcessing ? 0.7 : 1 }}>
-                <div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openDetail(b)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(b) } }}
+                  style={{ cursor: 'pointer' }}
+                  title="View / edit booking"
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                     <div className="avatar avatar-sm">
                       {canRespondToBooking(b) || (myArtistRecord?.id && String(b.artistId) === String(myArtistRecord.id))
@@ -762,6 +821,90 @@ export default function Bookings() {
             <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
               <Shield size={12} style={{ marginRight: 4 }} /> Secured by Stripe. Your payment information is encrypted.
             </div>
+          </div>
+        </div>
+      )}
+
+      {showDetail && editForm && (
+        <div className="modal-overlay" role="presentation" onClick={() => { setShowDetail(null); setEditForm(null) }}>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="booking-detail-title" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 id="booking-detail-title">{detailEditable ? 'Edit booking' : 'Booking details'}</h2>
+              <button type="button" className="btn-icon" onClick={() => { setShowDetail(null); setEditForm(null) }}><X size={18} /></button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: (statusConfig[showDetail.status] || statusConfig.pending).bg, color: (statusConfig[showDetail.status] || statusConfig.pending).color }}>
+                {(statusConfig[showDetail.status] || statusConfig.pending).label}
+              </span>
+              {hasLinkedContract(showDetail) && showDetail.contract?.title && (
+                <Link to={contractHref(showDetail)} className="btn btn-ghost btn-sm">
+                  <ExternalLink size={14} /> {showDetail.contract.title}
+                </Link>
+              )}
+            </div>
+
+            {!detailEditable ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 8 }}>
+                <div><strong>Artist:</strong> {showDetail.artistName}</div>
+                <div><strong>Date:</strong> {showDetail.date}</div>
+                <div><strong>Schedule:</strong> {bookingScheduleCaption(showDetail)}</div>
+                <div><strong>Type:</strong> {showDetail.type}</div>
+                <div><strong>Agreed fee:</strong> ${bookingSubtotal(showDetail).toLocaleString()}</div>
+                {showDetail.notes && <div><strong>Notes:</strong> {showDetail.notes}</div>}
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
+                  This booking can no longer be edited{showDetail.status !== 'pending' ? ` — it's ${showDetail.status}.` : '.'}
+                </p>
+              </div>
+            ) : (
+              <>
+                {editError && <div className="auth-error" style={{ marginBottom: 12 }}>{editError}</div>}
+                <div className="form-group">
+                  <label className="form-label">Artist {detailArtistLocked && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>· locked (contract signed)</span>}</label>
+                  <select
+                    className="form-input"
+                    value={editForm.artistId}
+                    disabled={detailArtistLocked}
+                    onChange={e => setEditForm(p => ({ ...p, artistId: e.target.value }))}
+                  >
+                    {!artists.some(a => String(a.id) === String(editForm.artistId)) && (
+                      <option value={editForm.artistId}>{showDetail.artistName}</option>
+                    )}
+                    {artists.map(a => <option key={a.id} value={a.id}>{a.name} — {a.role}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Date</label>
+                  <input className="form-input" type="date" value={editForm.date}
+                    onChange={e => setEditForm(p => ({ ...p, date: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Type</label>
+                  <select className="form-input" value={editForm.type} onChange={e => setEditForm(p => ({ ...p, type: e.target.value }))}>
+                    {['Consultation', 'Project Work', 'Full Day Session', 'Workshop', 'Review Session'].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Agreed fee (USD) {detailFeeLocked && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>· set by linked project</span>}</label>
+                  <input className="form-input" type="number" min={1} value={editForm.agreedTotal}
+                    disabled={detailFeeLocked}
+                    onChange={e => setEditForm(p => ({ ...p, agreedTotal: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Notes</label>
+                  <textarea className="form-input" value={editForm.notes}
+                    onChange={e => setEditForm(p => ({ ...p, notes: e.target.value }))} />
+                </div>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => { setShowDetail(null); setEditForm(null) }} disabled={editBusy}>Cancel</button>
+                  <button type="button" className="btn btn-primary" onClick={handleSaveEdit} disabled={editBusy}>
+                    {editBusy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />} Save changes
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

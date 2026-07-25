@@ -22,6 +22,7 @@ import {
   listBookingsForUser,
   getArtistIdForProfile,
 } from '../api/_lib/bookings.js'
+import { updatePendingBooking } from '../api/_lib/updateBooking.js'
 import { listPaymentsForUser } from '../api/_lib/payments.js'
 import { completeBookingPayment } from '../api/_lib/completeBookingPayment.js'
 import { createProjectCheckoutSession } from '../api/_lib/checkout.js'
@@ -616,6 +617,38 @@ app.post('/api/payments/create-intent', async (req, res) => {
     res.json({ clientSecret: intent.client_secret })
   } catch (err) {
     res.status(500).json({ error: err.message })
+  }
+})
+
+app.patch('/api/bookings/:id', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+
+  const ERROR_STATUS = {
+    not_found: [404, 'Booking not found'],
+    forbidden: [403, 'Only the client can edit this booking'],
+    not_pending: [400, 'Only pending bookings can be edited'],
+    contract_signed: [400, 'This project is already signed — the artist can no longer be changed'],
+    artist_not_found: [400, 'Selected artist not found'],
+    fee_locked_by_contract: [400, 'The fee is set by the linked project contract and cannot be changed here'],
+    invalid_fee: [400, 'Enter a valid fee (whole dollars)'],
+  }
+
+  try {
+    const result = await updatePendingBooking(database, {
+      id: req.params.id,
+      userId: user.id,
+      patch: req.body || {},
+    })
+    if (result.error) {
+      const [status, message] = ERROR_STATUS[result.error] || [400, result.error]
+      return res.status(status).json({ error: message })
+    }
+    return res.json(mapBookingToClient(result.booking))
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
   }
 })
 

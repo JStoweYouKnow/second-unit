@@ -209,17 +209,24 @@ export function useArtist(id) {
     }
 
     async function fetch() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('artists')
         .select(`
           *,
           skills:artist_skills(skill:skills(name)),
           brands:artist_brands(verified, brand:brands(name)),
-          portfolio:portfolio_items(*),
+          portfolio:portfolio_items!artist_id(*),
           availability:availability_slots(*)
         `)
         .eq('id', id)
-        .single()
+        .maybeSingle()
+
+      if (error) {
+        console.error('[useArtist]', error.message || error)
+        setArtist(null)
+        setLoading(false)
+        return
+      }
 
       let busyRows = []
       if (data?.id) {

@@ -150,7 +150,7 @@ function ConnectModal({ userEmail, artistId, onClose, ensureArtistId, allowMissi
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div className="form-group">
             <label className="form-label">First name</label>
             <input className="form-input" placeholder="First" value={form.firstName}
@@ -933,7 +933,7 @@ https://thecallsheet.ai
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+            <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
               {[
                 { label: isArtist ? 'Payee' : 'Artist', value: isArtist ? (me?.name ?? showReceipt.artistName) : showReceipt.artistName },
                 { label: 'Date', value: showReceipt.date },

@@ -940,7 +940,8 @@ textarea.form-input { min-height: 100px; resize: vertical; }
    gridTemplateColumns some dashboard rows set for desktop (repeat(4,1fr), 2fr 1fr). */
 @media (max-width: 768px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
-  .dash-split { grid-template-columns: 1fr !important; }
+  /* Collapse multi-column grids (dashboard rows, modal form grids) to one column. */
+  .dash-split, .stack-mobile { grid-template-columns: 1fr !important; }
 }
 @media (max-width: 420px) {
   .stats-grid { grid-template-columns: 1fr !important; }

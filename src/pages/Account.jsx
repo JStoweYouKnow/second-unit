@@ -470,7 +470,7 @@ export default function Account() {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                 <div className="form-group">
                   <label className="form-label">Full Name</label>
                   <input className="filter-select" style={{ width: '100%' }} value={fullName} onChange={(e) => setFullName(e.target.value)} />
@@ -496,7 +496,7 @@ export default function Account() {
                     Required before payouts. Add your legal name or business entity and upload a completed W-9 so hirers can issue 1099s.
                     The Callsheet does not file taxes for you.
                   </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                  <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                     <div className="form-group">
                       <label className="form-label">Legal name / business entity</label>
                       <input className="filter-select" style={{ width: '100%' }} value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Jane Doe or Doe Creative LLC" />

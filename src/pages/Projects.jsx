@@ -786,7 +786,7 @@ ${divider}
                   {artists.map(a => <option key={a.id} value={a.id}>{a.name} — {a.role}</option>)}
                 </select>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+              <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
                 <div className="form-group">
                   <label className="form-label">Start Date</label>
                   <input className="form-input" type="date" value={newProject.startDate}
@@ -820,7 +820,7 @@ ${divider}
                   Custom milestone payment split (default 33/33/34)
                 </label>
                 {useCustomMilestones && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 10 }}>
+                  <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 10 }}>
                     {DEFAULT_MILESTONE_TITLES.map((m, i) => (
                       <div key={m.title}>
                         <label className="form-label" style={{ fontSize: 11 }}>{m.title} ($)</label>
@@ -952,7 +952,7 @@ ${divider}
             </div>
 
             {/* Contract Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+            <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
               <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)' }}>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Artist</div>
                 <div style={{ fontWeight: 600 }}>{showView.artistName}</div>
@@ -1026,7 +1026,7 @@ ${divider}
             {/* Signatures */}
             <div style={{ marginBottom: 24 }}>
               <h3 style={{ fontSize: 14, marginBottom: 12, color: 'var(--text-secondary)' }}>Signatures</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div style={{
                   padding: 20, borderRadius: 'var(--radius-sm)',
                   border: `2px dashed ${showView.signedByEmployer ? 'var(--success)' : 'var(--border)'}`,

@@ -266,7 +266,7 @@ export default function Briefs() {
                 <textarea className="form-input" style={{ minHeight: 120 }} value={postForm.description} placeholder="Scope, references, deliverables, must-haves…"
                   onChange={(e) => setPostForm((p) => ({ ...p, description: e.target.value }))} />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div className="form-group">
                   <label className="form-label">Budget min ($)</label>
                   <input className="form-input" type="number" min={0} value={postForm.budgetMin}
@@ -278,7 +278,7 @@ export default function Briefs() {
                     onChange={(e) => setPostForm((p) => ({ ...p, budgetMax: e.target.value }))} />
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div className="form-group">
                   <label className="form-label">Timeline</label>
                   <input className="form-input" value={postForm.timeline} placeholder="e.g. 3 weeks, deliver by Aug 30"

@@ -1,6 +1,22 @@
 import { emailLayout, emailProfile } from './email.js'
+import { smsDispatch } from './sms.js'
 import { notifyUser } from './notifications.js'
 import { FRONTEND_URL } from './stripe.js'
+
+function channelOpts(profile, { title, body, link, category, ctaLabel, ctaUrl, subject }) {
+  if (!profile) return {}
+  const url = ctaUrl || (link ? `${FRONTEND_URL}${link}` : FRONTEND_URL)
+  return {
+    email: {
+      to: profile.email,
+      subject: subject || title,
+      html: emailLayout({ title, body, ctaLabel, ctaUrl: url }),
+      prefs: profile.notification_prefs,
+      category,
+    },
+    sms: smsDispatch(profile, { title, body, link: url, category }),
+  }
+}
 
 export async function notifyMessageReceived(db, {
   recipientId,
@@ -10,32 +26,24 @@ export async function notifyMessageReceived(db, {
   if (!recipientId) return null
   const profile = await emailProfile(db, recipientId)
   const body = preview.length > 120 ? `${preview.slice(0, 120)}…` : preview
+  const title = `New message from ${senderName}`
 
   return notifyUser(
     db,
     recipientId,
     {
       type: 'message',
-      title: `New message from ${senderName}`,
+      title,
       body,
       link: '/messages',
     },
-    profile
-      ? {
-          email: {
-            to: profile.email,
-            subject: `New message from ${senderName}`,
-            html: emailLayout({
-              title: `New message from ${senderName}`,
-              body,
-              ctaLabel: 'Open Messages',
-              ctaUrl: `${FRONTEND_URL}/messages`,
-            }),
-            prefs: profile.notification_prefs,
-            category: 'message',
-          },
-        }
-      : {}
+    channelOpts(profile, {
+      title,
+      body,
+      link: '/messages',
+      category: 'message',
+      ctaLabel: 'Open Messages',
+    })
   )
 }
 
@@ -55,22 +63,13 @@ export async function notifyBookingRequested(db, { booking, employerId, artistPr
     db,
     artistProfileId,
     { type: 'booking', title, body, link: '/bookings' },
-    artist
-      ? {
-          email: {
-            to: artist.email,
-            subject: title,
-            html: emailLayout({
-              title,
-              body,
-              ctaLabel: 'Review Booking',
-              ctaUrl: `${FRONTEND_URL}/bookings`,
-            }),
-            prefs: artist.notification_prefs,
-            category: 'booking',
-          },
-        }
-      : {}
+    channelOpts(artist, {
+      title,
+      body,
+      link: '/bookings',
+      category: 'booking',
+      ctaLabel: 'Review Booking',
+    })
   )
 }
 
@@ -83,22 +82,13 @@ export async function notifyBookingConfirmed(db, { booking, employerId, artistPr
     db,
     employerId,
     { type: 'booking', title, body, link: '/projects' },
-    employer
-      ? {
-          email: {
-            to: employer.email,
-            subject: title,
-            html: emailLayout({
-              title,
-              body,
-              ctaLabel: 'View Project',
-              ctaUrl: `${FRONTEND_URL}/projects`,
-            }),
-            prefs: employer.notification_prefs,
-            category: 'booking',
-          },
-        }
-      : {}
+    channelOpts(employer, {
+      title,
+      body,
+      link: '/projects',
+      category: 'booking',
+      ctaLabel: 'View Project',
+    })
   )
 
   if (artistProfileId) {
@@ -109,22 +99,13 @@ export async function notifyBookingConfirmed(db, { booking, employerId, artistPr
       db,
       artistProfileId,
       { type: 'booking', title: artistTitle, body: artistBody, link: '/projects' },
-      artist
-        ? {
-            email: {
-              to: artist.email,
-              subject: artistTitle,
-              html: emailLayout({
-                title: artistTitle,
-                body: artistBody,
-                ctaLabel: 'Sign Agreement',
-                ctaUrl: `${FRONTEND_URL}/projects`,
-              }),
-              prefs: artist.notification_prefs,
-              category: 'booking',
-            },
-          }
-        : {}
+      channelOpts(artist, {
+        title: artistTitle,
+        body: artistBody,
+        link: '/projects',
+        category: 'booking',
+        ctaLabel: 'Sign Agreement',
+      })
     )
   }
 }
@@ -143,26 +124,18 @@ export async function notifyContractSigned(db, {
       const profile = await emailProfile(db, userId)
       const title = `Agreement active: ${contract.title}`
       const body = 'Both parties have signed. Milestone payments are now unlocked.'
+      const link = `/projects?contract_id=${contract.id}`
       await notifyUser(
         db,
         userId,
-        { type: 'contract', title, body, link: `/projects?contract_id=${contract.id}` },
-        profile
-          ? {
-              email: {
-                to: profile.email,
-                subject: title,
-                html: emailLayout({
-                  title,
-                  body,
-                  ctaLabel: 'Pay Milestones',
-                  ctaUrl: `${FRONTEND_URL}/projects?contract_id=${contract.id}`,
-                }),
-                prefs: profile.notification_prefs,
-                category: 'contract',
-              },
-            }
-          : {}
+        { type: 'contract', title, body, link },
+        channelOpts(profile, {
+          title,
+          body,
+          link,
+          category: 'contract',
+          ctaLabel: 'Pay Milestones',
+        })
       )
     }
     return
@@ -172,6 +145,7 @@ export async function notifyContractSigned(db, {
   const other = await emailProfile(db, otherPartyId)
   const title = `${signerName} signed: ${contract.title}`
   const body = 'Your signature is needed to activate the agreement and unlock milestone payments.'
+  const link = `/projects?contract_id=${contract.id}`
 
   await notifyUser(
     db,
@@ -180,24 +154,15 @@ export async function notifyContractSigned(db, {
       type: 'contract',
       title,
       body,
-      link: `/projects?contract_id=${contract.id}`,
+      link,
     },
-    other
-      ? {
-          email: {
-            to: other.email,
-            subject: title,
-            html: emailLayout({
-              title,
-              body,
-              ctaLabel: 'Sign Agreement',
-              ctaUrl: `${FRONTEND_URL}/projects?contract_id=${contract.id}`,
-            }),
-            prefs: other.notification_prefs,
-            category: 'contract',
-          },
-        }
-      : {}
+    channelOpts(other, {
+      title,
+      body,
+      link,
+      category: 'contract',
+      ctaLabel: 'Sign Agreement',
+    })
   )
 }
 
@@ -206,6 +171,7 @@ export async function notifyMilestoneFunded(db, { contract, milestone, artistPro
   const profile = await emailProfile(db, artistProfileId)
   const title = `Milestone funded: ${milestone.title}`
   const body = `${contract.title} — ${milestone.title} has been paid. Submit deliverables (optional) and request release when ready for client approval.`
+  const link = `/projects?contract_id=${contract.id}`
 
   return notifyUser(
     db,
@@ -214,24 +180,15 @@ export async function notifyMilestoneFunded(db, { contract, milestone, artistPro
       type: 'payment',
       title,
       body,
-      link: `/projects?contract_id=${contract.id}`,
+      link,
     },
-    profile
-      ? {
-          email: {
-            to: profile.email,
-            subject: title,
-            html: emailLayout({
-              title,
-              body,
-              ctaLabel: 'View Project',
-              ctaUrl: `${FRONTEND_URL}/projects?contract_id=${contract.id}`,
-            }),
-            prefs: profile.notification_prefs,
-            category: 'payment',
-          },
-        }
-      : {}
+    channelOpts(profile, {
+      title,
+      body,
+      link,
+      category: 'payment',
+      ctaLabel: 'View Project',
+    })
   )
 }
 
@@ -250,22 +207,13 @@ export async function notifyMilestoneReleased(db, { contract, milestone, artistP
       body,
       link: '/payments',
     },
-    profile
-      ? {
-          email: {
-            to: profile.email,
-            subject: title,
-            html: emailLayout({
-              title,
-              body,
-              ctaLabel: 'View Earnings',
-              ctaUrl: `${FRONTEND_URL}/payments`,
-            }),
-            prefs: profile.notification_prefs,
-            category: 'payment',
-          },
-        }
-      : {}
+    channelOpts(profile, {
+      title,
+      body,
+      link: '/payments',
+      category: 'payment',
+      ctaLabel: 'View Earnings',
+    })
   )
 }
 
@@ -282,6 +230,7 @@ export async function notifyMilestoneReleaseRequested(db, { contract, milestone,
   const body = hasDeliverable
     ? `${contract.title} — the artist submitted work and asked you to approve "${milestone.title}" for payout.`
     : `${contract.title} — the artist asked you to approve "${milestone.title}" for payout.`
+  const link = `/projects?contract_id=${contract.id}`
 
   return notifyUser(
     db,
@@ -290,24 +239,15 @@ export async function notifyMilestoneReleaseRequested(db, { contract, milestone,
       type: 'payment',
       title,
       body,
-      link: `/projects?contract_id=${contract.id}`,
+      link,
     },
-    profile
-      ? {
-          email: {
-            to: profile.email,
-            subject: title,
-            html: emailLayout({
-              title,
-              body,
-              ctaLabel: 'Review Milestone',
-              ctaUrl: `${FRONTEND_URL}/projects?contract_id=${contract.id}`,
-            }),
-            prefs: profile.notification_prefs,
-            category: 'payment',
-          },
-        }
-      : {}
+    channelOpts(profile, {
+      title,
+      body,
+      link,
+      category: 'payment',
+      ctaLabel: 'Review Milestone',
+    })
   )
 }
 
@@ -324,31 +264,24 @@ export async function notifyReviewResponse(db, { review, artistProfileId }) {
   const body = (review.artist_response || '').trim()
   const preview = body.length > 120 ? `${body.slice(0, 120)}…` : body
   const profile = await emailProfile(db, review.reviewer_id)
+  const title = `${artistName} replied to your review`
+  const link = `/artist/${artistProfileId}?tab=reviews`
 
   return notifyUser(
     db,
     review.reviewer_id,
     {
       type: 'system',
-      title: `${artistName} replied to your review`,
+      title,
       body: preview,
-      link: `/artist/${artistProfileId}?tab=reviews`,
+      link,
     },
-    profile
-      ? {
-          email: {
-            to: profile.email,
-            subject: `${artistName} replied to your review`,
-            html: emailLayout({
-              title: `${artistName} replied to your review`,
-              body: preview,
-              ctaLabel: 'View review',
-              ctaUrl: `${FRONTEND_URL}/artist/${artistProfileId}?tab=reviews`,
-            }),
-            prefs: profile.notification_prefs,
-            category: 'booking',
-          },
-        }
-      : {}
+    channelOpts(profile, {
+      title,
+      body: preview,
+      link,
+      category: 'booking',
+      ctaLabel: 'View review',
+    })
   )
 }

@@ -6,6 +6,7 @@ import {
   getNotificationPrefs,
   updateNotificationPrefs,
 } from '../_lib/notifications.js'
+import { normalizePhone } from '../_lib/sms.js'
 
 const PrefsSchema = z.object({
   messages: z.boolean().optional(),
@@ -13,7 +14,18 @@ const PrefsSchema = z.object({
   billing: z.boolean().optional(),
   marketing: z.boolean().optional(),
   push: z.boolean().optional(),
+  sms: z.boolean().optional(),
+  phone: z.string().max(32).optional().nullable(),
 })
+
+async function getProfilePhone(userId) {
+  const { data } = await db
+    .from('profiles')
+    .select('phone')
+    .eq('id', userId)
+    .maybeSingle()
+  return data?.phone ?? null
+}
 
 export default async function handler(req, res) {
   const { ok } = rateLimit(getClientIp(req), 30, 60_000)
@@ -27,7 +39,8 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
       const prefs = await getNotificationPrefs(db, user.id)
-      return res.json(prefs)
+      const phone = await getProfilePhone(user.id)
+      return res.json({ ...prefs, phone })
     } catch (err) {
       return res.status(500).json({ error: err.message })
     }
@@ -36,8 +49,25 @@ export default async function handler(req, res) {
   if (req.method === 'PATCH') {
     try {
       const validated = PrefsSchema.parse(req.body || {})
-      const prefs = await updateNotificationPrefs(db, user.id, validated)
-      return res.json(prefs)
+      const { phone, ...prefsFields } = validated
+      const prefs = await updateNotificationPrefs(db, user.id, prefsFields)
+
+      if (phone !== undefined) {
+        const trimmed = phone == null ? '' : String(phone).trim()
+        const normalized = trimmed ? normalizePhone(trimmed) : null
+        if (trimmed && !normalized) {
+          return res.status(400).json({ error: 'Enter a valid mobile number (e.g. +1 555 123 4567)' })
+        }
+        const { error: phoneError } = await db
+          .from('profiles')
+          .update({ phone: normalized, updated_at: new Date().toISOString() })
+          .eq('id', user.id)
+        if (phoneError) throw phoneError
+        return res.json({ ...prefs, phone: normalized })
+      }
+
+      const storedPhone = await getProfilePhone(user.id)
+      return res.json({ ...prefs, phone: storedPhone })
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: err.errors })

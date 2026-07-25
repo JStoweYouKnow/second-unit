@@ -69,7 +69,7 @@ export async function emailProfile(db, profileId) {
   if (!db || !profileId) return null
   const { data } = await db
     .from('profiles')
-    .select('email, full_name, notification_prefs')
+    .select('email, full_name, phone, notification_prefs')
     .eq('id', profileId)
     .maybeSingle()
   return data

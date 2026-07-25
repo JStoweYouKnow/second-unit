@@ -4,6 +4,7 @@ const DEFAULT_PREFS = {
   billing: true,
   marketing: false,
   push: false,
+  sms: false,
 }
 
 export function mapNotificationToClient(row) {
@@ -22,6 +23,16 @@ export function mapNotificationToClient(row) {
 
 export function prefAllowsEmail(prefs, category) {
   const merged = { ...DEFAULT_PREFS, ...(prefs || {}) }
+  if (category === 'message') return merged.messages !== false
+  if (category === 'booking' || category === 'contract') return merged.projects !== false
+  if (category === 'payment') return merged.billing !== false
+  if (category === 'marketing') return merged.marketing === true
+  return true
+}
+
+export function prefAllowsSms(prefs, category) {
+  const merged = { ...DEFAULT_PREFS, ...(prefs || {}) }
+  if (merged.sms !== true) return false
   if (category === 'message') return merged.messages !== false
   if (category === 'booking' || category === 'contract') return merged.projects !== false
   if (category === 'payment') return merged.billing !== false
@@ -125,7 +136,7 @@ export async function markAllNotificationsRead(db, userId) {
   return { ok: true }
 }
 
-export async function notifyUser(db, userId, payload, { email = null } = {}) {
+export async function notifyUser(db, userId, payload, { email = null, sms = null } = {}) {
   const notification = await createNotification(db, { userId, ...payload })
   if (email && notification) {
     const { sendTransactionalEmail } = await import('./email.js')
@@ -135,6 +146,15 @@ export async function notifyUser(db, userId, payload, { email = null } = {}) {
       html: email.html,
       category: email.category || payload.type,
       prefs: email.prefs,
+    })
+  }
+  if (sms && notification) {
+    const { sendTransactionalSms } = await import('./sms.js')
+    await sendTransactionalSms({
+      to: sms.to,
+      body: sms.body,
+      category: sms.category || payload.type,
+      prefs: sms.prefs,
     })
   }
   return notification

@@ -54,7 +54,9 @@ export default function Account() {
     billing: true,
     marketing: false,
     push: false,
+    sms: false,
   })
+  const [smsPhone, setSmsPhone] = useState('')
   const [pushBusy, setPushBusy] = useState(false)
   const [paymentMethods, setPaymentMethods] = useState([])
   const [billingLoading, setBillingLoading] = useState(false)
@@ -110,7 +112,14 @@ export default function Account() {
 
   useEffect(() => {
     if (!isSupabaseConfigured || !profile?.id) return
-    profileApi.getNotificationPrefs().then(setNotifPrefs).catch(() => {})
+    profileApi
+      .getNotificationPrefs()
+      .then((data) => {
+        const { phone, ...prefs } = data || {}
+        setNotifPrefs((p) => ({ ...p, ...prefs }))
+        setSmsPhone(phone || '')
+      })
+      .catch(() => {})
   }, [profile?.id])
 
   const loadPaymentMethods = useCallback(async () => {
@@ -171,8 +180,13 @@ export default function Account() {
     setError('')
     try {
       if (isSupabaseConfigured) {
-        const savedPrefs = await profileApi.updateNotificationPrefs(notifPrefs)
-        setNotifPrefs(savedPrefs)
+        const savedPrefs = await profileApi.updateNotificationPrefs({
+          ...notifPrefs,
+          phone: smsPhone.trim() || null,
+        })
+        const { phone, ...prefs } = savedPrefs || {}
+        setNotifPrefs((p) => ({ ...p, ...prefs }))
+        setSmsPhone(phone || '')
       }
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
@@ -808,6 +822,41 @@ export default function Account() {
                     </div>
                   </label>
                 ))}
+              </div>
+
+              <div style={{ marginTop: 32, padding: 20, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', maxWidth: 600 }}>
+                <h4 style={{ margin: '0 0 8px 0' }}>Text message (SMS) alerts</h4>
+                <p style={{ margin: '0 0 16px 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  Receive SMS for the categories enabled above — messages, project updates, and billing alerts. Standard message rates may apply.
+                </p>
+                <label style={{ display: 'block', marginBottom: 12 }}>
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Mobile number</span>
+                  <input
+                    type="tel"
+                    className="input"
+                    placeholder="+1 555 123 4567"
+                    value={smsPhone}
+                    onChange={(e) => setSmsPhone(e.target.value)}
+                    autoComplete="tel"
+                    style={{ width: '100%', maxWidth: 280 }}
+                  />
+                </label>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!notifPrefs.sms}
+                    onChange={(e) => setNotifPrefs((p) => ({ ...p, sms: e.target.checked }))}
+                    style={{ marginTop: 4 }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>Enable SMS notifications</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {smsPhone.trim()
+                        ? 'Texts will be sent when important updates occur.'
+                        : 'Add your mobile number above to enable SMS alerts.'}
+                    </div>
+                  </div>
+                </label>
               </div>
 
               <div style={{ marginTop: 32, padding: 20, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', maxWidth: 600 }}>

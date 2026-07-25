@@ -55,20 +55,21 @@ npm run verify:migrations                      # includes product features
 | 17 | `realtime-messages.sql` | Message realtime |
 | 18 | `message-read-receipts.sql` | Read receipts |
 | 19 | `push-subscriptions.sql` | Web push |
-| 20 | `google-calendar-sync.sql` | Calendar OAuth sync |
-| 21 | `calendar-connections-rls.sql` | RLS on calendar token tables |
-| 22 | `reviews-visibility.sql` | Review visibility |
-| 23 | `review-responses.sql` | Artist review responses |
-| 24 | `brand-verification.sql` | Verified client credits |
-| 25 | `portfolio-storage.sql` | Portfolio media bucket |
-| 26 | `employer-tax-vault.sql` | Hirer company fields + tax doc vault |
-| 27 | `artist-featured-header.sql` | Artist-chosen profile header media |
-| 28 | `artist-video-reels.sql` | Named video reels (`video_reels` jsonb) |
-| 29 | `artist-timezone.sql` | Artist working timezone for availability |
-| 30 | `artist-profile-public.sql` | Dedicated header image URL + Artist Database public toggle |
-| 31 | `avatars-storage.sql` | Profile avatar uploads (`avatars` bucket) |
-| 32 | `artist-skills-brands-sync-rpc.sql` | Artist-owned RPC to sync skills/brands (expertise) |
-| 33 | `contract-milestone-descriptions.sql` | Hirer-set expected deliverable per milestone (`contracts.milestone_descriptions`) |
+| 20 | `profile-phone-sms.sql` | SMS phone number on profile |
+| 21 | `google-calendar-sync.sql` | Calendar OAuth sync |
+| 22 | `calendar-connections-rls.sql` | RLS on calendar token tables |
+| 23 | `reviews-visibility.sql` | Review visibility |
+| 24 | `review-responses.sql` | Artist review responses |
+| 25 | `brand-verification.sql` | Verified client credits |
+| 26 | `portfolio-storage.sql` | Portfolio media bucket |
+| 27 | `employer-tax-vault.sql` | Hirer company fields + tax doc vault |
+| 28 | `artist-featured-header.sql` | Artist-chosen profile header media |
+| 29 | `artist-video-reels.sql` | Named video reels (`video_reels` jsonb) |
+| 30 | `artist-timezone.sql` | Artist working timezone for availability |
+| 31 | `artist-profile-public.sql` | Dedicated header image URL + Artist Database public toggle |
+| 32 | `avatars-storage.sql` | Profile avatar uploads (`avatars` bucket) |
+| 33 | `artist-skills-brands-sync-rpc.sql` | Artist-owned RPC to sync skills/brands (expertise) |
+| 34 | `contract-milestone-descriptions.sql` | Hirer-set expected deliverable per milestone (`contracts.milestone_descriptions`) |
 
 ## Ad-hoc fixes (run only if needed)
 

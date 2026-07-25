@@ -27,6 +27,7 @@ export const FEATURE_MIGRATIONS = [
   'realtime-messages.sql',
   'message-read-receipts.sql',
   'push-subscriptions.sql',
+  'profile-phone-sms.sql',
   'google-calendar-sync.sql',
   'calendar-connections-rls.sql',
   'reviews-visibility.sql',

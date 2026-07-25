@@ -51,6 +51,11 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 RESEND_API_KEY=re_...
 EMAIL_FROM=The Callsheet <notifications@yourdomain.com>
 
+# SMS (optional — Twilio for text message alerts)
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+TWILIO_PHONE_NUMBER=+15551234567
+
 # Supabase (required for persistence)
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
@@ -98,6 +103,7 @@ The project includes a `vercel.json` config. API routes live under `/api/*` as V
    - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
    - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `FRONTEND_URL=https://www.thecallsheet.ai`
    - `RESEND_API_KEY`, `EMAIL_FROM` (optional, for email alerts)
+   - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` (optional, for SMS alerts)
    - `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_CALENDAR_REDIRECT_URI` (optional)
 3. Run SQL migrations in order (`supabase/MIGRATIONS.md`), including `contract-signature-audit.sql` and `employer-tax-vault.sql`.
 4. Deploy.

@@ -1,7 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Heart, Star, MapPin, Calendar, Play, Globe, IconX, Instagram, LinkedIn, Send, ChevronUp, ChevronDown } from '../components/icons'
+import { ArrowLeft, Heart, Star, MapPin, Calendar, Play, Globe, IconX, Instagram, LinkedIn, Send } from '../components/icons'
 import { useApp } from '../context/AppContext'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import CalendarModal from '../components/CalendarModal'
 import { useAuth } from '../context/AuthContext'
 import { artists as artistsApi } from '../lib/api'
@@ -10,12 +10,7 @@ import BrandChip from '../components/BrandChip'
 import { isArtistProfile } from '../lib/roleView'
 import { useArtist } from '../hooks/useData'
 import { useArtistReviews } from '../hooks/useArtistReviews'
-import { portfolio as portfolioApi } from '../lib/api'
-import { uploadPortfolioMedia, deletePortfolioStoragePath } from '../lib/portfolioMedia'
-import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { Upload, Loader2, Trash2 } from '../components/icons'
 import HirerReviewForm from '../components/HirerReviewForm'
-import ArtistReviewSettings from '../components/ArtistReviewSettings'
 import ReviewList from '../components/ReviewList'
 import { resolveProfileHero } from '../lib/profileHero'
 import { normalizeSocialUrl } from '../lib/socialLinks'
@@ -23,7 +18,6 @@ import {
   normalizeVideoReels,
   videoReelTitle,
   videoReelUrl,
-  videoReelsToPayload,
 } from '../lib/videoReels'
 function VideoPlayer({ url }) {
   const getEmbedUrl = (url) => {
@@ -113,12 +107,6 @@ export default function ArtistProfile() {
 
   const [portfolioItems, setPortfolioItems] = useState([])
   const [videoLinks, setVideoLinks] = useState([])
-  const [featuredPortfolioItemId, setFeaturedPortfolioItemId] = useState(null)
-  const [featuredVideoLink, setFeaturedVideoLink] = useState(null)
-  const [portfolioBusy, setPortfolioBusy] = useState(false)
-  const [portfolioError, setPortfolioError] = useState('')
-  const [featureBusy, setFeatureBusy] = useState(false)
-  const portfolioInputRef = useRef(null)
 
   function mapPortfolioRow(p) {
     const url = p.media_url || p.image || p.video
@@ -142,155 +130,23 @@ export default function ArtistProfile() {
   }, [artist?.portfolio])
 
   useEffect(() => {
-    setFeaturedPortfolioItemId(artist?.featuredPortfolioItemId ?? null)
-    setFeaturedVideoLink(artist?.featuredVideoLink ?? null)
-  }, [artist?.featuredPortfolioItemId, artist?.featuredVideoLink])
-
-  const persistFeaturedHeader = async ({ portfolioItemId = null, videoLink = null }) => {
-    if (!isOwnProfile || !artist?.id) return
-    setFeatureBusy(true)
-    setPortfolioError('')
-    setFeaturedPortfolioItemId(portfolioItemId)
-    setFeaturedVideoLink(videoLink)
-    try {
-      if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase
-          .from('artists')
-          .update({
-            featured_portfolio_item_id: portfolioItemId,
-            featured_video_link: videoLink,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', artist.id)
-        if (error) throw error
-      }
-    } catch (err) {
-      setFeaturedPortfolioItemId(artist.featuredPortfolioItemId ?? null)
-      setFeaturedVideoLink(artist.featuredVideoLink ?? null)
-      setPortfolioError(err.message || 'Could not update header feature')
-    } finally {
-      setFeatureBusy(false)
-    }
-  }
-
-  const clearFeaturedHeader = () => persistFeaturedHeader({ portfolioItemId: null, videoLink: null })
-
-  const persistPortfolioOrder = async (nextList) => {
-    setPortfolioItems(nextList)
-    if (!isOwnProfile || !isSupabaseConfigured) return
-    try {
-      await portfolioApi.reorder(nextList.map((p) => p.id))
-    } catch (err) {
-      setPortfolioError(err.message || 'Could not save order')
-    }
-  }
-
-  const movePortfolioItem = (index, direction) => {
-    const newList = [...portfolioItems]
-    const targetIndex = index + direction
-    if (targetIndex < 0 || targetIndex >= newList.length) return
-    const temp = newList[index]
-    newList[index] = newList[targetIndex]
-    newList[targetIndex] = temp
-    persistPortfolioOrder(newList)
-  }
-
-  const handleDeletePortfolioItem = async (item) => {
-    if (!item?.id || !window.confirm('Remove this portfolio item?')) return
-    setPortfolioBusy(true)
-    setPortfolioError('')
-    try {
-      if (isSupabaseConfigured) {
-        await portfolioApi.remove(item.id)
-      }
-      if (item.storagePath) {
-        await deletePortfolioStoragePath(item.storagePath)
-      }
-      setPortfolioItems((prev) => prev.filter((p) => p.id !== item.id))
-      if (featuredPortfolioItemId === item.id) {
-        setFeaturedPortfolioItemId(null)
-      }
-    } catch (err) {
-      setPortfolioError(err.message || 'Could not delete item')
-    } finally {
-      setPortfolioBusy(false)
-    }
-  }
-
-  const handlePortfolioUpload = async (e) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file || !artist?.id) return
-    setPortfolioBusy(true)
-    setPortfolioError('')
-    try {
-      const { storagePath, mediaUrl, mediaType } = await uploadPortfolioMedia(artist.id, file)
-      const created = await portfolioApi.create({
-        title: file.name.replace(/\.[^.]+$/, ''),
-        mediaUrl,
-        mediaType,
-        storagePath,
-        sortOrder: portfolioItems.length,
-      })
-      setPortfolioItems((prev) => [...prev, mapPortfolioRow(created)])
-    } catch (err) {
-      setPortfolioError(err.message || 'Upload failed')
-    } finally {
-      setPortfolioBusy(false)
-    }
-  }
-
-  useEffect(() => {
     if (artist?.videoLinks) setVideoLinks(normalizeVideoReels(artist.videoLinks))
   }, [artist?.videoLinks])
 
-  const persistVideoLinks = async (next) => {
-    const normalized = normalizeVideoReels(next)
-    setVideoLinks(normalized)
-    if (!isOwnProfile || !artist?.id || !isSupabaseConfigured || !supabase) return
-    try {
-      const payload = videoReelsToPayload(normalized)
-      const { error } = await supabase
-        .from('artists')
-        .update({
-          video_reels: payload.video_reels,
-          video_links: payload.video_links,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', artist.id)
-      if (error) throw error
-      const urls = payload.video_links
-      if (featuredVideoLink && !urls.includes(featuredVideoLink)) {
-        await persistFeaturedHeader({ portfolioItemId: null, videoLink: null })
-      }
-    } catch (err) {
-      setPortfolioError(err.message || 'Could not save video order')
-    }
-  }
-
-  const moveVideoLink = (index, direction) => {
-    const newList = [...videoLinks]
-    const targetIndex = index + direction
-    if (targetIndex < 0 || targetIndex >= newList.length) return
-    const temp = newList[index]
-    newList[index] = newList[targetIndex]
-    newList[targetIndex] = temp
-    persistVideoLinks(newList)
-  }
-
   if (artistLoading) return <div className="page-container" style={{ paddingTop: 80, textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
   if (!artist) return <div className="page-container"><p>Artist not found.</p></div>
+
+  if (artist.isPublic === false && !isOwnProfile && !isAdmin) {
+    return <div className="page-container"><p>Artist not found.</p></div>
+  }
 
   const {
     settings: reviewSettings,
     allReviews,
     publicReviews,
     publicAverage,
-    updateShowOnProfile,
-    updateReviewVisibility,
     submitReview,
     submitReviewResponse,
-    getVisibility,
     hirerExistingReview,
   } = reviewState
 
@@ -306,15 +162,15 @@ export default function ArtistProfile() {
     return null
   }
 
-  const { heroVideo, heroImg, source: heroSource } = resolveProfileHero({
+  const { heroVideo, heroImg } = resolveProfileHero({
     portfolioItems,
     videoLinks,
-    featuredPortfolioItemId,
-    featuredVideoLink,
+    headerImageUrl: artist.headerImageUrl,
+    featuredPortfolioItemId: artist.featuredPortfolioItemId,
+    featuredVideoLink: artist.featuredVideoLink,
     getVideoThumb,
   })
   const hasHeroVisual = !!(heroVideo || heroImg)
-  const hasManualFeature = !!(featuredPortfolioItemId || featuredVideoLink)
 
   const isFav = favorites.includes(artist.id)
   const hirerReview = isHirer ? hirerExistingReview(profile.id) : null
@@ -405,6 +261,29 @@ export default function ArtistProfile() {
       </div>
 
       <div className="page-container" style={{ paddingTop: 8 }}>
+      {isOwnProfile && (
+        <div
+          className="card slide-up"
+          style={{
+            marginBottom: 20,
+            padding: '14px 18px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 12,
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderColor: 'var(--accent-tint-border, var(--border))',
+            background: 'var(--accent-tint-05, var(--surface))',
+          }}
+        >
+          <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
+            You’re viewing your public page. Edit header, portfolio, and listing from Dashboard → My profile.
+          </span>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate('/dashboard', { state: { artistDashTab: 'profile' } })}>
+            Edit My profile
+          </button>
+        </div>
+      )}
       <div className="profile-actions-bar">
         {!isOwnProfile && (
           <button className="btn btn-primary btn-lg" onClick={() => startConversation(artist)}>
@@ -451,50 +330,9 @@ export default function ArtistProfile() {
 
           {activeTab === 'portfolio' && (
             <div className="slide-up">
-              {isOwnProfile && (
-                <div style={{
-                  marginBottom: 16,
-                  padding: '12px 14px',
-                  borderRadius: 10,
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg-elevated, var(--bg-secondary))',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  flexWrap: 'wrap',
-                }}>
-                  <Star size={14} fill={hasManualFeature ? 'var(--gold)' : 'none'} color="var(--gold)" />
-                  <span style={{ fontSize: 13, color: 'var(--text-secondary)', flex: '1 1 220px' }}>
-                    {hasManualFeature
-                      ? `Header uses your featured ${heroSource === 'video_link' ? 'reel' : 'portfolio'} pick.`
-                      : 'Header auto-picks your first portfolio item. Star any image, video, or reel to feature it instead.'}
-                  </span>
-                  {hasManualFeature && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      onClick={clearFeaturedHeader}
-                      disabled={featureBusy}
-                    >
-                      Use auto header
-                    </button>
-                  )}
-                </div>
-              )}
-              {isOwnProfile && isSupabaseConfigured && (
-                <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                  <input ref={portfolioInputRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" hidden onChange={handlePortfolioUpload} />
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => portfolioInputRef.current?.click()} disabled={portfolioBusy}>
-                    {portfolioBusy ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />}
-                    {portfolioBusy ? ' Uploading…' : ' Upload media'}
-                  </button>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>JPG, PNG, WebP, MP4, WebM, MOV — max 50MB</span>
-                  {portfolioError && <span style={{ fontSize: 12, color: 'var(--danger)' }}>{portfolioError}</span>}
-                </div>
-              )}
               {portfolioItems.length === 0 && videoLinks.length === 0 ? (
                 <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
-                  {isOwnProfile ? 'Upload portfolio images or video reels above.' : 'No portfolio items yet.'}
+                  No portfolio items yet.
                 </div>
               ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
@@ -510,40 +348,19 @@ export default function ArtistProfile() {
                     border: '1px solid var(--border)'
                   }}>
                     {item.video && (
-                      <video 
-                        autoPlay 
-                        muted 
-                        loop 
-                        playsInline 
+                      <video
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
                         style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                       >
                         <source src={item.video} type="video/mp4" />
                       </video>
                     )}
-                    
+
                     {(!item.image && !item.video) && item.title}
 
-                    {isOwnProfile && featuredPortfolioItemId === item.id && (
-                      <span style={{
-                        position: 'absolute',
-                        top: 10,
-                        left: 10,
-                        zIndex: 2,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        padding: '4px 8px',
-                        borderRadius: 6,
-                        background: 'rgba(0,0,0,0.65)',
-                        color: 'var(--gold)',
-                        fontSize: 11,
-                        fontWeight: 600,
-                        border: '1px solid rgba(255,255,255,0.15)',
-                      }}>
-                        <Star size={12} fill="var(--gold)" /> Header
-                      </span>
-                    )}
-                    
                     {(item.image || item.video) && (
                       <div style={{
                         position: 'absolute',
@@ -556,79 +373,8 @@ export default function ArtistProfile() {
                         fontWeight: 600,
                         fontSize: 13,
                         zIndex: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 8,
                       }}>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
-                        {isOwnProfile && (item.image || item.video) && (
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            disabled={featureBusy || portfolioBusy}
-                            onClick={() =>
-                              featuredPortfolioItemId === item.id
-                                ? clearFeaturedHeader()
-                                : persistFeaturedHeader({ portfolioItemId: item.id, videoLink: null })
-                            }
-                            style={{
-                              padding: '2px 8px',
-                              color: featuredPortfolioItemId === item.id ? 'var(--gold)' : 'white',
-                              border: '1px solid rgba(255,255,255,0.25)',
-                              flexShrink: 0,
-                            }}
-                            aria-label={featuredPortfolioItemId === item.id ? 'Unfeature from header' : 'Feature in header'}
-                          >
-                            <Star size={12} fill={featuredPortfolioItemId === item.id ? 'var(--gold)' : 'none'} />
-                            {featuredPortfolioItemId === item.id ? ' Featured' : ' Feature'}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    
-                    {isOwnProfile && (
-                      <div style={{
-                        position: 'absolute',
-                        top: 10,
-                        right: 10,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 4,
-                        background: 'rgba(0,0,0,0.5)',
-                        padding: 4,
-                        borderRadius: 8,
-                        backdropFilter: 'blur(4px)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        zIndex: 2,
-                      }}>
-                        <button
-                          type="button"
-                          onClick={() => movePortfolioItem(i, -1)}
-                          disabled={i === 0 || portfolioBusy}
-                          style={{ background: 'none', border: 'none', color: i === 0 ? 'rgba(255,255,255,0.2)' : 'white', cursor: i === 0 ? 'default' : 'pointer', padding: 2 }}
-                          aria-label="Move up"
-                        >
-                          <ChevronUp size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => movePortfolioItem(i, 1)}
-                          disabled={i === portfolioItems.length - 1 || portfolioBusy}
-                          style={{ background: 'none', border: 'none', color: i === portfolioItems.length - 1 ? 'rgba(255,255,255,0.2)' : 'white', cursor: i === portfolioItems.length - 1 ? 'default' : 'pointer', padding: 2 }}
-                          aria-label="Move down"
-                        >
-                          <ChevronDown size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeletePortfolioItem(item)}
-                          disabled={portfolioBusy}
-                          style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: portfolioBusy ? 'default' : 'pointer', padding: 2 }}
-                          aria-label="Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
                       </div>
                     )}
                   </div>
@@ -642,121 +388,22 @@ export default function ArtistProfile() {
                     {videoLinks.map((reel, i) => {
                       const url = videoReelUrl(reel)
                       const label = videoReelTitle(reel, i)
-                      const isFeaturedReel = featuredVideoLink === url
                       return (
                         <div
                           key={url || `reel-${i}`}
                           className="card video-reel-item"
-                          style={{
-                            padding: 0,
-                            overflow: 'hidden',
-                            borderColor: isFeaturedReel ? 'var(--gold)' : undefined,
-                          }}
+                          style={{ padding: 0, overflow: 'hidden' }}
                         >
                           <VideoPlayer url={url} />
                           <div style={{
                             padding: '12px 16px',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'space-between',
                             gap: 8,
                             borderTop: '1px solid var(--border)',
-                            flexWrap: 'wrap',
                           }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 160px', minWidth: 0 }}>
-                              <Play size={16} style={{ color: isFeaturedReel ? 'var(--gold)' : 'var(--accent)', flexShrink: 0 }} />
-                              {isOwnProfile ? (
-                                <input
-                                  className="form-input"
-                                  value={reel.title || ''}
-                                  placeholder={`Video Reel ${i + 1}`}
-                                  onChange={(e) => {
-                                    const title = e.target.value
-                                    setVideoLinks((prev) =>
-                                      prev.map((r, idx) => (idx === i ? { ...r, title } : r))
-                                    )
-                                  }}
-                                  onBlur={(e) => {
-                                    const title = e.target.value.trim()
-                                    const next = videoLinks.map((r, idx) =>
-                                      idx === i ? { ...r, title } : r
-                                    )
-                                    persistVideoLinks(next)
-                                  }}
-                                  aria-label={`Title for video reel ${i + 1}`}
-                                  style={{
-                                    fontWeight: 500,
-                                    fontSize: 14,
-                                    padding: '6px 10px',
-                                    minWidth: 0,
-                                    flex: 1,
-                                  }}
-                                />
-                              ) : (
-                                <span style={{ fontWeight: 500, fontSize: 14 }}>
-                                  {label}
-                                  {isFeaturedReel ? ' · Header' : ''}
-                                </span>
-                              )}
-                              {isOwnProfile && isFeaturedReel && (
-                                <span style={{ fontSize: 12, color: 'var(--gold)', flexShrink: 0 }}>Header</span>
-                              )}
-                            </div>
-
-                            {isOwnProfile && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <button
-                                  type="button"
-                                  className="btn btn-ghost btn-sm"
-                                  style={{
-                                    padding: '4px 8px',
-                                    color: isFeaturedReel ? 'var(--gold)' : undefined,
-                                  }}
-                                  onClick={() =>
-                                    isFeaturedReel
-                                      ? clearFeaturedHeader()
-                                      : persistFeaturedHeader({ portfolioItemId: null, videoLink: url })
-                                  }
-                                  disabled={featureBusy}
-                                  title={isFeaturedReel ? 'Remove from header' : 'Feature in header'}
-                                >
-                                  <Star size={14} fill={isFeaturedReel ? 'var(--gold)' : 'none'} />
-                                </button>
-                                <div
-                                  style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 2,
-                                    alignItems: 'center',
-                                  }}
-                                  role="group"
-                                  aria-label="Reorder video in list"
-                                >
-                                  <button
-                                    type="button"
-                                    className="btn btn-ghost btn-sm"
-                                    style={{ padding: '2px 6px', lineHeight: 1 }}
-                                    onClick={() => moveVideoLink(i, -1)}
-                                    disabled={i === 0}
-                                    aria-label="Move up in list"
-                                    title="Move up"
-                                  >
-                                    <ChevronUp size={16} />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="btn btn-ghost btn-sm"
-                                    style={{ padding: '2px 6px', lineHeight: 1 }}
-                                    onClick={() => moveVideoLink(i, 1)}
-                                    disabled={i === videoLinks.length - 1}
-                                    aria-label="Move down in list"
-                                    title="Move down"
-                                  >
-                                    <ChevronDown size={16} />
-                                  </button>
-                                </div>
-                              </div>
-                            )}
+                            <Play size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                            <span style={{ fontWeight: 500, fontSize: 14 }}>{label}</span>
                           </div>
                         </div>
                       )
@@ -769,16 +416,6 @@ export default function ArtistProfile() {
 
           {activeTab === 'reviews' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {isOwnProfile && (
-                <ArtistReviewSettings
-                  showReviewsOnProfile={reviewSettings.showReviewsOnProfile}
-                  onShowReviewsOnProfileChange={updateShowOnProfile}
-                  reviews={allReviews}
-                  getVisibility={getVisibility}
-                  onReviewVisibilityChange={updateReviewVisibility}
-                />
-              )}
-
               {isHirer && (
                 <HirerReviewForm
                   existingReview={hirerReview}
@@ -797,18 +434,10 @@ export default function ArtistProfile() {
                 reviews={reviewsForDisplay}
                 isOwnProfile={isOwnProfile}
                 onReply={isOwnProfile ? submitReviewResponse : undefined}
-                emptyMessage={
-                  isOwnProfile
-                    ? 'No reviews yet. When hirers leave feedback, you can choose what appears on your public profile.'
-                    : reviewSettings.showReviewsOnProfile
-                      ? 'No public reviews yet. Be the first to share feedback after working together.'
-                      : 'This artist has chosen not to display reviews on their public profile.'
-                }
               />
             </div>
           )}
         </div>
-
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="card">
             <h3 style={{ marginBottom: 16 }}>Rates</h3>

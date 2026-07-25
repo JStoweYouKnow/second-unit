@@ -154,6 +154,7 @@ export function useArtists({ search = '', roleFilter = 'all' } = {}) {
         projectFlatRate: a.project_flat_rate ?? undefined,
         location: a.location,
         available: a.available,
+        isPublic: a.is_public !== false,
         rating: parseFloat(a.rating),
         projects: a.total_projects,
         skills: a.skills?.map((s) => s.skill.name) || [],
@@ -162,6 +163,7 @@ export function useArtists({ search = '', roleFilter = 'all' } = {}) {
         ),
         videoLinks: normalizeVideoReels(a.video_reels || a.video_links || []),
         timezone: a.timezone || null,
+        headerImageUrl: a.header_image_url || null,
         availabilitySlots: availabilityDatesFromRows(
           a.availability || [],
           busyByArtist.get(a.id) || []
@@ -173,7 +175,7 @@ export function useArtists({ search = '', roleFilter = 'all' } = {}) {
           website: a.website || '#',
         },
         joined: a.created_at,
-      }))
+      })).filter((a) => a.isPublic)
 
       setArtists(formatted)
     } catch (err) {
@@ -259,6 +261,8 @@ export function useArtist(id) {
           videoLinks: normalizeVideoReels(data.video_reels || data.video_links || []),
           featuredPortfolioItemId: data.featured_portfolio_item_id || null,
           featuredVideoLink: data.featured_video_link || null,
+          headerImageUrl: data.header_image_url || null,
+          isPublic: data.is_public !== false,
           timezone: data.timezone || null,
           socials: {
             twitter: data.twitter || '#',

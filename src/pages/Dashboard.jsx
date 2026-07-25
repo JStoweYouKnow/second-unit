@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Heart, Star, Calendar, TrendingUp, Users, DollarSign, FileText, ArrowUpRight, BarChart3, PieChart, Activity, User, MapPin, ChevronRight, Loader2 } from '../components/icons'
 import { useArtists } from '../hooks/useData'
 import { buildOpenBriefCards } from '../lib/openBriefs'
@@ -12,6 +12,7 @@ import { buildMonthlySeries, buildMonthlyCounts, parseRowDate } from '../lib/ana
 import { artistReleasedAmount } from '../lib/fees'
 import { bookingSubtotal } from '../lib/pricing'
 import ArtistAvailabilityEditor from '../components/ArtistAvailabilityEditor'
+import ArtistMyProfileEditor from '../components/ArtistMyProfileEditor'
 import { stripeConnect } from '../lib/api'
 import { isSupabaseConfigured } from '../lib/supabase'
 
@@ -87,6 +88,7 @@ function Sparkline({ data, color = 'var(--accent)', height = 40 }) {
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { profile, effectiveRole, isAuthenticated } = useAuth()
   const { favorites, localProjects, bookings: allBookings } = useApp()
   const { artists } = useArtists()
@@ -97,6 +99,15 @@ export default function Dashboard() {
   const favArtists = artists.filter((a) => favorites.includes(a.id))
   const [timeRange, setTimeRange] = useState('6m')
   const [payoutReady, setPayoutReady] = useState(null)
+  const [artistDashTab, setArtistDashTab] = useState(
+    location.state?.artistDashTab === 'profile' ? 'profile' : 'overview'
+  )
+
+  useEffect(() => {
+    if (location.state?.artistDashTab === 'profile') {
+      setArtistDashTab('profile')
+    }
+  }, [location.state])
 
   useEffect(() => {
     if (!isArtist || !isSupabaseConfigured) {
@@ -275,6 +286,31 @@ export default function Dashboard() {
           </div>
         </div>
 
+        <div className="tabs" style={{ marginBottom: 28 }}>
+          <button
+            type="button"
+            className={`tab ${artistDashTab === 'overview' ? 'active' : ''}`}
+            onClick={() => setArtistDashTab('overview')}
+          >
+            Overview
+          </button>
+          <button
+            type="button"
+            className={`tab ${artistDashTab === 'profile' ? 'active' : ''}`}
+            onClick={() => setArtistDashTab('profile')}
+          >
+            My profile
+          </button>
+        </div>
+
+        {artistDashTab === 'profile' ? (
+          <ArtistMyProfileEditor
+            artistId={me.id}
+            onUpdated={() => refetchMyArtist?.()}
+          />
+        ) : (
+        <>
+
         {payoutReady === null && isSupabaseConfigured && (
           <div className="stripe-prompt stripe-prompt--action slide-up" style={{ padding: '16px 22px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -406,27 +442,6 @@ export default function Dashboard() {
           onTimeZoneChange={() => refetchMyArtist?.()}
         />
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, margin: 0 }}>Your public profile</h2>
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate(`/artist/${me.id}`)}>
-            <User size={14} /> View as clients see it
-          </button>
-        </div>
-        <div className="card card-glow slide-up" style={{ padding: 24, marginBottom: 32, display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div className="avatar" style={{ fontSize: 28 }}>{me.avatar}</div>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <h3 style={{ fontSize: 18, marginBottom: 4 }}>{me.name}</h3>
-            <span className="artist-role">{me.role}</span>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 12, marginBottom: 0 }}>
-              Bookings and payouts for this profile are shown below.
-            </p>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Spotlight visibility</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--accent)' }}>High</div>
-          </div>
-        </div>
-
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 16 }}>Upcoming bookings</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 32 }}>
           {myBookings.length === 0 ? (
@@ -518,6 +533,8 @@ export default function Dashboard() {
             )}
           </div>
         </section>
+        </>
+        )}
       </div>
     )
   }

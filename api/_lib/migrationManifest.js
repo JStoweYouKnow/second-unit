@@ -37,6 +37,7 @@ export const FEATURE_MIGRATIONS = [
   'artist-featured-header.sql',
   'artist-video-reels.sql',
   'artist-timezone.sql',
+  'artist-profile-public.sql',
 ]
 
 /** Tracking table bootstrap — apply once before recording other migrations. */

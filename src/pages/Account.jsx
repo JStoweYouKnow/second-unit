@@ -549,6 +549,10 @@ export default function Account() {
                 <>
                   <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
                   <h3 style={{ marginBottom: 24 }}>Artist Profile Details</h3>
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+                    For header image, portfolio layout, and Spotlight visibility, use{' '}
+                    <Link to="/dashboard" state={{ artistDashTab: 'profile' }}>Dashboard → My profile</Link>.
+                  </p>
                   {artistLoading ? (
                     <p style={{ color: 'var(--text-muted)' }}>Loading artist profile…</p>
                   ) : (

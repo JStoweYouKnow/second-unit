@@ -72,6 +72,8 @@ function normalizeArtist(row, skills = [], brands = []) {
     rating: row.rating,
     totalProjects: row.total_projects,
     timezone: row.timezone || null,
+    headerImageUrl: row.header_image_url || null,
+    isPublic: row.is_public !== false,
   }
 }
 

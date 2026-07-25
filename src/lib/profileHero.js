@@ -1,16 +1,21 @@
 import { videoReelUrl, videoReelUrls } from './videoReels.js'
 
 /**
- * Resolve profile header media from featured picks, with auto fallback.
- * @returns {{ heroVideo: string|null, heroImg: string|null, source: 'portfolio'|'video_link'|'auto'|null }}
+ * Resolve profile header media.
+ * Priority: dedicated header image → featured portfolio/reel → auto first media.
  */
 export function resolveProfileHero({
   portfolioItems = [],
   videoLinks = [],
+  headerImageUrl = null,
   featuredPortfolioItemId = null,
   featuredVideoLink = null,
   getVideoThumb = () => null,
 } = {}) {
+  if (headerImageUrl) {
+    return { heroVideo: null, heroImg: headerImageUrl, source: 'header' }
+  }
+
   const featuredItem = featuredPortfolioItemId
     ? portfolioItems.find((p) => p.id === featuredPortfolioItemId)
     : null

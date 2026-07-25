@@ -37,4 +37,15 @@ assert.deepEqual(
   { heroVideo: null, heroImg: 'thumb:https://vimeo.com/9', source: 'video_link' }
 )
 
+assert.deepEqual(
+  resolveProfileHero({
+    portfolioItems: portfolio,
+    videoLinks: [],
+    headerImageUrl: 'https://cdn.example/header.jpg',
+    featuredPortfolioItemId: 'b',
+    getVideoThumb,
+  }),
+  { heroVideo: null, heroImg: 'https://cdn.example/header.jpg', source: 'header' }
+)
+
 console.log('profile-hero.test.mjs: ok')

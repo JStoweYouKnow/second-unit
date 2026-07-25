@@ -252,7 +252,37 @@ export default function Dashboard() {
     }))
   }, [artists])
 
-  const recentActivity = []
+  // Real recent-activity feed for the hirer, from their bookings, projects and payments.
+  const recentActivity = useMemo(() => {
+    const items = []
+    for (const b of employerBookings) {
+      items.push({
+        when: b.createdAt || b.date,
+        text: `${b.status === 'confirmed' ? 'Confirmed booking' : 'Booking request'} · ${b.artistName || 'Artist'}`,
+        color: b.status === 'confirmed' ? 'var(--success)' : 'var(--warning)',
+      })
+    }
+    for (const c of localProjects) {
+      items.push({
+        when: c.createdAt,
+        text: `Project ${c.status}: ${c.title}`,
+        color: c.status === 'active' ? 'var(--success)' : 'var(--accent)',
+      })
+    }
+    for (const p of allPayments) {
+      if (p.status !== 'paid') continue
+      items.push({
+        when: p.createdAt || p.date,
+        text: `Paid $${Number(p.amount || 0).toLocaleString()}${p.artistName ? ` · ${p.artistName}` : ''}`,
+        color: 'var(--accent)',
+      })
+    }
+    return items
+      .filter((it) => it.when)
+      .sort((a, b) => new Date(b.when) - new Date(a.when))
+      .slice(0, 6)
+      .map((it) => ({ ...it, time: formatActivityTime(it.when) }))
+  }, [employerBookings, localProjects, allPayments])
 
   // Real weekly booking activity for the artist (replaces the old sample data).
   const artistBookingTrend = useMemo(
@@ -616,6 +646,19 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {favorites.length === 0 && employerBookings.length === 0 && localProjects.length === 0 && (
+        <div className="card slide-up" style={{ padding: 28, marginBottom: 24 }}>
+          <h3 style={{ fontSize: 16, marginBottom: 8 }}>Welcome — let’s make your first hire</h3>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 16, maxWidth: 640 }}>
+            Browse the vetted artist network, favorite people you like, message to align on scope, then book or post an open brief.
+          </p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <Link to="/" className="btn btn-primary">Browse artists</Link>
+            <Link to="/briefs" className="btn btn-secondary">Post an open brief</Link>
+          </div>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="stats-grid slide-up" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div className="stat-card">
@@ -681,7 +724,7 @@ export default function Dashboard() {
           <h3 style={{ fontSize: 16, fontFamily: 'var(--font-display)', marginBottom: 4 }}>
             <Activity size={16} style={{ marginRight: 6, color: 'var(--accent)' }} /> Booking Trend
           </h3>
-          <span style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 16 }}>Bookings per week (last 12 weeks)</span>
+          <span style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 16 }}>Bookings per month over the selected range</span>
           <Sparkline data={bookingTrend} height={60} />
         </div>
 
@@ -723,12 +766,16 @@ export default function Dashboard() {
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--warning)' }} /> In Progress
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {localProjects.filter(p => p.status === 'active' || p.status === 'pending').map(p => (
-              <div key={p.id} className="project-phase-card">
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{p.title}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.artistName} · {p.status}</div>
-              </div>
-            ))}
+            {localProjects.filter(p => p.status === 'active' || p.status === 'pending').length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>No projects in progress.</p>
+            ) : (
+              localProjects.filter(p => p.status === 'active' || p.status === 'pending').map(p => (
+                <div key={p.id} className="project-phase-card">
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{p.title}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.artistName} · {p.status}</div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -738,12 +785,16 @@ export default function Dashboard() {
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success)' }} /> Completed
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {localProjects.filter(p => p.status === 'completed').map(p => (
-              <div key={p.id} className="project-phase-card">
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{p.title}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.artistName}</div>
-              </div>
-            ))}
+            {localProjects.filter(p => p.status === 'completed').length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>No completed projects yet.</p>
+            ) : (
+              localProjects.filter(p => p.status === 'completed').map(p => (
+                <div key={p.id} className="project-phase-card">
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{p.title}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.artistName}</div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

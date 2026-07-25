@@ -18,6 +18,7 @@ import {
   artistEscrowAmount,
   paymentDisplayAmount,
 } from '../lib/fees'
+import { buildReceiptHtml, downloadWordDoc, openPrintablePdf } from '../lib/documentExport'
 
 function loadLS(key) {
   try { return JSON.parse(localStorage.getItem(key) || 'null') } catch { return null }
@@ -466,6 +467,20 @@ https://thecallsheet.ai
     a.download = `Receipt_${payment.id}.txt`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const exportReceipt = (payment, format) => {
+    const html = buildReceiptHtml(payment, {
+      isArtist,
+      viewerName: profile?.full_name || (isArtist ? me?.name : 'Client'),
+      platformFeePercent: PLATFORM_FEE_PERCENT,
+      platformFee: platformFeeAmount(payment.amount),
+      artistPayout: artistEarningsAmount(payment),
+      displayAmount: paymentDisplayAmount(payment, isArtist),
+      method: stripeStatus?.email ? `Stripe · ${stripeStatus.email}` : 'Stripe',
+    })
+    if (format === 'word') downloadWordDoc(html, `Receipt_${payment.id}`)
+    else openPrintablePdf(html, `Receipt ${payment.id}`)
   }
 
   const handleDownloadInvoice = (payment) => {
@@ -961,9 +976,12 @@ https://thecallsheet.ai
             )}
 
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              <button type="button" className="btn btn-secondary" onClick={() => handleDownloadReceipt(showReceipt)}>
-                <Download size={16} /> Receipt (.txt)
-              </button>
+              <div className="doc-export-group">
+                <span className="doc-export-label"><Download size={13} /> Receipt</span>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => exportReceipt(showReceipt, 'pdf')}>PDF</button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => exportReceipt(showReceipt, 'word')}>Word</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleDownloadReceipt(showReceipt)}>.txt</button>
+              </div>
               <button type="button" className="btn btn-secondary" onClick={() => handleDownloadInvoice(showReceipt)}>
                 <FileText size={16} /> Invoice (.txt)
               </button>

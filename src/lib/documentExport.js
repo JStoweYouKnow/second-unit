@@ -183,6 +183,50 @@ export function buildInvoiceHtml(contract, { clientName, payments = [], platform
   return docShell(`${invoiceNo} — Invoice`, inner)
 }
 
+/** A payment receipt — hirer (charge breakdown) or artist (payout) view. */
+export function buildReceiptHtml(payment, {
+  isArtist = false,
+  viewerName = '',
+  platformFeePercent = 15,
+  platformFee = 0,
+  artistPayout = 0,
+  displayAmount = 0,
+  method = 'Stripe',
+} = {}) {
+  const rows = isArtist
+    ? `
+      <div class="totals" style="width:100%">
+        <div class="line"><span class="muted">Client payment for your work</span><span>${money(payment.amount)}</span></div>
+        <div class="line"><span class="muted">Platform fee (${platformFeePercent}%)</span><span>−${money(platformFee)}</span></div>
+        <div class="line grand"><span>Paid to you</span><span>${money(displayAmount)}</span></div>
+      </div>`
+    : `
+      <div class="totals" style="width:100%">
+        <div class="line"><span class="muted">Subtotal</span><span>${money(payment.amount)}</span></div>
+        <div class="line"><span class="muted">Platform fee (${platformFeePercent}%, retained)</span><span>${money(platformFee)}</span></div>
+        <div class="line"><span class="muted">Artist payout</span><span>${money(artistPayout)}</span></div>
+        <div class="line grand"><span>Total charged</span><span>${money(payment.amount)}</span></div>
+      </div>`
+
+  const inner = `
+    <div class="brand">The Callsheet</div>
+    <h1>Receipt</h1>
+    <div class="muted">Receipt ${esc(payment.id)} · ${fmtDate(payment.date)} · <span class="pill">${esc(payment.status || '')}</span></div>
+
+    <div class="grid">
+      <div><strong>${isArtist ? 'Payee' : 'Billed to'}</strong><br>${esc(viewerName || (isArtist ? 'Artist' : 'Client'))}</div>
+      <div><strong>${isArtist ? 'From' : 'Artist'}</strong><br>${esc(payment.artistName || '')}</div>
+    </div>
+
+    <h2>${esc(payment.description || 'Engagement')}</h2>
+    ${rows}
+
+    <p class="muted" style="margin-top:20px; font-size:12px">Method: ${esc(method)} · Processed securely by Stripe. This is a financial record, not a tax form.</p>
+    <div class="footer">The Callsheet · thecallsheet.ai</div>
+  `
+  return docShell(`Receipt ${payment.id}`, inner)
+}
+
 /** Download styled HTML as a Word-openable .doc file. */
 export function downloadWordDoc(html, filename) {
   const blob = new Blob(['﻿', html], { type: 'application/msword' })

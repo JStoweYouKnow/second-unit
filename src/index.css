@@ -1511,14 +1511,17 @@ button.mobile-topbar-brand--home:focus-visible {
   text-transform: none; letter-spacing: normal;
 }
 .notif-panel {
-  position: absolute; bottom: calc(100% + 12px); left: -8px; right: auto; width: min(360px, calc(100vw - 32px));
+  /* Fixed to the viewport so no sidebar/flex ancestor can constrict or clip it.
+     Anchored just above the account footer, opening into the content area. */
+  position: fixed; left: 20px; bottom: 84px; right: auto; top: auto;
+  width: min(380px, calc(100vw - 40px));
   background: var(--bg-card);
   color: var(--text-primary);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
-  z-index: 1000;
+  z-index: 2000;
   /* Reset inherited .nav-label styles (uppercase / muted / tiny) */
   font-size: 14px;
   font-weight: 400;

@@ -1,10 +1,11 @@
 import { useTheme } from '../context/ThemeContext'
 
-const LOGO_SRC = '/brand/the-callsheet-transparent-logo.png'
-
 /**
- * The Callsheet brand lockup — transparent PNG (white mark + wordmark).
- * Inverted on light UI; native white on dark surfaces and the brand bar.
+ * The Callsheet brand lockup — a theme-colored vector wordmark.
+ *
+ * Rendered as live text (not a raster) using `currentColor`, so it is dark on
+ * light UI and light on dark UI automatically — matching the light/dark logo
+ * artwork. On an intentionally dark surface regardless of theme, pass onDark.
  *
  * variant: sidebar | compact | landing | auth
  */
@@ -13,17 +14,19 @@ export default function BrandLogo({ variant = 'sidebar', onDark }) {
   const useOnDark = onDark ?? isDark
 
   return (
-    <img
-      src={LOGO_SRC}
-      alt="The Callsheet"
+    <span
+      role="img"
+      aria-label="The Callsheet AI"
       className={[
         'brand-logo',
-        variant === 'compact' ? 'brand-logo--compact' : '',
-        variant === 'landing' ? 'brand-logo--landing' : '',
-        variant === 'auth' ? 'brand-logo--auth' : '',
+        `brand-logo--${variant}`,
         useOnDark ? 'brand-logo--on-dark' : '',
-      ].filter(Boolean).join(' ')}
-      decoding="async"
-    />
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      <span className="brand-logo__word" aria-hidden="true">The Callsheet</span>
+      <span className="brand-logo__ai" aria-hidden="true">AI</span>
+    </span>
   )
 }

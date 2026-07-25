@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { ArrowRight, Star, Play, CheckCircle } from '../components/icons'
 import ThemeToggle from '../components/ThemeToggle'
+import BrandLogo from '../components/BrandLogo'
 import { useAuth } from '../context/AuthContext'
 
 export default function Landing() {
@@ -18,12 +19,7 @@ export default function Landing() {
     <div className="landing-page">
       <header className="landing-header">
         <div className="logo-home">
-          <img
-            src="/brand/the-callsheet-transparent-logo.png"
-            alt="The Callsheet"
-            className="brand-logo brand-logo--landing brand-logo--on-dark"
-            decoding="async"
-          />
+          <BrandLogo variant="landing" onDark />
         </div>
         <nav className="landing-nav" aria-label="Main Navigation">
           <button

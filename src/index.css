@@ -229,39 +229,45 @@ button.logo:focus-visible {
 .logo-text { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
 
 /* Brand lockup — full-width home control (transparent PNG) */
-img.brand-logo {
-  display: block;
-  width: min(200px, 100%);
-  height: auto;
-  object-fit: contain;
-  object-position: left center;
-  filter: invert(1);
+/* Theme-colored wordmark lockup (dark on light UI, light on dark UI via currentColor). */
+.brand-logo {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.14em;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+  white-space: nowrap;
+  font-size: 20px; /* default: sidebar */
+  -webkit-user-select: none;
+  user-select: none;
 }
-.logo--home img.brand-logo {
-  margin-left: -28px;
-  margin-top: -6px;
+.brand-logo__word { display: inline-block; }
+.brand-logo__ai {
+  font-size: 0.30em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75em;
+  height: 1.75em;
+  border: 0.14em solid currentColor;
+  border-radius: 999px;
+  margin-top: -0.15em; /* superscript lift */
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
-img.brand-logo.brand-logo--on-dark {
-  filter: none;
-}
-img.brand-logo.brand-logo--compact {
-  width: min(320px, 82vw);
-  height: auto;
-}
-img.brand-logo.brand-logo--landing {
-  width: min(220px, 88vw);
-  height: auto;
-}
-.landing-header img.brand-logo.brand-logo--landing {
-  width: min(220px, 92vw);
-  height: auto;
-}
-.auth-header img.brand-logo,
-img.brand-logo.brand-logo--auth {
-  width: min(440px, 100%);
-  height: auto;
-  margin: 0 auto;
-}
+/* On an intentionally dark surface regardless of theme. */
+.brand-logo.brand-logo--on-dark { color: #fafaf8; }
+.logo--home .brand-logo { margin-left: -2px; }
+.brand-logo.brand-logo--compact { font-size: 24px; }
+.brand-logo.brand-logo--landing { font-size: 24px; }
+.brand-logo.brand-logo--auth { display: flex; justify-content: center; font-size: clamp(30px, 5vw, 42px); }
 
 .sidebar-nav {
   display: flex;
@@ -979,9 +985,8 @@ button.mobile-topbar-brand--home {
   min-width: 0;
   justify-content: flex-start;
 }
-button.mobile-topbar-brand--home img.brand-logo {
-  width: min(320px, 78vw);
-  height: auto;
+button.mobile-topbar-brand--home .brand-logo {
+  font-size: 20px;
 }
 button.mobile-topbar-brand--home:hover {
   background: var(--surface);

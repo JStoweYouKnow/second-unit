@@ -502,6 +502,7 @@ export default function Dashboard() {
         </div>
 
         <div
+          className="dash-split"
           style={{
             display: 'grid',
             gridTemplateColumns: gigMix.length > 0 ? '2fr 1fr' : '1fr',
@@ -541,7 +542,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
+        <div className="dash-split" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
           <div className="card slide-up" style={{ padding: 24 }}>
             <h3 style={{ fontSize: 16, fontFamily: 'var(--font-display)', marginBottom: 4 }}>
               <Activity size={16} style={{ marginRight: 6, color: 'var(--accent)' }} /> Booking activity
@@ -684,7 +685,7 @@ export default function Dashboard() {
       </div>
 
       {/* Charts Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 32 }}>
+      <div className="dash-split" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 32 }}>
         <div className="card slide-up" style={{ padding: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <div>
@@ -719,7 +720,7 @@ export default function Dashboard() {
       </div>
 
       {/* Booking Trend + Activity */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
+      <div className="dash-split" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
         <div className="card slide-up" style={{ padding: 24 }}>
           <h3 style={{ fontSize: 16, fontFamily: 'var(--font-display)', marginBottom: 4 }}>
             <Activity size={16} style={{ marginRight: 6, color: 'var(--accent)' }} /> Booking Trend
@@ -759,7 +760,7 @@ export default function Dashboard() {
       {/* Projects in Phases */}
       <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 20 }}>Your Projects</h2>
       
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
+      <div className="dash-split" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
         {/* In Progress Projects */}
         <div className="card" style={{ padding: 20 }}>
           <h3 style={{ fontSize: 15, marginBottom: 16, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>

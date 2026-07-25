@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Send, Check, CheckCheck, HelpCircle, Wifi, WifiOff, User, Plus, X, Search } from '../components/icons'
+import { Send, Check, CheckCheck, HelpCircle, Wifi, WifiOff, User, Plus, X, Search, ChevronLeft } from '../components/icons'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { useArtists } from '../hooks/useData'
@@ -24,6 +24,13 @@ export default function Messages() {
 
   const [activeConv, setActiveConv] = useState(null)
   const [input, setInput] = useState('')
+  // On phones the list and thread are separate panes; this toggles which shows.
+  const [mobileThreadOpen, setMobileThreadOpen] = useState(false)
+
+  const openThread = (id) => {
+    setActiveConv(id)
+    setMobileThreadOpen(true)
+  }
 
   useEffect(() => {
     if (visibleMessages.length > 0 && (!activeConv || !visibleMessages.find(m => m.id === activeConv))) {
@@ -182,7 +189,7 @@ export default function Messages() {
     setComposeBusy(true)
     try {
       const id = await startConversation(artist)
-      if (id) setActiveConv(id)
+      if (id) openThread(id)
       setShowCompose(false)
       setComposeSearch('')
     } finally {
@@ -198,8 +205,8 @@ export default function Messages() {
   }, [artists, composeSearch])
 
   return (
-    <div className="page-container" style={{ padding: 0, display: 'flex', height: 'calc(100vh)', overflow: 'hidden' }}>
-      <div style={{ width: 340, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
+    <div className="page-container messages-page" data-view={mobileThreadOpen ? 'thread' : 'list'}>
+      <div className="messages-list-pane">
         <div style={{ padding: '24px 20px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20 }}>Messages</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -223,7 +230,7 @@ export default function Messages() {
             visibleMessages.map(m => (
               <div key={m.id}
                 className={`message-item ${m.id === (activeConv || visibleMessages[0]?.id) ? 'active' : ''} ${m.unread ? 'unread' : ''}`}
-                onClick={() => setActiveConv(m.id)}>
+                onClick={() => openThread(m.id)}>
                 <div className="avatar avatar-sm">{m.viewerIsArtist ? <User size={16} /> : m.avatar}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -244,8 +251,16 @@ export default function Messages() {
       </div>
 
       {conversation ? (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div className="messages-thread-pane">
           <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              type="button"
+              className="btn-icon messages-back-btn"
+              aria-label="Back to conversations"
+              onClick={() => setMobileThreadOpen(false)}
+            >
+              <ChevronLeft size={18} />
+            </button>
             <div className="avatar avatar-sm">{convIsArtist ? <User size={16} /> : conversation.avatar}</div>
             <div>
               <div style={{ fontWeight: 600 }}>{convIsArtist ? 'Client' : conversation.artistName}</div>
@@ -308,7 +323,7 @@ export default function Messages() {
           </div>
         </div>
       ) : (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+        <div className="messages-thread-pane" style={{ alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
           Select a conversation to start messaging
         </div>
       )}

@@ -1207,6 +1207,75 @@ button.mobile-topbar-brand--home:focus-visible {
   cursor: default;
   opacity: 0.45;
 }
+.airbnb-calendar__day--schedule-pending {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+}
+.airbnb-calendar__day--schedule-confirmed {
+  border-color: color-mix(in srgb, var(--success) 45%, var(--border));
+  background: color-mix(in srgb, var(--success) 8%, var(--surface));
+}
+.airbnb-calendar__day--schedule-booked {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+.schedule-calendar {
+  margin-bottom: 20px;
+  padding: 20px;
+}
+.schedule-calendar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.schedule-calendar__nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.schedule-calendar__month {
+  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 16px;
+  min-width: 160px;
+  text-align: center;
+}
+.schedule-calendar__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.schedule-calendar__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.schedule-calendar__legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+}
+.schedule-calendar__legend-dot--pending {
+  background: color-mix(in srgb, var(--warning) 35%, var(--surface));
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border));
+}
+.schedule-calendar__legend-dot--confirmed {
+  background: color-mix(in srgb, var(--success) 35%, var(--surface));
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border));
+}
+.schedule-calendar__legend-dot--booked {
+  background: color-mix(in srgb, var(--accent) 30%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
 .airbnb-calendar__day--today .airbnb-calendar__date {
   font-weight: 700;
   color: var(--ink);

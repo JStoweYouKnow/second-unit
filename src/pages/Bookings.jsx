@@ -13,6 +13,8 @@ import { PLATFORM_FEE_PERCENT } from '../lib/fees'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { userNeedsToSign } from '../lib/contractSigning'
 import { artistSelectLabel } from '../lib/roleFilters'
+import ScheduleCalendar from '../components/ScheduleCalendar'
+import { bookingOccursOnDate } from '../lib/calendarDayMeta'
 
 export default function Bookings({ embedded = false }) {
   const { profile, effectiveRole } = useAuth()
@@ -53,6 +55,7 @@ export default function Bookings({ embedded = false }) {
   const hasLinkedContract = (booking) => Boolean(booking?.contractId || booking?.contract?.id)
 
   const [tab, setTab] = useState('upcoming')
+  const [selectedDateKey, setSelectedDateKey] = useState(null)
   const [showNew, setShowNew] = useState(false)
   const [showPay, setShowPay] = useState(null)
   const [newBooking, setNewBooking] = useState({
@@ -163,9 +166,15 @@ export default function Bookings({ embedded = false }) {
     return bookings
   }, [bookings])
 
-  const filtered = tab === 'upcoming'
-    ? roleBookings.filter(b => b.status === 'confirmed' || b.status === 'pending' || b.status === 'paid')
-    : roleBookings
+  const filtered = useMemo(() => {
+    let base = tab === 'upcoming'
+      ? roleBookings.filter(b => b.status === 'confirmed' || b.status === 'pending' || b.status === 'paid')
+      : roleBookings
+    if (selectedDateKey) {
+      base = base.filter((b) => bookingOccursOnDate(b, selectedDateKey))
+    }
+    return base
+  }, [tab, roleBookings, selectedDateKey])
 
   const bookingTitle = (b) => {
     if (canRespondToBooking(b)) return 'Client booking'
@@ -419,21 +428,43 @@ export default function Bookings({ embedded = false }) {
         <div className="auth-error" style={{ marginBottom: 20 }}>{bookingsError}</div>
       )}
 
+      <ScheduleCalendar
+        bookings={roleBookings}
+        isArtist={isArtist}
+        selectedDateKey={selectedDateKey}
+        onSelectDate={setSelectedDateKey}
+      />
+
+      {selectedDateKey && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            Showing bookings for <strong>{selectedDateKey}</strong>
+          </span>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedDateKey(null)}>
+            Clear filter
+          </button>
+        </div>
+      )}
+
       <div className="tabs">
         <button type="button" className={`tab ${tab === 'upcoming' ? 'active' : ''}`} onClick={() => setTab('upcoming')}>Upcoming</button>
         <button type="button" className={`tab ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>All Bookings</button>
       </div>
 
       {(bookingsLoading || (isArtist && artistLoading)) ? (
-        <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
-          <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
-          <p>Loading bookings…</p>
+        <div className="card" style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>
+          <Loader2 size={28} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+          <p style={{ margin: 0 }}>Loading bookings…</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
           <Calendar size={32} style={{ marginBottom: 8, opacity: 0.5 }} />
-          <p style={{ marginBottom: isArtist ? 0 : 12 }}>{isArtist ? 'No scheduled projects on your calendar yet.' : 'No scheduled projects yet.'}</p>
-          {!isArtist && (
+          <p style={{ marginBottom: isArtist ? 0 : 12 }}>
+            {selectedDateKey
+              ? 'No bookings on this date.'
+              : (isArtist ? 'No scheduled projects on your calendar yet.' : 'No scheduled projects yet.')}
+          </p>
+          {!isArtist && !selectedDateKey && (
             <Link to="/projects?new=1" className="btn btn-primary btn-sm"><Plus size={14} /> New project</Link>
           )}
         </div>

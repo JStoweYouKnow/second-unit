@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getCalendarDayMeta, groupBookingsByDate } from '../src/lib/calendarDayMeta.js'
+import { getCalendarDayMeta, groupBookingsByDate, bookingDateKeys, groupScheduleBookingsByDate, getScheduleDayMeta, bookingOccursOnDate } from '../src/lib/calendarDayMeta.js'
 
 test('getCalendarDayMeta marks available days with open hour count', () => {
   const cell = { dateKey: '2026-08-01', inMonth: true, past: false, hide: false }
@@ -28,4 +28,36 @@ test('groupBookingsByDate maps artist bookings by date', () => {
   assert.equal(map['2026-08-03']?.length, 1)
   assert.equal(map['2026-08-03'][0].name, 'Feature shoot')
   assert.equal(map['2026-08-04'], undefined)
+})
+
+test('bookingDateKeys expands multi-day bookings', () => {
+  const keys = bookingDateKeys({ date: '2026-08-10', durationUnit: 'days', duration: 3 })
+  assert.deepEqual(keys, ['2026-08-10', '2026-08-11', '2026-08-12'])
+})
+
+test('groupScheduleBookingsByDate includes all active bookings', () => {
+  const map = groupScheduleBookingsByDate([
+    { id: '1', artistId: 'a1', artistName: 'Alex', date: '2026-08-03', type: 'Feature shoot', status: 'confirmed' },
+    { id: '2', artistId: 'a2', artistName: 'Blake', date: '2026-08-03', type: 'Consult', status: 'pending' },
+    { id: '3', artistId: 'a1', date: '2026-08-04', type: 'Cancelled', status: 'cancelled' },
+  ])
+  assert.equal(map['2026-08-03']?.length, 2)
+  assert.equal(map['2026-08-04'], undefined)
+})
+
+test('getScheduleDayMeta prioritizes pending status', () => {
+  const cell = { dateKey: '2026-08-03', inMonth: true, past: false, hide: false }
+  const meta = getScheduleDayMeta(cell, [
+    { status: 'confirmed' },
+    { status: 'pending' },
+  ])
+  assert.equal(meta.status, 'pending')
+  assert.match(meta.caption, /2 bookings/)
+})
+
+test('bookingOccursOnDate matches span days', () => {
+  const booking = { date: '2026-08-10', durationUnit: 'days', duration: 2 }
+  assert.equal(bookingOccursOnDate(booking, '2026-08-10'), true)
+  assert.equal(bookingOccursOnDate(booking, '2026-08-11'), true)
+  assert.equal(bookingOccursOnDate(booking, '2026-08-12'), false)
 })

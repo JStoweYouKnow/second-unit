@@ -1,5 +1,5 @@
 import { format } from 'date-fns'
-import { getCalendarDayMeta } from '../lib/calendarDayMeta'
+import { getCalendarDayMeta, getScheduleDayMeta } from '../lib/calendarDayMeta'
 
 /**
  * Airbnb-style availability month grid — rounded tiles, captions, booking chips.
@@ -17,6 +17,7 @@ export default function AvailabilityCalendarGrid({
   dayRangeKeys = null,
   bookingsByDate = {},
   hideEmptyCells = false,
+  scheduleMode = false,
 }) {
   const rangeSet = dayRangeKeys instanceof Set ? dayRangeKeys : new Set(dayRangeKeys || [])
 
@@ -28,7 +29,9 @@ export default function AvailabilityCalendarGrid({
   }
 
   const isClickable = (cell, meta) => {
-    if (!cell.inMonth || cell.past || cell.hide) return false
+    if (!cell.inMonth || cell.hide) return false
+    if (scheduleMode) return true
+    if (cell.past) return false
     if (editable) return true
     return meta.hasOpen
   }
@@ -48,21 +51,26 @@ export default function AvailabilityCalendarGrid({
               return <div key={cell.dateKey} className="airbnb-calendar__day airbnb-calendar__day--spacer" aria-hidden />
             }
 
-            const meta = getCalendarDayMeta(cell, availability, { editable })
-            const selected = isSelected(cell)
-            const clickable = isClickable(cell, meta)
             const chips = bookingsByDate[cell.dateKey] || []
             const chip = chips[0]
+            const meta = scheduleMode
+              ? getScheduleDayMeta(cell, chips)
+              : getCalendarDayMeta(cell, availability, { editable })
+            const selected = isSelected(cell)
+            const clickable = isClickable(cell, meta)
 
             const classNames = [
               'airbnb-calendar__day',
               !cell.inMonth && 'airbnb-calendar__day--other-month',
               cell.isToday && 'airbnb-calendar__day--today',
-              cell.past && 'airbnb-calendar__day--past',
-              meta.status === 'available' && 'airbnb-calendar__day--available',
-              meta.status === 'booked-out' && 'airbnb-calendar__day--booked-out',
-              meta.status === 'blocked' && 'airbnb-calendar__day--blocked',
-              meta.status === 'empty' && editable && 'airbnb-calendar__day--empty',
+              !scheduleMode && cell.past && 'airbnb-calendar__day--past',
+              !scheduleMode && meta.status === 'available' && 'airbnb-calendar__day--available',
+              !scheduleMode && meta.status === 'booked-out' && 'airbnb-calendar__day--booked-out',
+              !scheduleMode && meta.status === 'blocked' && 'airbnb-calendar__day--blocked',
+              !scheduleMode && meta.status === 'empty' && editable && 'airbnb-calendar__day--empty',
+              scheduleMode && meta.status === 'pending' && 'airbnb-calendar__day--schedule-pending',
+              scheduleMode && meta.status === 'confirmed' && 'airbnb-calendar__day--schedule-confirmed',
+              scheduleMode && meta.status === 'scheduled' && 'airbnb-calendar__day--schedule-booked',
               selected && 'airbnb-calendar__day--selected',
               !clickable && 'airbnb-calendar__day--disabled',
             ].filter(Boolean).join(' ')

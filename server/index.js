@@ -33,6 +33,7 @@ import {
   updateBrief,
   applyToBrief,
   updateApplicationStatus,
+  getArtistApplicationOnBrief,
 } from '../api/_lib/briefs.js'
 import { listPaymentsForUser } from '../api/_lib/payments.js'
 import { completeBookingPayment } from '../api/_lib/completeBookingPayment.js'
@@ -1128,7 +1129,14 @@ app.get('/api/briefs/:id', async (req, res) => {
       const result = await listApplicationsForBrief(db, req.params.id, user.id)
       return res.json({ ...result.brief, applications: result.applications })
     }
-    res.json(mapBriefToClient(brief))
+    const myApplication = await getArtistApplicationOnBrief(db, req.params.id, user.id)
+    return res.json({
+      ...mapBriefToClient(brief, {
+        applied: Boolean(myApplication),
+        applicationStatus: myApplication?.status,
+      }),
+      myApplication,
+    })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -1198,7 +1206,7 @@ app.patch('/api/briefs/:id/applications/:appId', async (req, res) => {
           type: 'system',
           title: 'Application update',
           body: `${note} "${result.brief.title}"`,
-          link: '/briefs',
+          link: `/briefs?id=${req.params.id}`,
         })
       }
     } catch (notifyErr) {

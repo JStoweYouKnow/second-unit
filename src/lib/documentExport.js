@@ -1,10 +1,9 @@
 /**
  * Zero-dependency contract & invoice export.
  *
- * PDF  — open a print-ready window and invoke the browser's print dialog,
- *        where the user picks "Save as PDF" (works in every browser, no libs).
- * Word — a Blob of styled HTML with the Word MIME type; .doc files that are
- *        HTML open natively in Microsoft Word / Google Docs / Pages.
+ * PDF  — downloads a print-ready .html file; open it in your browser and use
+ *        Print → Save as PDF (no extra tabs or pop-ups).
+ * Word — real .docx files via the docx library (Microsoft Word, Google Docs, Pages).
  *
  * Both consume the same HTML built here, so the contract/invoice look identical
  * regardless of the chosen format.
@@ -107,23 +106,7 @@ export function buildContractHtml(contract, { clientName } = {}) {
 export function buildInvoiceHtml(contract, { clientName, payments = [], platformFeePercent = 15 } = {}) {
   const client = clientName || contract.clientName || 'Client'
   const value = Number(contract.value || 0)
-
-  let items = Array.isArray(contract.milestones) && contract.milestones.length
-    ? contract.milestones.map((m, i) => ({
-        title: m.title || `Milestone ${i + 1}`,
-        amount: Number(m.amount || 0),
-        status: m.status || 'pending',
-      }))
-    : null
-
-  if (!items) {
-    const third = Math.round(value / 3)
-    items = [
-      { title: 'On execution', amount: third, status: 'pending' },
-      { title: 'First draft / proof', amount: third, status: 'pending' },
-      { title: 'Final delivery', amount: value - third * 2, status: 'pending' },
-    ]
-  }
+  const items = getInvoiceLineItems(contract)
 
   const subtotal = items.reduce((s, it) => s + it.amount, 0) || value
   const paid = payments
@@ -183,6 +166,26 @@ export function buildInvoiceHtml(contract, { clientName, payments = [], platform
   return docShell(`${invoiceNo} — Invoice`, inner)
 }
 
+/** Shared milestone line items for invoice HTML and DOCX exports. */
+export function getInvoiceLineItems(contract) {
+  const value = Number(contract.value || 0)
+
+  if (Array.isArray(contract.milestones) && contract.milestones.length) {
+    return contract.milestones.map((m, i) => ({
+      title: m.title || `Milestone ${i + 1}`,
+      amount: Number(m.amount || 0),
+      status: m.status || 'pending',
+    }))
+  }
+
+  const third = Math.round(value / 3)
+  return [
+    { title: 'On execution', amount: third, status: 'pending' },
+    { title: 'First draft / proof', amount: third, status: 'pending' },
+    { title: 'Final delivery', amount: value - third * 2, status: 'pending' },
+  ]
+}
+
 /** A payment receipt — hirer (charge breakdown) or artist (payout) view. */
 export function buildReceiptHtml(payment, {
   isArtist = false,
@@ -227,30 +230,26 @@ export function buildReceiptHtml(payment, {
   return docShell(`Receipt ${payment.id}`, inner)
 }
 
-/** Download styled HTML as a Word-openable .doc file. */
-export function downloadWordDoc(html, filename) {
-  const blob = new Blob(['﻿', html], { type: 'application/msword' })
+function triggerDownload(blob, filename) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = filename.endsWith('.doc') ? filename : `${filename}.doc`
+  a.download = filename
+  a.rel = 'noopener'
   a.click()
   URL.revokeObjectURL(url)
 }
 
-/** Open a print-ready window and trigger the print dialog (user saves as PDF). */
-export function openPrintablePdf(html, title = 'Document') {
-  const win = window.open('', '_blank', 'noopener,width=900,height=1100')
-  if (!win) {
-    // Popup blocked — fall back to a same-tab data document.
-    const blob = new Blob([html], { type: 'text/html' })
-    window.location.href = URL.createObjectURL(blob)
-    return
-  }
-  win.document.open()
-  win.document.write(html)
-  win.document.title = title
-  win.document.close()
-  // Give the browser a tick to lay out before printing.
-  win.onload = () => setTimeout(() => win.print(), 250)
+/** Download a print-ready HTML file (open in browser, then Print → Save as PDF). */
+export function downloadPrintableHtml(html, filename) {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const name = filename.endsWith('.html') ? filename : `${filename}.html`
+  triggerDownload(blob, name)
 }
+
+/** @deprecated Use downloadPrintableHtml — avoids opening extra browser tabs. */
+export function openPrintablePdf(html, filename = 'Document') {
+  downloadPrintableHtml(html, filename)
+}
+
+export { triggerDownload }

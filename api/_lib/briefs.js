@@ -8,8 +8,12 @@ export function mapBriefToClient(row, extra = {}) {
     employerName: row.employer?.full_name ?? extra.employerName ?? 'Client',
     title: row.title,
     description: row.description ?? '',
+    budget: row.budget_min ?? row.budget_max ?? null,
     budgetMin: row.budget_min ?? null,
     budgetMax: row.budget_max ?? null,
+    ndaStoragePath: row.nda_storage_path ?? null,
+    ndaName: row.nda_name ?? null,
+    ndaMime: row.nda_mime ?? null,
     timeline: row.timeline ?? '',
     location: row.location ?? 'Remote',
     skills: Array.isArray(row.skills) ? row.skills : [],
@@ -17,6 +21,7 @@ export function mapBriefToClient(row, extra = {}) {
     createdAt: row.created_at,
     applicationCount: extra.applicationCount ?? undefined,
     applied: extra.applied ?? undefined,
+    applicationStatus: extra.applicationStatus ?? undefined,
   }
 }
 
@@ -42,12 +47,18 @@ export function mapBriefToDb(payload, employerId) {
     const n = Math.round(Number(v))
     return Number.isFinite(n) && n >= 0 ? n : null
   }
+  const budget =
+    payload.budget != null
+      ? num(payload.budget)
+      : payload.budgetMin != null || payload.budgetMax != null
+        ? num(payload.budgetMin ?? payload.budgetMax)
+        : null
   return {
     employer_id: employerId,
     title: String(payload.title || '').slice(0, 200),
     description: String(payload.description || '').slice(0, 4000),
-    budget_min: payload.budgetMin != null ? num(payload.budgetMin) : null,
-    budget_max: payload.budgetMax != null ? num(payload.budgetMax) : null,
+    budget_min: budget,
+    budget_max: budget,
     timeline: payload.timeline ? String(payload.timeline).slice(0, 200) : null,
     location: payload.location ? String(payload.location).slice(0, 120) : 'Remote',
     skills: Array.isArray(payload.skills)
@@ -64,22 +75,56 @@ export async function listOpenBriefs(db, viewerProfileId) {
     .eq('status', 'open')
     .order('created_at', { ascending: false })
   if (error) throw error
-  if (!briefs?.length) return []
 
   const artistId = await getArtistIdForProfile(db, viewerProfileId)
-  let appliedSet = new Set()
+  const appStatusByBriefId = new Map()
   if (artistId) {
     const { data: apps } = await db
       .from('brief_applications')
-      .select('brief_id')
+      .select('brief_id, status')
       .eq('artist_id', artistId)
-      .in('brief_id', briefs.map((b) => b.id))
-    appliedSet = new Set((apps || []).map((a) => a.brief_id))
+    for (const app of apps || []) appStatusByBriefId.set(app.brief_id, app.status)
   }
 
-  return briefs.map((b) =>
-    mapBriefToClient(b, { applied: appliedSet.has(b.id) })
-  )
+  const openById = new Map((briefs || []).map((b) => [b.id, b]))
+  const missingIds = [...appStatusByBriefId.keys()].filter((id) => !openById.has(id))
+  if (missingIds.length) {
+    const { data: appliedBriefs, error: appliedErr } = await db
+      .from('open_briefs')
+      .select('*, employer:profiles!employer_id(full_name)')
+      .in('id', missingIds)
+    if (appliedErr) throw appliedErr
+    for (const b of appliedBriefs || []) openById.set(b.id, b)
+  }
+
+  return [...openById.values()]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .map((b) =>
+      mapBriefToClient(b, {
+        applied: appStatusByBriefId.has(b.id),
+        applicationStatus: appStatusByBriefId.get(b.id),
+      }),
+    )
+}
+
+export async function getArtistApplicationOnBrief(db, briefId, artistProfileId) {
+  const artistId = await getArtistIdForProfile(db, artistProfileId)
+  if (!artistId) return null
+  const { data, error } = await db
+    .from('brief_applications')
+    .select('id, status, message, proposed_rate, created_at')
+    .eq('brief_id', briefId)
+    .eq('artist_id', artistId)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return null
+  return {
+    id: data.id,
+    status: data.status,
+    message: data.message ?? '',
+    proposedRate: data.proposed_rate ?? null,
+    createdAt: data.created_at,
+  }
 }
 
 /** A hirer's own briefs with applicant counts. */
@@ -133,6 +178,17 @@ export async function updateBrief(db, id, employerId, patch) {
   if (patch.title != null) update.title = String(patch.title).slice(0, 200)
   if (patch.description != null) update.description = String(patch.description).slice(0, 4000)
   if (patch.timeline !== undefined) update.timeline = patch.timeline ? String(patch.timeline).slice(0, 200) : null
+  if (patch.ndaStoragePath !== undefined) {
+    update.nda_storage_path = patch.ndaStoragePath
+      ? String(patch.ndaStoragePath).slice(0, 500)
+      : null
+  }
+  if (patch.ndaName !== undefined) {
+    update.nda_name = patch.ndaName ? String(patch.ndaName).slice(0, 255) : null
+  }
+  if (patch.ndaMime !== undefined) {
+    update.nda_mime = patch.ndaMime ? String(patch.ndaMime).slice(0, 120) : null
+  }
 
   const { data, error } = await db.from('open_briefs').update(update).eq('id', id).select('*').single()
   if (error) throw error

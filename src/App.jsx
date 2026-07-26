@@ -1,5 +1,5 @@
 import { useState, useCallback, lazy, Suspense, useMemo, useEffect } from 'react'
-import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom'
+import { Routes, Route, useNavigate, useLocation, Navigate, useSearchParams } from 'react-router-dom'
 import { LayoutDashboard, Trophy, MessageSquare, Calendar, FileText, CreditCard, LogOut, Loader2, User, Menu, X, UserPlus, Shield, Briefcase } from './components/icons'
 import { demoArtistPersona, isArtistProfile } from './lib/roleView'
 import { useArtistProfile } from './hooks/useArtistProfile'
@@ -17,7 +17,9 @@ import { useBookings } from './hooks/useBookings'
 import { adminApi } from './lib/api'
 import NotificationPanel from './components/NotificationPanel'
 import PushNotificationSync from './components/PushNotificationSync'
+import OnboardingGuideModal from './components/OnboardingGuideModal'
 import ErrorBoundary from './components/ErrorBoundary'
+import { useOnboardingGuide } from './hooks/useOnboardingGuide'
 import BrandLogo from './components/BrandLogo'
 import ThemeToggle from './components/ThemeToggle'
 
@@ -95,17 +97,21 @@ function ApplicantGate({ children }) {
   const allowedPaths = ['/application-status', '/account', '/apply']
   const isAllowed = allowedPaths.some((p) => location.pathname === p || location.pathname.startsWith(`${p}/`))
 
+  // Only block the whole page on the first load — not on background refetches.
+  const gateBlocking =
+    (appLoading && application == null) || (artistLoading && artist == null)
+
   useEffect(() => {
-    if (!appLoading && !artistLoading) {
+    if (!gateBlocking) {
       setGateTimedOut(false)
       return
     }
     const timer = setTimeout(() => setGateTimedOut(true), APPLICANT_GATE_TIMEOUT_MS)
     return () => clearTimeout(timer)
-  }, [appLoading, artistLoading])
+  }, [gateBlocking])
 
   if (isAdmin || artist) return children
-  if ((appLoading || artistLoading) && !gateTimedOut) return <LoadingScreen />
+  if (gateBlocking && !gateTimedOut) return <LoadingScreen />
   if (isPendingApplicant(application) && !isAllowed) {
     return <Navigate to="/application-status" replace />
   }
@@ -116,7 +122,8 @@ function ApplicantGate({ children }) {
 function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, profile, signOut, isMockMode, isAdmin, fetchProfile, adminViewAs, setAdminViewAs, effectiveRole, isAuthenticated } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { user, profile, signOut, isMockMode, isAdmin, fetchProfile, adminViewAs, setAdminViewAs, effectiveRole, isAuthenticated, loading: authLoading } = useAuth()
   const { artist, refetch: refetchArtist } = useArtistProfile(profile?.id || user?.id)
   const { applications: adminApplications } = useAdminApplications(isAdmin)
   const { invites: adminInvites } = useAdminInvites(isAdmin)
@@ -126,6 +133,28 @@ function AppShell() {
   const [personaBusy, setPersonaBusy] = useState(false)
   const [personaError, setPersonaError] = useState(null)
   const { favorites, toggleFavorite } = useFavorites(user?.id)
+  const {
+    role: onboardingRole,
+    open: onboardingOpen,
+    showGuide: showOnboardingGuide,
+    closeGuide: closeOnboardingGuide,
+    dismissGuide: dismissOnboardingGuide,
+  } = useOnboardingGuide({
+    userId: user?.id,
+    isAdmin,
+    adminViewAs,
+    effectiveRole,
+    enabled: isAuthenticated,
+    authLoading,
+  })
+
+  useEffect(() => {
+    if (searchParams.get('guide') !== '1') return
+    showOnboardingGuide()
+    const next = new URLSearchParams(searchParams)
+    next.delete('guide')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams, showOnboardingGuide])
 
   // When admin switches to Artist view, provision a linked artists row so Connect/payouts work.
   useEffect(() => {
@@ -266,6 +295,7 @@ function AppShell() {
     bookingsError,
     refetchBookings,
     realtimeConnected,
+    showOnboardingGuide,
   }
 
   const handleSignOut = async () => {
@@ -356,7 +386,6 @@ function AppShell() {
           </button>
           <nav className="sidebar-nav">
             <div className="nav-section">
-              <div className="nav-label">Main</div>
               {navItems.map((item) => {
                 const active = item.matchPrefix
                   ? location.pathname === item.matchPrefix || location.pathname.startsWith(`${item.matchPrefix}/`)
@@ -458,6 +487,9 @@ function AppShell() {
               </div>
               <ThemeToggle showLabel />
               <div className="sidebar-doc-links">
+                <button type="button" className="nav-link" onClick={showOnboardingGuide}>
+                  Getting started
+                </button>
                 <button type="button" className="nav-link" onClick={() => goNav('/help')}>
                   Help
                 </button>
@@ -554,6 +586,14 @@ function AppShell() {
             </Suspense>
           </ErrorBoundary>
         </main>
+        {onboardingRole && (
+          <OnboardingGuideModal
+            role={onboardingRole}
+            open={onboardingOpen}
+            onClose={closeOnboardingGuide}
+            onDismiss={dismissOnboardingGuide}
+          />
+        )}
       </div>
     </AppContext.Provider>
   )

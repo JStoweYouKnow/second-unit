@@ -76,7 +76,7 @@ export async function notifyBookingRequested(db, { booking, employerId, artistPr
 export async function notifyBookingConfirmed(db, { booking, employerId, artistProfileId }) {
   const employer = await emailProfile(db, employerId)
   const title = `${booking.artist_name || 'Artist'} confirmed your booking`
-  const body = `${booking.booking_type || 'Booking'} on ${String(booking.date).slice(0, 10)} — sign the project agreement to begin milestone payments.`
+  const body = `The project agreement is ready — you and the artist can both sign now, in either order, to unlock milestone payments.`
 
   await notifyUser(
     db,
@@ -94,7 +94,7 @@ export async function notifyBookingConfirmed(db, { booking, employerId, artistPr
   if (artistProfileId) {
     const artist = await emailProfile(db, artistProfileId)
     const artistTitle = 'Booking confirmed — sign the agreement'
-    const artistBody = `Your booking with ${employer?.full_name || 'the client'} is confirmed. Both parties must sign before milestone payments begin.`
+    const artistBody = `Your booking with ${employer?.full_name || 'the client'} is confirmed. You and the client can both sign the agreement now, in either order, before milestone payments begin.`
     await notifyUser(
       db,
       artistProfileId,
@@ -144,7 +144,7 @@ export async function notifyContractSigned(db, {
   if (!otherPartyId) return
   const other = await emailProfile(db, otherPartyId)
   const title = `${signerName} signed: ${contract.title}`
-  const body = 'Your signature is needed to activate the agreement and unlock milestone payments.'
+  const body = `${signerName} signed the agreement. You can sign anytime — order does not matter. Both signatures are required to activate milestone payments.`
   const link = `/projects?contract_id=${contract.id}`
 
   await notifyUser(
@@ -162,6 +162,22 @@ export async function notifyContractSigned(db, {
       link,
       category: 'contract',
       ctaLabel: 'Sign Agreement',
+    })
+  )
+
+  // Confirm to the signer that their signature is recorded.
+  const signerTitle = `Signature recorded: ${contract.title}`
+  const signerBody = 'Your signature is on file. The agreement activates when the other party signs too — they can sign before or after you.'
+  await notifyUser(
+    db,
+    signedByUserId,
+    { type: 'contract', title: signerTitle, body: signerBody, link },
+    channelOpts(signer, {
+      title: signerTitle,
+      body: signerBody,
+      link,
+      category: 'contract',
+      ctaLabel: 'View Project',
     })
   )
 }

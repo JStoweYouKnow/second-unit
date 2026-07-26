@@ -56,12 +56,17 @@ export function buildAgreementTerms({
   importedTerms = null,
   bookingNotes = null,
   hasAttachment = false,
+  attachmentName = null,
 } = {}) {
   const custom = typeof importedTerms === 'string' ? importedTerms.trim() : ''
-  if (custom) return custom
+  const attachmentNote = hasAttachment
+    ? `\n\n---\n\nA custom agreement file is attached to this project${attachmentName ? ` (“${attachmentName}”)` : ''}. Download and review it from the project record before signing. Your typed signature on The Callsheet applies to this platform record and incorporates the attached file by reference.`
+    : ''
+
+  if (custom) return `${custom}${attachmentNote}`
 
   if (hasAttachment) {
-    return `${STANDARD_AGREEMENT_TEMPLATE}\n\n---\n\n[A custom agreement file is attached to this project. Download the original file from the project record.]`
+    return `${STANDARD_AGREEMENT_TEMPLATE}${attachmentNote}`
   }
 
   const notes = typeof bookingNotes === 'string' ? bookingNotes.trim() : ''
@@ -70,4 +75,30 @@ export function buildAgreementTerms({
   }
 
   return STANDARD_AGREEMENT_TEMPLATE
+}
+
+const DEFAULT_MILESTONE_TITLES = [
+  'On contract execution',
+  'First draft / proof delivery',
+  'Final approval & delivery',
+]
+
+export function appendMilestoneDeliverables(terms, descriptions, amounts = null) {
+  if (!Array.isArray(descriptions) || !descriptions.some((d) => String(d || '').trim())) {
+    return terms
+  }
+  const blocks = descriptions
+    .map((raw, i) => {
+      const d = String(raw || '').trim()
+      if (!d) return null
+      const title = DEFAULT_MILESTONE_TITLES[i] || `Milestone ${i + 1}`
+      const amt =
+        Array.isArray(amounts) && amounts[i] != null && Number(amounts[i]) > 0
+          ? ` — $${Number(amounts[i]).toLocaleString()}`
+          : ''
+      return `${title}${amt}:\n${d}`
+    })
+    .filter(Boolean)
+  if (!blocks.length) return terms
+  return `${terms}\n\n---\n\nEXPECTED DELIVERABLES BY MILESTONE\n\n${blocks.join('\n\n')}`
 }

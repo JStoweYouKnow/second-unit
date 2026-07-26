@@ -12,9 +12,12 @@ import { contracts as contractsApi, payments as paymentsApi } from '../lib/api'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { uploadContractAttachment, downloadContractAttachment } from '../lib/contractAttachments'
 import { splitMilestoneAmounts, DEFAULT_MILESTONE_TITLES } from '../lib/milestones'
-import { STANDARD_AGREEMENT_TEMPLATE, buildAgreementTerms } from '../lib/agreementTemplate'
+import { STANDARD_AGREEMENT_TEMPLATE, buildAgreementTerms, appendMilestoneDeliverables } from '../lib/agreementTemplate'
+import { artistSelectLabel } from '../lib/roleFilters'
 import { PLATFORM_FEE_PERCENT } from '../lib/fees'
-import { buildContractHtml, buildInvoiceHtml, downloadWordDoc, openPrintablePdf } from '../lib/documentExport'
+import { IconTooltip } from '../components/IconTooltip'
+import { buildContractHtml, buildInvoiceHtml, downloadPrintableHtml } from '../lib/documentExport'
+import { contractSigningHint, userNeedsToSign } from '../lib/contractSigning'
 
 const MAX_CUSTOM_FILE_BYTES = 15 * 1024 * 1024 // 15MB
 
@@ -270,25 +273,20 @@ export default function Projects() {
     let importedTerms = null
 
     if (projectType === 'custom') {
-      const parts = []
-      if (hasCustomText) parts.push(newProject.customTerms.trim())
+      if (hasCustomText) importedTerms = newProject.customTerms.trim()
       if (hasCustomFile) {
-        const kb = (customAgreementUpload.size / 1024).toFixed(1)
-        parts.push(
-          `[Uploaded agreement: ${customAgreementUpload.name} — ${kb} KB]\nUse “Download attachment” on this project to retrieve the PDF or Word file.`
-        )
         if (!isSupabaseConfigured) {
           attachmentUrl = customAgreementUpload.objectUrl
         }
         attachmentName = customAgreementUpload.name
         attachmentMime = customAgreementUpload.mimeType
       }
-      importedTerms = parts.length ? parts.join('\n\n---\n\n') : null
     }
 
-    const terms = buildAgreementTerms({
+    let terms = buildAgreementTerms({
       importedTerms,
       hasAttachment: !!hasCustomFile,
+      attachmentName: customAgreementUpload?.name,
     })
 
     const totalValue = parseInt(newProject.value, 10) || 0
@@ -312,6 +310,7 @@ export default function Projects() {
       newProject.deliverable3,
     ].map((d) => (d || '').trim().slice(0, 500))
     const hasAnyDeliverable = milestoneDescriptions.some((d) => d.length > 0)
+    terms = appendMilestoneDeliverables(terms, milestoneDescriptions, milestoneAmounts)
 
     setCreating(true)
     try {
@@ -382,11 +381,20 @@ export default function Projects() {
       return
     }
     if (!contract?.attachmentUrl || !contract?.attachmentName) return
-    const a = document.createElement('a')
-    a.href = contract.attachmentUrl
-    a.download = contract.attachmentName
-    a.rel = 'noopener'
-    a.click()
+    try {
+      const response = await fetch(contract.attachmentUrl)
+      if (!response.ok) throw new Error('Download failed')
+      const blob = await response.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = contract.attachmentName
+      a.rel = 'noopener'
+      a.click()
+      URL.revokeObjectURL(blobUrl)
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   const handleReuploadAttachment = async (e) => {
@@ -532,20 +540,32 @@ https://thecallsheet.ai
 
   const safeName = (contract) => (contract.title || 'Contract').replace(/\s+/g, '_')
 
-  const exportContract = (contract, format) => {
+  const exportContract = async (contract, format) => {
+    if (format === 'word') {
+      const { downloadContractDocx } = await import('../lib/documentExportDocx')
+      await downloadContractDocx(contract, `${safeName(contract)}_Agreement`, { clientName: profile?.full_name })
+      return
+    }
     const html = buildContractHtml(contract, { clientName: profile?.full_name })
-    if (format === 'word') downloadWordDoc(html, `${safeName(contract)}_Agreement`)
-    else openPrintablePdf(html, `${contract.title || 'Contract'} — Agreement`)
+    downloadPrintableHtml(html, `${safeName(contract)}_Agreement`)
   }
 
-  const exportInvoice = (contract, format) => {
+  const exportInvoice = async (contract, format) => {
+    if (format === 'word') {
+      const { downloadInvoiceDocx } = await import('../lib/documentExportDocx')
+      await downloadInvoiceDocx(contract, `${safeName(contract)}_Invoice`, {
+        clientName: profile?.full_name,
+        payments: paymentRows.filter((p) => p.contractId === contract.id),
+        platformFeePercent: PLATFORM_FEE_PERCENT,
+      })
+      return
+    }
     const html = buildInvoiceHtml(contract, {
       clientName: profile?.full_name,
       payments: paymentRows.filter((p) => p.contractId === contract.id),
       platformFeePercent: PLATFORM_FEE_PERCENT,
     })
-    if (format === 'word') downloadWordDoc(html, `${safeName(contract)}_Invoice`)
-    else openPrintablePdf(html, `${contract.title || 'Contract'} — Invoice`)
+    downloadPrintableHtml(html, `${safeName(contract)}_Invoice`)
   }
 
   const [w9Busy, setW9Busy] = useState(false)
@@ -708,7 +728,7 @@ ${divider}
                 <div className={`contract-status ${c.status}`} style={{ color: s.color }}>
                   {s.icon} {s.label}
                 </div>
-                {c.status === 'pending' && ((!isArtist && !c.signedByEmployer) || (isArtist && !c.signedByArtist)) && (
+                {userNeedsToSign(c, isArtist) && (
                   <button
                     type="button"
                     className="btn btn-success btn-sm"
@@ -720,22 +740,32 @@ ${divider}
                     <PenTool size={14} /> Sign Project
                   </button>
                 )}
-                <button type="button" className="btn-icon" title="View" onClick={() => setShowView(c)}><Eye size={16} /></button>
-                <button type="button" className="btn-icon" title="Download contract (.txt)" onClick={() => handleDownloadPDF(c)}><Download size={16} /></button>
-                <button type="button" className="btn-icon" title="Download contract statement / invoice (.txt)" onClick={() => handleDownloadContractInvoice(c)}><Receipt size={16} /></button>
+                <IconTooltip tip="View project details">
+                  <button type="button" className="btn-icon" aria-label="View project details" onClick={() => setShowView(c)}><Eye size={16} /></button>
+                </IconTooltip>
+                <IconTooltip tip="Download contract summary as plain text (.txt)">
+                  <button type="button" className="btn-icon" aria-label="Download contract summary as plain text" onClick={() => handleDownloadPDF(c)}><Download size={16} /></button>
+                </IconTooltip>
+                <IconTooltip tip="Download invoice / payment statement (.txt)">
+                  <button type="button" className="btn-icon" aria-label="Download invoice statement" onClick={() => handleDownloadContractInvoice(c)}><Receipt size={16} /></button>
+                </IconTooltip>
                 {(c.hasAttachment || c.attachmentUrl) && c.attachmentName && (
-                  <button
-                    type="button"
-                    className="btn-icon"
-                    title={`Download ${c.attachmentName}`}
-                    onClick={() => handleDownloadAttachment(c)}
-                  >
-                    <Upload size={16} />
-                  </button>
+                  <IconTooltip tip={`Download original agreement file (${c.attachmentName})`}>
+                    <button
+                      type="button"
+                      className="btn-icon"
+                      aria-label={`Download ${c.attachmentName}`}
+                      onClick={() => handleDownloadAttachment(c)}
+                    >
+                      <FileText size={16} />
+                    </button>
+                  </IconTooltip>
                 )}
-                <button type="button" className="btn-icon" title="Copy Link" onClick={() => handleCopyLink(c)}>
-                  {copied === c.id ? <Check size={16} style={{ color: 'var(--success)' }} /> : <Copy size={16} />}
-                </button>
+                <IconTooltip tip={copied === c.id ? 'Link copied!' : 'Copy link to this project'}>
+                  <button type="button" className="btn-icon" aria-label="Copy link to this project" onClick={() => handleCopyLink(c)}>
+                    {copied === c.id ? <Check size={16} style={{ color: 'var(--success)' }} /> : <Copy size={16} />}
+                  </button>
+                </IconTooltip>
               </div>
             </div>
           )
@@ -752,7 +782,7 @@ ${divider}
             </div>
 
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.5 }}>
-              Creating a project adds it to your Schedule and asks the artist to confirm the dates. Once confirmed, both of you sign the agreement and pay by milestone.
+              Creating a project adds it to your Schedule and asks the artist to confirm the dates. Once confirmed, you and the artist can both sign the agreement (in either order) and pay by milestone.
             </p>
 
             <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
@@ -783,7 +813,7 @@ ${divider}
                 <select className="form-input" value={newProject.artistId}
                   onChange={e => setNewProject(p => ({ ...p, artistId: e.target.value }))} required>
                   <option value="">Select an artist...</option>
-                  {artists.map(a => <option key={a.id} value={a.id}>{a.name} — {a.role}</option>)}
+                  {artists.map(a => <option key={a.id} value={a.id}>{artistSelectLabel(a)}</option>)}
                 </select>
               </div>
               <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
@@ -1011,7 +1041,8 @@ ${divider}
               <h3 style={{ fontSize: 14, marginBottom: 12, color: 'var(--text-secondary)' }}>Terms & Conditions</h3>
               {showView.attachmentName && (
                 <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
-                  Includes uploaded file: <strong style={{ color: 'var(--text-secondary)' }}>{showView.attachmentName}</strong> — use &quot;Original file&quot; below to download.
+                  Includes uploaded file: <strong style={{ color: 'var(--text-secondary)' }}>{showView.attachmentName}</strong>
+                  {' '}— use <strong>Uploaded template</strong> below for the unsigned file, or <strong>Signed agreement</strong> for the executed record with both signatures.
                 </p>
               )}
               <div style={{
@@ -1025,7 +1056,12 @@ ${divider}
 
             {/* Signatures */}
             <div style={{ marginBottom: 24 }}>
-              <h3 style={{ fontSize: 14, marginBottom: 12, color: 'var(--text-secondary)' }}>Signatures</h3>
+              <h3 style={{ fontSize: 14, marginBottom: 4, color: 'var(--text-secondary)' }}>Signatures</h3>
+              {showView.status === 'pending' && (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.45 }}>
+                  {contractSigningHint(showView, isArtist) || 'Both parties can sign in any order. The agreement activates when both signatures are collected.'}
+                </p>
+              )}
               <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div style={{
                   padding: 20, borderRadius: 'var(--radius-sm)',
@@ -1047,7 +1083,7 @@ ${divider}
                     <>
                       <PenTool size={24} style={{ color: 'var(--text-muted)', marginBottom: 8, opacity: 0.5 }} />
                       <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Client Signature</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Awaiting</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Not signed yet</div>
                     </>
                   )}
                 </div>
@@ -1071,7 +1107,7 @@ ${divider}
                     <>
                       <PenTool size={24} style={{ color: 'var(--text-muted)', marginBottom: 8, opacity: 0.5 }} />
                       <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Artist Signature</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Awaiting</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Not signed yet</div>
                     </>
                   )}
                 </div>
@@ -1079,26 +1115,29 @@ ${divider}
             </div>
 
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              {showView.status === 'pending' && ((!isArtist && !showView.signedByEmployer) || (isArtist && !showView.signedByArtist)) && (
+              {userNeedsToSign(showView, isArtist) && (
                 <button type="button" className="btn btn-success" onClick={() => { setSignError(''); setShowView(null); setShowSign(showView) }}>
                   <PenTool size={16} /> Sign Project
                 </button>
               )}
               <div className="doc-export-group">
-                <span className="doc-export-label"><Download size={13} /> Contract</span>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => exportContract(showView, 'pdf')}>PDF</button>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => exportContract(showView, 'word')}>Word</button>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleDownloadPDF(showView)}>.txt</button>
+                <span className="doc-export-label">
+                  <Download size={13} />{' '}
+                  {showView.signedByEmployer && showView.signedByArtist ? 'Signed agreement' : 'Agreement draft'}
+                </span>
+                <button type="button" className="btn btn-secondary btn-sm" title="Download printable HTML — open it, then choose Print → Save as PDF" onClick={() => exportContract(showView, 'pdf')}>PDF</button>
+                <button type="button" className="btn btn-secondary btn-sm" title="Download as Microsoft Word document (.docx)" onClick={() => exportContract(showView, 'word')}>Word</button>
+                <button type="button" className="btn btn-ghost btn-sm" title="Download plain-text contract summary" onClick={() => handleDownloadPDF(showView)}>.txt</button>
               </div>
               <div className="doc-export-group">
                 <span className="doc-export-label"><Receipt size={13} /> Invoice</span>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => exportInvoice(showView, 'pdf')}>PDF</button>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => exportInvoice(showView, 'word')}>Word</button>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleDownloadContractInvoice(showView)}>.txt</button>
+                <button type="button" className="btn btn-secondary btn-sm" title="Download printable HTML — open it, then choose Print → Save as PDF" onClick={() => exportInvoice(showView, 'pdf')}>PDF</button>
+                <button type="button" className="btn btn-secondary btn-sm" title="Download as Microsoft Word document (.docx)" onClick={() => exportInvoice(showView, 'word')}>Word</button>
+                <button type="button" className="btn btn-ghost btn-sm" title="Download plain-text invoice statement" onClick={() => handleDownloadContractInvoice(showView)}>.txt</button>
               </div>
               {(showView.hasAttachment || showView.attachmentUrl) && showView.attachmentName && (
-                <button type="button" className="btn btn-secondary" onClick={() => handleDownloadAttachment(showView)}>
-                  <Download size={16} /> Original file
+                <button type="button" className="btn btn-secondary" title="The file you uploaded when creating the project — unsigned template only" onClick={() => handleDownloadAttachment(showView)}>
+                  <Download size={16} /> Uploaded template (unsigned)
                 </button>
               )}
               {!isArtist && (
@@ -1134,13 +1173,14 @@ ${divider}
       {/* ========== E-Sign Modal ========== */}
       {showSign && (
         <div className="modal-overlay" onClick={() => !signing && setShowSign(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div className="modal-header">
               <h2>Sign Project</h2>
               <button type="button" className="btn-icon" disabled={signing} onClick={() => setShowSign(null)}><X size={18} /></button>
             </div>
 
-            <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 24 }}>
+            <div style={{ overflowY: 'auto', flex: 1, paddingRight: 4 }}>
+            <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 16 }}>
               <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{showSign.title}</div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
                 {isArtist ? `Signing as artist · ${showSign.artistName}` : `Artist: ${showSign.artistName}`}
@@ -1152,15 +1192,45 @@ ${divider}
               <div className="auth-error" style={{ marginBottom: 16 }}>{signError}</div>
             )}
 
+            {contractSigningHint(showSign, isArtist) && (
+              <div style={{ padding: 12, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', marginBottom: 16, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                {contractSigningHint(showSign, isArtist)}
+              </div>
+            )}
+
+            {(showSign.hasAttachment || showSign.attachmentUrl) && showSign.attachmentName && (
+              <div style={{ padding: 14, background: 'var(--accent-tint-05)', border: '1px solid var(--accent-tint-border)', borderRadius: 'var(--radius-sm)', marginBottom: 16, fontSize: 13 }}>
+                <strong>Attached agreement file:</strong> {showSign.attachmentName}
+                <p style={{ margin: '8px 0 10px', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                  Review the uploaded document before signing. Your typed signature applies to the full agreement below and incorporates this file by reference.
+                </p>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleDownloadAttachment(showSign)}>
+                  <Download size={14} /> Download attached file
+                </button>
+              </div>
+            )}
+
+            <div style={{ marginBottom: 16 }}>
+              <h3 style={{ fontSize: 14, marginBottom: 8, color: 'var(--text-secondary)' }}>Full agreement — read before signing</h3>
+              <div style={{
+                padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius-sm)',
+                fontSize: 12.5, lineHeight: 1.7, color: 'var(--text-secondary)',
+                maxHeight: 280, overflowY: 'auto', fontFamily: 'monospace', whiteSpace: 'pre-wrap',
+                border: '1px solid var(--border)',
+              }}>
+                {showSign.terms || STANDARD_AGREEMENT_TEMPLATE}
+              </div>
+            </div>
+
             {/* Agreement Summary */}
             <div style={{ padding: 16, background: 'var(--accent-tint-05)', border: '1px solid var(--accent-tint-border)', borderRadius: 'var(--radius-sm)', marginBottom: 24, fontSize: 13 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontWeight: 600 }}>
                 <Shield size={16} style={{ color: 'var(--accent)' }} /> By signing, you agree to:
               </div>
               <ul style={{ paddingLeft: 20, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
-                <li>The terms and conditions of this {showSign.type} agreement</li>
+                <li>The full agreement text shown above{showSign.attachmentName ? ` and the attached file (${showSign.attachmentName})` : ''}</li>
                 <li>Payment of ${(showSign.value || 0).toLocaleString()} according to the milestone schedule</li>
-                <li>The cancellation policy and dispute resolution procedures</li>
+                <li>The cancellation policy and dispute resolution procedures in the agreement</li>
                 <li>This electronic signature is legally binding</li>
               </ul>
             </div>
@@ -1220,6 +1290,7 @@ ${divider}
 
             <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
               <Shield size={12} style={{ marginRight: 4 }} /> Typed e-sign records your name, time, IP, and a hash of the agreement terms (not DocuSign-grade identity proofing).
+            </div>
             </div>
           </div>
         </div>

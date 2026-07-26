@@ -41,7 +41,7 @@ export default async function handler(req, res) {
           type: 'system',
           title: 'Application update',
           body: `${note} "${result.brief.title}"`,
-          link: '/briefs',
+          link: `/briefs?id=${id}`,
         })
       }
     } catch (notifyErr) {

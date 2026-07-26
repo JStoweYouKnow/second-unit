@@ -71,6 +71,7 @@ npm run verify:migrations                      # includes product features
 | 33 | `artist-skills-brands-sync-rpc.sql` | Artist-owned RPC to sync skills/brands (expertise) |
 | 34 | `contract-milestone-descriptions.sql` | Hirer-set expected deliverable per milestone (`contracts.milestone_descriptions`) |
 | 35 | `open-briefs.sql` | Open-brief marketplace (`open_briefs`, `brief_applications`) |
+| 36 | `open-brief-nda.sql` | Optional NDA/MNDA upload on open briefs (`brief-nda` bucket) |
 
 ## Ad-hoc fixes (run only if needed)
 

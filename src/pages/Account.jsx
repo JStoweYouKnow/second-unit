@@ -628,7 +628,7 @@ export default function Account() {
                   <hr style={{ margin: '32px 0', borderColor: 'var(--border)' }} />
                   <h3 style={{ marginBottom: 12 }}>Artist profile</h3>
                   <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
-                    Header image, portfolio, reels, and database listing visibility are edited from{' '}
+                    Header image, reels, and database listing visibility are edited from{' '}
                     <Link to={artist?.id ? `/artist/${artist.id}` : '/dashboard'}>My profile</Link> in the sidebar.
                   </p>
                 </>

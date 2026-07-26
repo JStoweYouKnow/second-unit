@@ -451,10 +451,10 @@ END:VCALENDAR`
           >
             Days
           </button>
-          <span style={{ fontSize: 13, color: 'var(--text-muted)', alignSelf: 'center' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-muted)', alignSelf: 'center', lineHeight: 1.45 }}>
             {mode === 'hours'
-              ? 'Pick a day, then a start and end hour'
-              : 'Pick a start day, then an end day'}
+              ? '1. Pick a day · 2. Pick start & end hour (same day only)'
+              : '1. Pick first day · 2. Pick last day · every day in between must be open'}
           </span>
         </div>
         )}
@@ -732,7 +732,9 @@ END:VCALENDAR`
           <span>
             {editable
               ? 'Tap hours to open or block segments · booked slots stay locked'
-              : 'Hours: contiguous open slots · Days: every day in range must be open'}
+              : mode === 'hours'
+                ? 'Hourly booking: one day, pick a time range'
+                : 'Multi-day booking: click first and last open day'}
           </span>
         </div>
       </div>

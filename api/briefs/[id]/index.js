@@ -6,6 +6,7 @@ import {
   mapBriefToClient,
   listApplicationsForBrief,
   updateBrief,
+  getArtistApplicationOnBrief,
 } from '../../_lib/briefs.js'
 
 export default async function handler(req, res) {
@@ -27,7 +28,14 @@ export default async function handler(req, res) {
         const result = await listApplicationsForBrief(db, id, user.id)
         return res.json({ ...result.brief, applications: result.applications })
       }
-      return res.json(mapBriefToClient(brief))
+      const myApplication = await getArtistApplicationOnBrief(db, id, user.id)
+      return res.json({
+        ...mapBriefToClient(brief, {
+          applied: Boolean(myApplication),
+          applicationStatus: myApplication?.status,
+        }),
+        myApplication,
+      })
     } catch (err) {
       return res.status(500).json({ error: err.message })
     }

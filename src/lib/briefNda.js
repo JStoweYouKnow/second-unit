@@ -1,26 +1,33 @@
 import { supabase, isSupabaseConfigured } from './supabase'
 
-const BUCKET = 'contract-attachments'
+const BUCKET = 'brief-nda'
+export const MAX_BRIEF_NDA_BYTES = 15 * 1024 * 1024
+
+export function isAllowedBriefNdaFile(file) {
+  if (!file?.name) return false
+  if (/\.(pdf|doc|docx)$/i.test(file.name)) return true
+  const mime = (file.type || '').toLowerCase()
+  return (
+    mime === 'application/pdf' ||
+    mime === 'application/msword' ||
+    mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  )
+}
 
 function sanitizeFilename(name) {
-  return (name || 'agreement')
+  return (name || 'nda')
     .replace(/[^\w.\-() ]+/g, '_')
     .replace(/\s+/g, '_')
     .slice(0, 120)
 }
 
-/**
- * Upload a custom agreement file to Supabase Storage.
- * @param {string} contractId
- * @param {File} file
- */
-export async function uploadContractAttachment(contractId, file) {
+export async function uploadBriefNda(briefId, file) {
   if (!isSupabaseConfigured || !supabase) {
     throw new Error('Storage requires Supabase configuration')
   }
-  if (!contractId || !file) throw new Error('Contract and file required')
+  if (!briefId || !file) throw new Error('Brief and file required')
 
-  const path = `${contractId}/${Date.now()}-${sanitizeFilename(file.name)}`
+  const path = `${briefId}/${Date.now()}-${sanitizeFilename(file.name)}`
   const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
     cacheControl: '3600',
     upsert: false,
@@ -31,12 +38,7 @@ export async function uploadContractAttachment(contractId, file) {
   return path
 }
 
-/**
- * Create a short-lived signed download URL for a stored attachment.
- * @param {string} storagePath
- * @param {number} expiresIn seconds
- */
-export async function getContractAttachmentSignedUrl(storagePath, expiresIn = 3600) {
+export async function getBriefNdaSignedUrl(storagePath, expiresIn = 3600) {
   if (!isSupabaseConfigured || !supabase || !storagePath) return null
 
   const { data, error } = await supabase.storage
@@ -47,8 +49,8 @@ export async function getContractAttachmentSignedUrl(storagePath, expiresIn = 36
   return data?.signedUrl ?? null
 }
 
-export async function downloadContractAttachment(storagePath, filename) {
-  const url = await getContractAttachmentSignedUrl(storagePath)
+export async function downloadBriefNda(storagePath, filename) {
+  const url = await getBriefNdaSignedUrl(storagePath)
   if (!url) return
 
   const response = await fetch(url)
@@ -58,7 +60,7 @@ export async function downloadContractAttachment(storagePath, filename) {
   const blobUrl = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = blobUrl
-  a.download = filename || 'agreement'
+  a.download = filename || 'nda'
   a.rel = 'noopener'
   a.click()
   URL.revokeObjectURL(blobUrl)

@@ -349,7 +349,16 @@ export const briefs = {
           applicationCount: apps.filter((a) => a.briefId === b.id).length,
         }))
       }
-      return all.filter((b) => b.status === 'open')
+      const myApps = apps.filter((a) => a.artistName === 'You')
+      const appByBrief = new Map(myApps.map((a) => [a.briefId, a.status]))
+      const openBriefs = all.filter((b) => b.status === 'open')
+      const openIds = new Set(openBriefs.map((b) => b.id))
+      const appliedExtra = all.filter((b) => appByBrief.has(b.id) && !openIds.has(b.id))
+      return [...openBriefs, ...appliedExtra].map((b) => ({
+        ...b,
+        applied: appByBrief.has(b.id),
+        applicationStatus: appByBrief.get(b.id),
+      }))
     }
     return request(`/api/briefs${mine ? '?mine=1' : ''}`)
   },
@@ -374,7 +383,15 @@ export const briefs = {
     if (!isSupabaseConfigured) {
       const brief = readBriefsMock().find((b) => String(b.id) === String(id))
       if (!brief) throw new Error('Brief not found')
-      return { ...brief, applications: readAppsMock().filter((a) => a.briefId === id) }
+      const applications = readAppsMock().filter((a) => a.briefId === id)
+      const myApplication = applications.find((a) => a.artistName === 'You') || null
+      return {
+        ...brief,
+        applications,
+        applied: Boolean(myApplication),
+        applicationStatus: myApplication?.status,
+        myApplication,
+      }
     }
     return request(`/api/briefs/${id}`)
   },

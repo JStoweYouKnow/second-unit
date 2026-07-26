@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Send, Check, CheckCheck, HelpCircle, Wifi, WifiOff, User, Plus, X, Search, ChevronLeft } from '../components/icons'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
@@ -7,6 +7,19 @@ import { getSocket } from '../lib/socket'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { useTypingBroadcast } from '../hooks/useTypingBroadcast'
 import { isArtistProfile } from '../lib/roleView'
+import { getMessagePrompts } from '../lib/messagePrompts'
+
+const ARTIST_ACCEPT_MESSAGE = /^I've accepted the project "/i
+const ARTIST_READY_ACCEPT_MESSAGE = /^I'm ready to accept!/i
+
+function artistHasAcceptedConversation(conversation) {
+  if (!conversation?.thread?.length) return false
+  return conversation.thread.some(
+    (msg) =>
+      msg.sender === 'artist' &&
+      (ARTIST_ACCEPT_MESSAGE.test(msg.text) || ARTIST_READY_ACCEPT_MESSAGE.test(msg.text))
+  )
+}
 
 export default function Messages() {
   const { allMessages, sendMessage, startConversation, localProjects, markConversationRead, realtimeConnected } = useApp()
@@ -16,6 +29,8 @@ export default function Messages() {
   const [showCompose, setShowCompose] = useState(false)
   const [composeSearch, setComposeSearch] = useState('')
   const [composeBusy, setComposeBusy] = useState(false)
+  const [acceptBusy, setAcceptBusy] = useState(false)
+  const [showQuestionMenu, setShowQuestionMenu] = useState(false)
 
   // Show every thread the user is part of, from either side (hirer or artist).
   // Each conversation carries its own `viewerIsArtist`, so a dual-role user no
@@ -41,6 +56,8 @@ export default function Messages() {
   const [typingIndicator, setTypingIndicator] = useState({})
   const [socketOk, setSocketOk] = useState(false)
   const chatEndRef = useRef(null)
+  const chatInputRef = useRef(null)
+  const questionMenuRef = useRef(null)
   const typingTimeout = useRef(null)
   const senderName = profile?.full_name || user?.user_metadata?.full_name || 'User'
 
@@ -67,6 +84,27 @@ export default function Messages() {
   const conversation = visibleMessages.find(m => m.id === activeConv) || visibleMessages[0]
   // Role of the viewer *for the active thread* (a user can be artist on one and hirer on another).
   const convIsArtist = conversation?.viewerIsArtist ?? isArtist
+  const showAcceptButton =
+    convIsArtist && conversation && !artistHasAcceptedConversation(conversation)
+  const quickQuestions = useMemo(() => getMessagePrompts(convIsArtist), [convIsArtist])
+
+  useEffect(() => {
+    setShowQuestionMenu(false)
+  }, [activeConv])
+
+  useEffect(() => {
+    if (!showQuestionMenu) return
+    const onPointerDown = (e) => {
+      if (questionMenuRef.current?.contains(e.target)) return
+      setShowQuestionMenu(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('touchstart', onPointerDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('touchstart', onPointerDown)
+    }
+  }, [showQuestionMenu])
 
   useEffect(() => {
     const socket = getSocket()
@@ -182,6 +220,26 @@ export default function Messages() {
     }, 2000)
   }
 
+  const handleAcceptProject = async () => {
+    if (!activeConv || !showAcceptButton || acceptBusy) return
+    setAcceptBusy(true)
+    try {
+      const project = localProjects.find((p) => String(p.artistId) === String(conversation.artistId))
+      const text = project
+        ? `I've accepted the project "${project.title}"! Let's get started.`
+        : "I'm ready to accept! Please send over the project details."
+      await sendMessage(activeConv, text, 'artist')
+    } finally {
+      setAcceptBusy(false)
+    }
+  }
+
+  const handleSelectQuestion = useCallback((text) => {
+    setInput(text)
+    setShowQuestionMenu(false)
+    requestAnimationFrame(() => chatInputRef.current?.focus())
+  }, [])
+
   const liveConnected = realtimeConnected || socketOk
 
   const handleStartConversation = async (artist) => {
@@ -271,28 +329,46 @@ export default function Messages() {
               </div>
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-              <button
-                className="btn btn-success btn-sm"
-                onClick={() => {
-                  const project = localProjects.find(p => String(p.artistId) === String(conversation.artistId))
-                  if (project) {
-                    sendMessage(activeConv, `I've accepted the project "${project.title}"! Let's get started.`, convIsArtist ? 'artist' : 'user')
-                  } else {
-                    sendMessage(activeConv, "I'm ready to accept! Please send over the project details.", convIsArtist ? 'artist' : 'user')
-                  }
-                }}
-              >
-                <Check size={14} /> Accept
-              </button>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  setInput("I have a question regarding the timeline and deliverables: ")
-                  document.querySelector('.chat-input-bar input')?.focus()
-                }}
-              >
-                <HelpCircle size={14} /> Ask Question
-              </button>
+              {showAcceptButton && (
+                <button
+                  type="button"
+                  className="btn btn-success btn-sm"
+                  disabled={acceptBusy}
+                  onClick={handleAcceptProject}
+                >
+                  <Check size={14} /> {acceptBusy ? 'Accepting…' : 'Accept'}
+                </button>
+              )}
+              <div ref={questionMenuRef} className="messages-quick-questions">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  aria-expanded={showQuestionMenu}
+                  aria-haspopup="menu"
+                  onClick={() => setShowQuestionMenu((open) => !open)}
+                >
+                  <HelpCircle size={14} /> Quick questions
+                </button>
+                {showQuestionMenu && (
+                  <div className="messages-quick-questions__menu" role="menu">
+                    <div className="messages-quick-questions__heading">
+                      {convIsArtist ? 'Ask your client' : 'Ask the artist'}
+                    </div>
+                    {quickQuestions.map((prompt) => (
+                      <button
+                        key={prompt.id}
+                        type="button"
+                        role="menuitem"
+                        className="messages-quick-questions__item"
+                        onClick={() => handleSelectQuestion(prompt.text)}
+                      >
+                        <span className="messages-quick-questions__label">{prompt.label}</span>
+                        <span className="messages-quick-questions__text">{prompt.text}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -317,8 +393,13 @@ export default function Messages() {
           </div>
 
           <div className="chat-input-bar">
-            <input value={input} onChange={handleTyping} placeholder="Type a message..."
-              onKeyDown={e => e.key === 'Enter' && handleSend()} />
+            <input
+              ref={chatInputRef}
+              value={input}
+              onChange={handleTyping}
+              placeholder="Type a message..."
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            />
             <button className="btn btn-primary" onClick={handleSend}><Send size={16} /></button>
           </div>
         </div>

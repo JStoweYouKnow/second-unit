@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Upload, Loader2, Trash2, ChevronUp, ChevronDown, Eye, EyeOff, ExternalLink, Calendar,
+  Upload, Loader2, Eye, EyeOff, ExternalLink, Calendar,
 } from './icons'
 import CalendarModal from './CalendarModal'
 import { ArtistFormFields } from './ArtistFormFields'
@@ -11,10 +11,9 @@ import { useArtistProfile, saveArtistProfile } from '../hooks/useArtistProfile'
 import { useArtistReviews } from '../hooks/useArtistReviews'
 import { useAuth } from '../context/AuthContext'
 import { artistRecordToForm, emptyArtistForm, parseCommaList } from '../lib/artistProfile'
-import { portfolio as portfolioApi } from '../lib/api'
-import { uploadPortfolioMedia, uploadHeaderImage, deletePortfolioStoragePath } from '../lib/portfolioMedia'
+import { uploadHeaderImage } from '../lib/portfolioMedia'
 import { resolveProfileHero } from '../lib/profileHero'
-import { normalizeVideoReels, videoReelUrl, videoReelTitle } from '../lib/videoReels'
+import { normalizeVideoReels } from '../lib/videoReels'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 
 function mapPortfolioRow(p) {
@@ -26,12 +25,11 @@ function mapPortfolioRow(p) {
     image: isVideo ? null : url,
     video: isVideo ? url : null,
     colorIdx: p.colorIdx ?? 0,
-    storagePath: p.storage_path ?? null,
   }
 }
 
 /**
- * Sidebar “My profile” — edit public layout, header, portfolio, and listing.
+ * Sidebar “My profile” — edit public layout, header, and listing.
  */
 export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
   const { profile } = useAuth()
@@ -40,34 +38,28 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
   const reviewState = useArtistReviews(artistId)
 
   const [form, setForm] = useState(emptyArtistForm())
-  const [portfolioItems, setPortfolioItems] = useState([])
   const [headerImageUrl, setHeaderImageUrl] = useState(null)
   const [isPublic, setIsPublic] = useState(true)
   const [busy, setBusy] = useState(false)
   const [headerBusy, setHeaderBusy] = useState(false)
-  const [portfolioBusy, setPortfolioBusy] = useState(false)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [showCalendar, setShowCalendar] = useState(false)
   const headerInputRef = useRef(null)
-  const portfolioInputRef = useRef(null)
 
   useEffect(() => {
     if (artistRecord) setForm(artistRecordToForm(artistRecord))
   }, [artistRecord])
 
   useEffect(() => {
-    if (artist?.portfolio?.length) {
-      setPortfolioItems(artist.portfolio.map(mapPortfolioRow))
-    } else {
-      setPortfolioItems([])
-    }
-  }, [artist?.portfolio])
-
-  useEffect(() => {
     setHeaderImageUrl(artist?.headerImageUrl ?? null)
     setIsPublic(artist?.isPublic !== false)
   }, [artist?.headerImageUrl, artist?.isPublic])
+
+  const portfolioItems = useMemo(
+    () => (artist?.portfolio?.length ? artist.portfolio.map(mapPortfolioRow) : []),
+    [artist?.portfolio]
+  )
 
   const getVideoThumb = (url) => {
     if (!url) return null
@@ -175,63 +167,6 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
       setError(err.message || 'Could not save profile')
     } finally {
       setBusy(false)
-    }
-  }
-
-  const handlePortfolioUpload = async (e) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file || !artistId) return
-    setPortfolioBusy(true)
-    setError('')
-    try {
-      const uploaded = await uploadPortfolioMedia(artistId, file)
-      const created = await portfolioApi.create({
-        title: file.name.replace(/\.[^.]+$/, '') || 'Portfolio',
-        mediaUrl: uploaded.mediaUrl,
-        mediaType: uploaded.mediaType,
-        storagePath: uploaded.storagePath,
-        sortOrder: portfolioItems.length,
-      })
-      setPortfolioItems((prev) => [...prev, mapPortfolioRow(created)])
-      onUpdated?.()
-    } catch (err) {
-      setError(err.message || 'Upload failed')
-    } finally {
-      setPortfolioBusy(false)
-    }
-  }
-
-  const persistPortfolioOrder = async (nextList) => {
-    setPortfolioItems(nextList)
-    if (!isSupabaseConfigured) return
-    try {
-      await portfolioApi.reorder(nextList.map((p) => p.id))
-    } catch (err) {
-      setError(err.message || 'Could not save order')
-    }
-  }
-
-  const movePortfolioItem = (index, direction) => {
-    const next = [...portfolioItems]
-    const target = index + direction
-    if (target < 0 || target >= next.length) return
-    ;[next[index], next[target]] = [next[target], next[index]]
-    persistPortfolioOrder(next)
-  }
-
-  const handleDeletePortfolioItem = async (item) => {
-    if (!item?.id || !window.confirm('Remove this portfolio item?')) return
-    setPortfolioBusy(true)
-    setError('')
-    try {
-      if (isSupabaseConfigured) await portfolioApi.remove(item.id)
-      if (item.storagePath) await deletePortfolioStoragePath(item.storagePath)
-      setPortfolioItems((prev) => prev.filter((p) => p.id !== item.id))
-    } catch (err) {
-      setError(err.message || 'Could not delete item')
-    } finally {
-      setPortfolioBusy(false)
     }
   }
 
@@ -370,117 +305,6 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
           </button>
         </div>
       </form>
-
-      {/* Portfolio */}
-      <div className="card" style={{ padding: 24, marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-          <div>
-            <h3 style={{ margin: '0 0 6px', fontSize: 16 }}>Portfolio</h3>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-              Upload, reorder, or remove media shown on your public page.
-            </p>
-          </div>
-          <div>
-            <input
-              ref={portfolioInputRef}
-              type="file"
-              accept="image/*,video/mp4,video/webm,video/quicktime"
-              hidden
-              onChange={handlePortfolioUpload}
-            />
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              disabled={portfolioBusy || !isSupabaseConfigured}
-              onClick={() => portfolioInputRef.current?.click()}
-            >
-              {portfolioBusy ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />}
-              {portfolioBusy ? ' Uploading…' : ' Upload media'}
-            </button>
-          </div>
-        </div>
-
-        {portfolioItems.length === 0 ? (
-          <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: 0 }}>No portfolio items yet.</p>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-            {portfolioItems.map((item, i) => (
-              <div
-                key={item.id}
-                style={{
-                  position: 'relative',
-                  aspectRatio: '4/3',
-                  borderRadius: 10,
-                  overflow: 'hidden',
-                  border: '1px solid var(--border)',
-                  background: item.image
-                    ? `url(${item.image}) center/cover`
-                    : '#111',
-                }}
-              >
-                {item.video && (
-                  <video
-                    muted
-                    playsInline
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    src={item.video}
-                  />
-                )}
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 'auto 0 0 0',
-                    padding: '8px 10px',
-                    background: 'linear-gradient(transparent, rgba(0,0,0,0.75))',
-                    color: 'white',
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
-                >
-                  {item.title}
-                </div>
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 6,
-                    right: 6,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 2,
-                    background: 'rgba(0,0,0,0.55)',
-                    borderRadius: 8,
-                    padding: 2,
-                  }}
-                >
-                  <button type="button" className="btn-icon" style={{ color: 'white' }} disabled={i === 0} onClick={() => movePortfolioItem(i, -1)} aria-label="Move up">
-                    <ChevronUp size={14} />
-                  </button>
-                  <button type="button" className="btn-icon" style={{ color: 'white' }} disabled={i === portfolioItems.length - 1} onClick={() => movePortfolioItem(i, 1)} aria-label="Move down">
-                    <ChevronDown size={14} />
-                  </button>
-                  <button type="button" className="btn-icon" style={{ color: 'var(--danger)' }} onClick={() => handleDeletePortfolioItem(item)} aria-label="Delete">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {videoLinks.some((r) => videoReelUrl(r)) && (
-          <div style={{ marginTop: 20 }}>
-            <h4 style={{ margin: '0 0 10px', fontSize: 14 }}>Video reels on profile</h4>
-            <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--text-secondary)', fontSize: 13 }}>
-              {videoLinks.filter((r) => videoReelUrl(r)).map((reel, i) => (
-                <li key={videoReelUrl(reel) || i}>{videoReelTitle(reel, i)}</li>
-              ))}
-            </ul>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
-              Edit reel URLs, titles, and optional cover images in Profile details above, then Save details.
-            </p>
-          </div>
-        )}
-      </div>
 
       <ArtistReviewSettings
         showReviewsOnProfile={reviewSettings.showReviewsOnProfile}

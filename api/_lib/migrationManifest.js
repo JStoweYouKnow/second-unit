@@ -43,6 +43,7 @@ export const FEATURE_MIGRATIONS = [
   'artist-skills-brands-sync-rpc.sql',
   'contract-milestone-descriptions.sql',
   'open-briefs.sql',
+  'open-brief-nda.sql',
 ]
 
 /** Tracking table bootstrap — apply once before recording other migrations. */

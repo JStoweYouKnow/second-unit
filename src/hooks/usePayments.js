@@ -1,35 +1,56 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { payments as paymentsApi } from '../lib/api'
+
+function normalizePaymentRow(row) {
+  if (!row || typeof row !== 'object') return null
+  return {
+    ...row,
+    description: row.description || 'Payment',
+    artistName: row.artistName || 'Artist',
+    status: row.status || 'pending',
+    amount: Number(row.amount) || 0,
+  }
+}
 
 export function usePayments(enabled = true) {
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const fetchIdRef = useRef(0)
 
   const refetch = useCallback(async () => {
     if (!enabled) {
-      setPayments([])
       setLoading(false)
       return
     }
 
+    const fetchId = ++fetchIdRef.current
     setLoading(true)
     setError(null)
 
     try {
       const data = await paymentsApi.list()
-      setPayments(Array.isArray(data) ? data : [])
+      if (fetchId !== fetchIdRef.current) return
+      const rows = Array.isArray(data) ? data : []
+      setPayments(rows.map(normalizePaymentRow).filter(Boolean))
     } catch (err) {
+      if (fetchId !== fetchIdRef.current) return
       setError(err.message || 'Failed to load payments')
-      setPayments([])
+      // Keep existing rows visible when a background refresh fails.
     } finally {
-      setLoading(false)
+      if (fetchId === fetchIdRef.current) {
+        setLoading(false)
+      }
     }
   }, [enabled])
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false)
+      return
+    }
     refetch()
-  }, [refetch])
+  }, [enabled, refetch])
 
   return { payments, loading, error, refetch }
 }

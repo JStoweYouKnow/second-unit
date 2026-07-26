@@ -22,6 +22,7 @@ const defaultAppContext = {
   bookingsError: null,
   refetchBookings: async () => [],
   realtimeConnected: false,
+  showOnboardingGuide: () => {},
 }
 
 export const AppContext = createContext(defaultAppContext)

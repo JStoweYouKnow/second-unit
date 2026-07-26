@@ -39,3 +39,8 @@ export function artistMatchesRoleFilter(artistRole, selectedRoles) {
   if (tags.length === 0) return selectedRoles.has(artistRole?.trim())
   return tags.some((tag) => selectedRoles.has(tag))
 }
+
+/** One-line label for artist pickers — display name only (role titles are often long headlines). */
+export function artistSelectLabel(artist) {
+  return artist?.name?.trim() || 'Artist'
+}

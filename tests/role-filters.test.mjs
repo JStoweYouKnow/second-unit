@@ -4,6 +4,7 @@ import {
   roleFilterTags,
   collectRoleFilterOptions,
   artistMatchesRoleFilter,
+  artistSelectLabel,
 } from '../src/lib/roleFilters.js'
 
 test('long comma-separated headline collapses to first segment', () => {
@@ -30,4 +31,16 @@ test('artistMatchesRoleFilter matches normalized tags', () => {
     'Founder, Thought Leader, Creative Technologist, Former Studio Head at Luma AI'
   assert.equal(artistMatchesRoleFilter(role, selected), true)
   assert.equal(artistMatchesRoleFilter('Artist', selected), false)
+})
+
+test('artistSelectLabel shows display name only', () => {
+  const artist = {
+    name: 'Verena Puhm',
+    role: 'Founder, Thought Leader, Creative Technologist, Former Studio Head at Luma AI',
+  }
+  assert.equal(artistSelectLabel(artist), 'Verena Puhm')
+})
+
+test('artistSelectLabel falls back for missing name', () => {
+  assert.equal(artistSelectLabel({ role: 'Artist' }), 'Artist')
 })

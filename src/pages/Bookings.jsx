@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { Calendar, Clock, Plus, CheckCircle, AlertCircle, X, Send, CreditCard, Loader2, Shield, ExternalLink } from '../components/icons'
+import { Calendar, Clock, Plus, CheckCircle, AlertCircle, X, Send, CreditCard, Loader2, Shield, ExternalLink, PenTool } from '../components/icons'
 import { useArtists } from '../hooks/useData'
 import { useArtistProfile } from '../hooks/useArtistProfile'
 import { usePayments } from '../hooks/usePayments'
@@ -11,6 +11,8 @@ import { isArtistProfile } from '../lib/roleView'
 import { bookingSubtotal, bookingScheduleCaption } from '../lib/pricing'
 import { PLATFORM_FEE_PERCENT } from '../lib/fees'
 import { isSupabaseConfigured } from '../lib/supabase'
+import { userNeedsToSign } from '../lib/contractSigning'
+import { artistSelectLabel } from '../lib/roleFilters'
 
 export default function Bookings() {
   const { profile, effectiveRole } = useAuth()
@@ -522,9 +524,21 @@ export default function Bookings() {
                           )
                         )}
                         {b.status === 'confirmed' && isAssignedArtistOn(b) && (
-                          <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 140, textAlign: 'right' }}>
-                            {hasLinkedContract(b) ? 'Contract ready — awaiting signatures / payment' : 'Awaiting client payment'}
-                          </span>
+                          hasLinkedContract(b) ? (
+                            userNeedsToSign(b.contract, true) ? (
+                              <Link to={contractHref(b)} className="btn btn-success btn-sm">
+                                <PenTool size={14} /> Sign agreement
+                              </Link>
+                            ) : (
+                              <Link to={contractHref(b)} className="btn btn-primary btn-sm">
+                                <ExternalLink size={14} /> {contractActionLabel(b, true)}
+                              </Link>
+                            )
+                          ) : (
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 140, textAlign: 'right' }}>
+                              Awaiting client payment
+                            </span>
+                          )
                         )}
 
                         {b.status === 'paid' && isEmployerOn(b) && (
@@ -583,7 +597,7 @@ export default function Bookings() {
                 <select className="form-input" value={newBooking.artistId} onChange={e => setNewBooking(p => ({ ...p, artistId: e.target.value }))} required>
                   <option value="">Select an artist...</option>
                   {bookingArtists.map(a => (
-                    <option key={a.id} value={a.id}>{a.name} — {a.role}</option>
+                    <option key={a.id} value={a.id}>{artistSelectLabel(a)}</option>
                   ))}
                   {newBooking.artistId && !bookingArtists.some((a) => String(a.id) === String(newBooking.artistId)) && (
                     <option value={newBooking.artistId}>Selected artist</option>
@@ -874,7 +888,7 @@ export default function Bookings() {
                     {!artists.some(a => String(a.id) === String(editForm.artistId)) && (
                       <option value={editForm.artistId}>{showDetail.artistName}</option>
                     )}
-                    {artists.map(a => <option key={a.id} value={a.id}>{a.name} — {a.role}</option>)}
+                    {artists.map(a => <option key={a.id} value={a.id}>{artistSelectLabel(a)}</option>)}
                   </select>
                 </div>
                 <div className="form-group">

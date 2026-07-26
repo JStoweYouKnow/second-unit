@@ -18,7 +18,7 @@ import {
   artistEscrowAmount,
   paymentDisplayAmount,
 } from '../lib/fees'
-import { buildReceiptHtml, downloadWordDoc, openPrintablePdf } from '../lib/documentExport'
+import { buildReceiptHtml, downloadPrintableHtml } from '../lib/documentExport'
 
 function loadLS(key) {
   try { return JSON.parse(localStorage.getItem(key) || 'null') } catch { return null }
@@ -214,6 +214,13 @@ export default function Payments() {
   const [connectError, setConnectError] = useState(null)
   const [connectBusy, setConnectBusy] = useState(false)
   const [confirmBusy, setConfirmBusy] = useState(false)
+  const [showSetup, setShowSetup] = useState(false)
+  const [showConnect, setShowConnect] = useState(false)
+  const [showStripe, setShowStripe] = useState(false)
+  const [showReceipt, setShowReceipt] = useState(null)
+  const [selectedPayment, setSelectedPayment] = useState(null)
+  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
 
   const refreshConnectStatus = async () => {
     if (!isArtist) return
@@ -273,14 +280,6 @@ export default function Payments() {
     refreshConnectStatus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isArtist, myArtistRecord?.id, myArtistRecord?.stripeAccountId])
-
-  const [showSetup, setShowSetup] = useState(false)
-  const [showConnect, setShowConnect] = useState(false)
-  const [showStripe, setShowStripe] = useState(false)
-  const [showReceipt, setShowReceipt] = useState(null)
-  const [selectedPayment, setSelectedPayment] = useState(null)
-  const [filter, setFilter] = useState('all')
-  const [search, setSearch] = useState('')
 
   // Handle return from Stripe Connect onboarding
   useEffect(() => {
@@ -347,9 +346,14 @@ export default function Payments() {
 
   const filteredPayments = paymentPool.filter(p => {
     if (filter !== 'all' && p.status !== filter) return false
-    if (search && !p.description.toLowerCase().includes(search.toLowerCase()) && !p.artistName.toLowerCase().includes(search.toLowerCase())) return false
-    return true
+    const q = search.trim().toLowerCase()
+    if (!q) return true
+    const description = String(p.description || '').toLowerCase()
+    const artistName = String(p.artistName || '').toLowerCase()
+    return description.includes(q) || artistName.includes(q)
   })
+
+  const paymentsInitialLoading = paymentsLoading && paymentPool.length === 0
 
   const sumAmount = (payments) =>
     payments.reduce((s, p) => s + paymentDisplayAmount(p, isArtist), 0)
@@ -469,8 +473,8 @@ https://thecallsheet.ai
     URL.revokeObjectURL(url)
   }
 
-  const exportReceipt = (payment, format) => {
-    const html = buildReceiptHtml(payment, {
+  const exportReceipt = async (payment, format) => {
+    const receiptOptions = {
       isArtist,
       viewerName: profile?.full_name || (isArtist ? me?.name : 'Client'),
       platformFeePercent: PLATFORM_FEE_PERCENT,
@@ -478,9 +482,14 @@ https://thecallsheet.ai
       artistPayout: artistEarningsAmount(payment),
       displayAmount: paymentDisplayAmount(payment, isArtist),
       method: stripeStatus?.email ? `Stripe · ${stripeStatus.email}` : 'Stripe',
-    })
-    if (format === 'word') downloadWordDoc(html, `Receipt_${payment.id}`)
-    else openPrintablePdf(html, `Receipt ${payment.id}`)
+    }
+    if (format === 'word') {
+      const { downloadReceiptDocx } = await import('../lib/documentExportDocx')
+      await downloadReceiptDocx(payment, `Receipt_${payment.id}`, receiptOptions)
+      return
+    }
+    const html = buildReceiptHtml(payment, receiptOptions)
+    downloadPrintableHtml(html, `Receipt_${payment.id}`)
   }
 
   const handleDownloadInvoice = (payment) => {
@@ -818,7 +827,12 @@ https://thecallsheet.ai
       )}
 
       {paymentsError && (
-        <div className="auth-error" style={{ marginBottom: 20 }}>{paymentsError}</div>
+        <div className="auth-error" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <span>{paymentsError}</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => refetchPayments()}>
+            Retry
+          </button>
+        </div>
       )}
 
       {/* Filters */}
@@ -854,7 +868,7 @@ https://thecallsheet.ai
           <span style={{ textAlign: 'center' }}>Receipt · Invoice</span>
         </div>
 
-        {paymentsLoading ? (
+        {paymentsInitialLoading ? (
           <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
             <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
             <p>Loading payments…</p>

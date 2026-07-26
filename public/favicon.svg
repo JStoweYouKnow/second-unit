@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="The Callsheet">
-  <rect width="64" height="64" fill="#0a0a0a"/>
-  <!-- Slate mark: slanted right edge, circular punch hole -->
-  <path fill="#fafaf8" d="M13 14h27.5l9.5 12.5V50H13V14z"/>
-  <circle cx="31.5" cy="32" r="4.25" fill="#0a0a0a"/>
-</svg>

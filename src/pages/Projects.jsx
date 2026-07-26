@@ -2,6 +2,7 @@ import { useMemo, useState, useRef, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { FileText, Plus, Download, Eye, CheckCircle, Clock, Archive, X, PenTool, Shield, Copy, Check, Upload, Receipt } from '../components/icons'
 import { ContractMilestonesPanel } from '../components/ContractMilestonesPanel'
+import Bookings from './Bookings'
 import { useArtists } from '../hooks/useData'
 import { useArtistProfile } from '../hooks/useArtistProfile'
 import { usePayments } from '../hooks/usePayments'
@@ -49,6 +50,15 @@ export default function Projects() {
     refetchBookings,
   } = useApp()
   const [searchParams, setSearchParams] = useSearchParams()
+  // Projects hosts two views of the same engagements: the contract list and the
+  // Schedule (calendar) view, which is the embedded Bookings component.
+  const view = searchParams.get('view') === 'schedule' ? 'schedule' : 'projects'
+  const setView = (v) => {
+    const next = new URLSearchParams(searchParams)
+    if (v === 'schedule') next.set('view', 'schedule')
+    else next.delete('view')
+    setSearchParams(next, { replace: true })
+  }
   const [milestoneBusy, setMilestoneBusy] = useState(null)
   const [milestoneError, setMilestoneError] = useState('')
   const isArtist = isArtistProfile(profile)
@@ -667,14 +677,23 @@ ${divider}
         <div className="page-header-row">
           <div>
             <h1>Projects</h1>
-            <p>{isArtist ? 'Engagements clients have sent you — agreement, schedule, milestones and documents' : 'Each project holds the agreement, schedule, milestones and documents for one engagement'}</p>
+            <p>{view === 'schedule'
+              ? 'Calendar view — confirm dates and pay; the agreement, milestones and documents live in each project.'
+              : (isArtist ? 'Engagements clients have sent you — agreement, schedule, milestones and documents' : 'Each project holds the agreement, schedule, milestones and documents for one engagement')}</p>
           </div>
           {!isArtist && (
             <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> New Project</button>
           )}
         </div>
+        <div className="tabs" style={{ marginTop: 8 }}>
+          <button type="button" className={`tab ${view === 'projects' ? 'active' : ''}`} onClick={() => setView('projects')}>Projects</button>
+          <button type="button" className={`tab ${view === 'schedule' ? 'active' : ''}`} onClick={() => setView('schedule')}>Schedule</button>
+        </div>
       </div>
 
+      {view === 'schedule' && <Bookings embedded />}
+
+      {view === 'projects' && (<>
       {/* Project Stats */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         {[
@@ -771,6 +790,7 @@ ${divider}
           )
         })}
       </div>
+      </>)}
 
       {/* ========== New Contract Modal ========== */}
       {showNew && (

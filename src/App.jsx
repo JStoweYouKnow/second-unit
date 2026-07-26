@@ -1,6 +1,6 @@
-import { useState, useCallback, lazy, Suspense, useMemo, useEffect } from 'react'
+import { useState, lazy, Suspense, useMemo, useEffect } from 'react'
 import { Routes, Route, useNavigate, useLocation, Navigate, useSearchParams } from 'react-router-dom'
-import { LayoutDashboard, Trophy, MessageSquare, Calendar, FileText, CreditCard, LogOut, Loader2, User, Menu, X, UserPlus, Shield, Briefcase } from './components/icons'
+import { LayoutDashboard, Trophy, MessageSquare, FileText, CreditCard, LogOut, Loader2, User, Menu, X, UserPlus, Shield, Briefcase } from './components/icons'
 import { demoArtistPersona, isArtistProfile } from './lib/roleView'
 import { useArtistProfile } from './hooks/useArtistProfile'
 import { useMyApplication, isPendingApplicant, useAdminApplications } from './hooks/useArtistApplication'
@@ -28,7 +28,6 @@ const Leaderboard = lazy(() => import('./pages/Leaderboard'))
 const ArtistProfile = lazy(() => import('./pages/ArtistProfile'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Messages = lazy(() => import('./pages/Messages'))
-const Bookings = lazy(() => import('./pages/Bookings'))
 const Projects = lazy(() => import('./pages/Projects'))
 const Briefs = lazy(() => import('./pages/Briefs'))
 const Payments = lazy(() => import('./pages/Payments'))
@@ -77,6 +76,16 @@ function HomeGate() {
   const { effectiveRole } = useAuth()
   if (effectiveRole === 'artist') return <Navigate to="/dashboard" replace />
   return <Leaderboard />
+}
+
+// Schedule merged into Projects: /bookings now redirects to the Schedule tab,
+// preserving the availability-calendar handoff (new -> book) params.
+function BookingsRedirect() {
+  const [params] = useSearchParams()
+  const next = new URLSearchParams(params)
+  next.set('view', 'schedule')
+  if (next.get('new') === '1') { next.delete('new'); next.set('book', '1') }
+  return <Navigate to={`/projects?${next.toString()}`} replace />
 }
 
 function formatAccountRole(role) {
@@ -239,10 +248,9 @@ function AppShell() {
         { path: '/admin/invites', icon: UserPlus, label: 'Invites', badge: activeInviteCount || null },
         { path: '/home', icon: Trophy, label: 'Artist Database' },
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-        { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
-        { path: '/bookings', icon: Calendar, label: 'Schedule' },
-        { path: '/projects', icon: FileText, label: 'Projects' },
         { path: '/briefs', icon: Briefcase, label: 'Open Briefs' },
+        { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
+        { path: '/projects', icon: FileText, label: 'Projects' },
         { path: '/payments', icon: CreditCard, label: 'Payments' },
       ]
     }
@@ -250,26 +258,24 @@ function AppShell() {
       const pid = demoPersona?.id ?? artist?.id
       const items = [
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-        { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
-        { path: '/bookings', icon: Calendar, label: 'Schedule' },
-        { path: '/disputes', icon: Shield, label: 'Disputes' },
-        { path: '/projects', icon: FileText, label: 'Projects' },
         { path: '/briefs', icon: Briefcase, label: 'Open Briefs' },
+        { path: '/projects', icon: FileText, label: 'Projects' },
+        { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
         { path: '/payments', icon: CreditCard, label: 'Earnings' },
+        { path: '/disputes', icon: Shield, label: 'Disputes' },
       ]
       if (pid) {
         const profilePath = `/artist/${pid}`
-        items.splice(1, 0, { path: profilePath, icon: User, label: 'My profile', matchPrefix: profilePath })
+        items.splice(3, 0, { path: profilePath, icon: User, label: 'My profile', matchPrefix: profilePath })
       }
       return items
     }
     return [
       { path: '/', icon: Trophy, label: 'Artist Database' },
       { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
-      { path: '/bookings', icon: Calendar, label: 'Schedule' },
-      { path: '/projects', icon: FileText, label: 'Projects' },
       { path: '/briefs', icon: Briefcase, label: 'Open Briefs' },
+      { path: '/messages', icon: MessageSquare, label: 'Messages', badge: unreadCount || null },
+      { path: '/projects', icon: FileText, label: 'Projects' },
       { path: '/payments', icon: CreditCard, label: 'Payments' },
     ]
   }, [effectiveRole, adminViewAs, unreadCount, demoPersona?.id, artist?.id, isAdmin, pendingApplicationCount, activeInviteCount, openDisputeCount])
@@ -572,7 +578,7 @@ function AppShell() {
                 <Route path="/artist/:id" element={<ProtectedRoute><ApplicantGate><ArtistProfile /></ApplicantGate></ProtectedRoute>} />
                 <Route path="/dashboard" element={<ProtectedRoute><ApplicantGate><Dashboard /></ApplicantGate></ProtectedRoute>} />
                 <Route path="/messages" element={<ProtectedRoute><ApplicantGate><Messages /></ApplicantGate></ProtectedRoute>} />
-                <Route path="/bookings" element={<ProtectedRoute><ApplicantGate><Bookings /></ApplicantGate></ProtectedRoute>} />
+                <Route path="/bookings" element={<ProtectedRoute><ApplicantGate><BookingsRedirect /></ApplicantGate></ProtectedRoute>} />
                 <Route path="/projects" element={<ProtectedRoute><ApplicantGate><Projects /></ApplicantGate></ProtectedRoute>} />
                 <Route path="/briefs" element={<ProtectedRoute><ApplicantGate><Briefs /></ApplicantGate></ProtectedRoute>} />
                 <Route path="/payments" element={<ProtectedRoute><ApplicantGate><Payments /></ApplicantGate></ProtectedRoute>} />

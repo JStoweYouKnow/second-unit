@@ -8,6 +8,7 @@ import { artists as artistsApi } from '../lib/api'
 import BrandChip from '../components/BrandChip'
 import { isArtistProfile } from '../lib/roleView'
 import { useArtist } from '../hooks/useData'
+import { useArtistProfile } from '../hooks/useArtistProfile'
 import { useArtistReviews } from '../hooks/useArtistReviews'
 import HirerReviewForm from '../components/HirerReviewForm'
 import ReviewList from '../components/ReviewList'
@@ -33,13 +34,17 @@ export default function ArtistProfile() {
   const [brandBusy, setBrandBusy] = useState(null)
   const [localBrands, setLocalBrands] = useState(null)
   const { artist, loading: artistLoading, refetch: refetchArtist } = useArtist(id)
+  const { artist: myArtistRecord } = useArtistProfile(profile?.id)
   const reviewState = useArtistReviews(id)
 
   useEffect(() => {
     if (searchParams.get('tab') === 'reviews') setActiveTab('reviews')
   }, [searchParams])
 
-  const isOwnProfile = isArtistProfile(profile) && artist?.profileId === profile?.id
+  const isOwnProfile =
+    !!artist &&
+    ((isArtistProfile(profile) && artist.profileId === profile?.id) ||
+      (myArtistRecord?.id && String(myArtistRecord.id) === String(artist.id)))
   const isHirer = profile && !isArtistProfile(profile)
   const viewAsPublic = searchParams.get('view') === 'public'
 
@@ -319,13 +324,15 @@ export default function ArtistProfile() {
           </button>
         )}
         <button className="btn btn-secondary" onClick={() => setShowCalendar(true)}>
-          <Calendar size={16} /> {isOwnProfile ? 'Manage Calendar' : 'View Calendar'}
+          <Calendar size={16} /> {isOwnProfile ? 'Edit Availability' : 'View Calendar'}
         </button>
+        {!isOwnProfile && (
         <button className="btn btn-ghost" onClick={() => toggleFavorite(artist.id)}
           style={isFav ? { color: 'var(--danger)' } : {}}>
           <Heart size={16} fill={isFav ? 'var(--danger)' : 'none'} />
           {isFav ? 'Favorited' : 'Add to Favorites'}
         </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

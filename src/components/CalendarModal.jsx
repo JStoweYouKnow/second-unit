@@ -378,7 +378,7 @@ END:VCALENDAR`
       >
         <div className="modal-header">
           <h2 id="calendar-modal-title">
-            {editable ? 'Manage your availability' : `${artist.name}'s availability`}
+            {editable ? 'Edit availability' : `${artist.name}'s availability`}
           </h2>
           <button type="button" className="btn-icon" onClick={onClose} aria-label="Close calendar">
             <X size={18} aria-hidden />

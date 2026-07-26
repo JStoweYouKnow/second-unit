@@ -213,7 +213,7 @@ export default function ArtistMyProfileEditor({ artistId, onUpdated }) {
             <ExternalLink size={14} /> View public page
           </Link>
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowCalendar(true)}>
-            <Calendar size={14} /> Manage calendar
+            <Calendar size={14} /> Edit Availability
           </button>
         </div>
       </div>

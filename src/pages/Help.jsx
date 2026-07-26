@@ -61,7 +61,7 @@ export default function Help() {
       <h3>How do artists open hours?</h3>
       <ol>
         <li>
-          From <strong>Dashboard</strong> or your profile, open your availability calendar.
+          From <strong>Dashboard</strong> or <strong>My profile → Edit Availability</strong>.
         </li>
         <li>
           Set your <strong>working timezone</strong> so hirers see the correct local times.

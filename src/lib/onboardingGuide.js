@@ -55,7 +55,7 @@ const GUIDES = {
         title: 'Set up your profile & calendar',
         body: 'Hirers book you from your public profile. Open availability on days and hours you want work.',
         bullets: [
-          'Dashboard → open your availability calendar',
+          'My profile → Edit Availability to open days and hours',
           'Set your working timezone, pick dates, tap hours to open, then Save this day',
           'Edit bio, rates, and reels from My profile',
         ],

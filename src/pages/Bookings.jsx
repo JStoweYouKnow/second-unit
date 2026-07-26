@@ -14,7 +14,7 @@ import { isSupabaseConfigured } from '../lib/supabase'
 import { userNeedsToSign } from '../lib/contractSigning'
 import { artistSelectLabel } from '../lib/roleFilters'
 
-export default function Bookings() {
+export default function Bookings({ embedded = false }) {
   const { profile, effectiveRole } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const { artist: myArtistRecord, loading: artistLoading } = useArtistProfile(profile?.id)
@@ -98,9 +98,9 @@ export default function Bookings() {
     return () => { cancelled = true }
   }, [searchParams, refetch, setSearchParams])
 
-  // Prefill create form from availability calendar handoff
+  // Prefill create form from availability calendar handoff (?book=1&artistId=…)
   useEffect(() => {
-    if (searchParams.get('new') !== '1') return
+    if (searchParams.get('book') !== '1') return
     const artistId = searchParams.get('artistId')
     if (!artistId) return
 
@@ -126,7 +126,7 @@ export default function Bookings() {
     setShowNew(true)
 
     const next = new URLSearchParams(searchParams)
-    ;['new', 'artistId', 'date', 'time', 'duration', 'durationUnit'].forEach((k) => next.delete(k))
+    ;['book', 'artistId', 'date', 'time', 'duration', 'durationUnit'].forEach((k) => next.delete(k))
     setSearchParams(next, { replace: true })
   }, [searchParams, setSearchParams])
 
@@ -379,22 +379,24 @@ export default function Bookings() {
   }
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div className="page-header-row">
-          <div>
-            <h1>{isArtist ? 'Your schedule' : 'Schedule'}</h1>
-            <p>
-              {isArtist
-                ? 'The calendar view of your projects — confirm dates here; the contract, signing and milestones live in the linked Project.'
-                : 'The calendar view of your projects. Each entry links to its Project, where the agreement, signing, milestones and documents live.'}
-            </p>
+    <div className={embedded ? '' : 'page-container'}>
+      {!embedded && (
+        <div className="page-header">
+          <div className="page-header-row">
+            <div>
+              <h1>{isArtist ? 'Your schedule' : 'Schedule'}</h1>
+              <p>
+                {isArtist
+                  ? 'The calendar view of your projects — confirm dates here; the contract, signing and milestones live in the linked Project.'
+                  : 'The calendar view of your projects. Each entry links to its Project, where the agreement, signing, milestones and documents live.'}
+              </p>
+            </div>
+            {!isArtist && (
+              <Link to="/projects?new=1" className="btn btn-primary"><Plus size={16} /> New project</Link>
+            )}
           </div>
-          {!isArtist && (
-            <Link to="/projects?new=1" className="btn btn-primary"><Plus size={16} /> New project</Link>
-          )}
         </div>
-      </div>
+      )}
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '14px 16px', marginBottom: 20, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 13, color: 'var(--text-secondary)' }}>
         <Shield size={16} style={{ flexShrink: 0, marginTop: 2, color: 'var(--accent)' }} />

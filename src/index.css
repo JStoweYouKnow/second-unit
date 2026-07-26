@@ -239,11 +239,11 @@ button.logo:focus-visible {
   -webkit-user-select: none;
   user-select: none;
 }
-.brand-logo-img--sidebar { height: 44px; }
-.brand-logo-img--compact { height: 52px; }
-.brand-logo-img--landing { height: 52px; }
+.brand-logo-img--sidebar { height: 37.4px; }
+.brand-logo-img--compact { height: 44.2px; }
+.brand-logo-img--landing { height: 44.2px; }
 .brand-logo-img--auth {
-  height: clamp(64px, 10vw, 88px);
+  height: clamp(54.4px, 8.5vw, 74.8px);
   margin-inline: auto;
 }
 .logo--home .brand-logo-img { margin-left: -4px; }
@@ -975,7 +975,7 @@ button.mobile-topbar-brand--home {
   justify-content: flex-start;
 }
 button.mobile-topbar-brand--home .brand-logo-img {
-  height: 40px;
+  height: 34px;
 }
 button.mobile-topbar-brand--home:hover {
   background: var(--surface);

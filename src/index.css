@@ -2280,8 +2280,6 @@ button.mobile-topbar-brand--home:focus-visible {
 
 /* ===== Landing page ===== */
 .landing-page {
-  min-height: 100vh;
-  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
@@ -2301,14 +2299,19 @@ button.mobile-topbar-brand--home:focus-visible {
   --landing-header-muted: rgba(250, 250, 248, 0.72);
   --landing-header-border: rgba(250, 250, 248, 0.1);
 }
-@media (max-width: 768px), (max-height: 550px) {
-  .landing-page {
-    min-height: 100dvh;
-  }
-}
 
 .landing-content {
   flex: 0 0 auto;
+}
+
+.landing-hero,
+.landing-features,
+.landing-about {
+  flex: 0 0 auto;
+  padding: 16px clamp(20px, 5vw, 48px) 20px;
+  background: var(--landing-bg);
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .landing-header {
@@ -2414,16 +2417,12 @@ button.mobile-topbar-brand--home:focus-visible {
 }
 
 .landing-hero {
-  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px 24px 20px;
   border-bottom: none;
-  box-sizing: border-box;
   position: relative;
   overflow: hidden;
-  background: var(--landing-bg);
 }
 .landing-brand-lockup {
   display: block;
@@ -2447,9 +2446,11 @@ button.mobile-topbar-brand--home:focus-visible {
   text-align: center;
 }
 @media (max-width: 768px), (max-height: 550px) {
-  .landing-hero {
-    flex: none;
-    padding: 60px 24px;
+  .landing-hero,
+  .landing-features,
+  .landing-about {
+    padding-top: 24px;
+    padding-bottom: 20px;
   }
 }
 
@@ -2495,21 +2496,55 @@ button.mobile-topbar-brand--home:focus-visible {
 }
 
 .landing-features {
-  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 40px 24px;
+  justify-content: flex-start;
   max-width: 1200px;
   margin: 0 auto;
-  box-sizing: border-box;
-  width: 100%;
 }
-@media (max-width: 768px), (max-height: 550px) {
-  .landing-features {
-    flex: none;
-    padding: 60px 24px;
-  }
+
+.landing-about {
+  display: flex;
+  flex-direction: column;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.landing-about__body {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.landing-about__block h3 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 10px;
+}
+
+.landing-about__block p {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.landing-about__block p + p {
+  margin-top: 10px;
+}
+
+.landing-about__cta {
+  margin-top: 36px;
+  text-align: center;
+}
+
+.landing-about__cta p {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 48ch;
+  margin: 0 auto 20px;
 }
 
 .landing-section-title {
@@ -2561,68 +2596,6 @@ button.mobile-topbar-brand--home:focus-visible {
   border: 1px solid var(--border-strong);
   background: var(--surface);
   margin-bottom: 16px;
-}
-
-.landing-cta-container {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  box-sizing: border-box;
-}
-@media (max-width: 768px), (max-height: 550px) {
-  .landing-cta-container {
-    flex: none;
-    height: auto;
-  }
-}
-
-.landing-cta-band {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 40px 24px;
-  text-align: center;
-  background: var(--band-bg);
-  color: var(--band-fg);
-  border-top: none;
-  box-sizing: border-box;
-}
-@media (max-width: 768px), (max-height: 550px) {
-  .landing-cta-band {
-    flex: none;
-    padding: 60px 24px;
-  }
-}
-
-.landing-cta-band h2 {
-  font-family: var(--font-display);
-  font-size: clamp(32px, 5vw, 44px);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  margin-bottom: 16px;
-  color: inherit;
-}
-
-.landing-cta-band p {
-  color: color-mix(in srgb, var(--band-fg) 72%, transparent);
-  font-weight: 400;
-  font-size: 17px;
-  margin-bottom: 36px;
-  max-width: 40ch;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.landing-cta-band .btn-inverse {
-  background: var(--band-fg);
-  color: var(--band-bg);
-  border-color: var(--band-fg);
-}
-.landing-cta-band .btn-inverse:hover {
-  opacity: 0.92;
 }
 
 .landing-footer {

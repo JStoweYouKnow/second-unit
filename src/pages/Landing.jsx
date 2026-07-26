@@ -39,10 +39,10 @@ export default function Landing() {
           </button>
           <button
             type="button"
-            className={`landing-nav-link ${activeTab === 'beta' ? 'active' : ''}`}
-            onClick={() => setActiveTab('beta')}
+            className={`landing-nav-link ${activeTab === 'about' ? 'active' : ''}`}
+            onClick={() => setActiveTab('about')}
           >
-            Private Beta
+            About Us
           </button>
         </nav>
         <div className="landing-header__actions">
@@ -113,24 +113,60 @@ export default function Landing() {
             <div className="reveal-stagger reveal-stagger--3" style={{ display: 'flex', justifyContent: 'center', marginTop: 32 }}>
               <button
                 type="button"
-                onClick={() => setActiveTab('beta')}
+                onClick={() => setActiveTab('about')}
                 className="btn btn-primary"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
               >
-                Join Private Beta <ArrowRight size={18} />
+                About Us <ArrowRight size={18} />
               </button>
             </div>
           </section>
         )}
 
-        {activeTab === 'beta' && (
-          <div className="landing-cta-container landing-tab-content" key="beta">
-            <section className="landing-cta-band">
-              <h2>Ready to redefine production?</h2>
-              <p>Join the private beta today and access the future of creative talent.</p>
-              <Link to="/signup" className="btn btn-inverse btn-lg">Get Started</Link>
-            </section>
-          </div>
+        {activeTab === 'about' && (
+          <section className="landing-about landing-tab-content" key="about">
+            <h2 className="landing-section-title reveal-stagger reveal-stagger--1">About The Callsheet</h2>
+            <div className="landing-about__body">
+              <article className="landing-about__block reveal-stagger reveal-stagger--1">
+                <h3>What we&apos;re building</h3>
+                <p>
+                  The Callsheet is a marketplace for AI-native creatives and the teams that hire them.
+                  We bring discovery, availability, messaging, bookings, agreements, milestone payments,
+                  and dispute tools into one place so production work can move with less friction.
+                </p>
+              </article>
+              <article className="landing-about__block reveal-stagger reveal-stagger--2">
+                <h3>Who it&apos;s for</h3>
+                <p>
+                  <strong>Artists</strong> publish profiles, set rates and availability, accept bookings,
+                  and get paid through Stripe Connect after work is approved.
+                </p>
+                <p>
+                  <strong>Hirers</strong> find talent, book time or project blocks, fund milestones in
+                  platform escrow, review deliverables, and release payment when ready.
+                </p>
+              </article>
+              <article className="landing-about__block reveal-stagger reveal-stagger--3">
+                <h3>How we think about trust</h3>
+                <p>
+                  Payments are processed by Stripe. Funds for milestones and bookings are held by the
+                  platform until the hirer approves release. Artists complete Connect onboarding before
+                  payouts can land. Disputes can be opened on-platform when something goes wrong.
+                </p>
+              </article>
+            </div>
+            <div className="landing-about__cta reveal-stagger reveal-stagger--3">
+              <p>We&apos;re in private beta — features ship quickly and early users shape what we build next.</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center' }}>
+                <Link to="/signup" className="btn btn-primary btn-lg">
+                  Join Beta <ArrowRight size={18} />
+                </Link>
+                <a href="mailto:support@thecallsheet.ai" className="btn btn-secondary btn-lg">
+                  Contact Us
+                </a>
+              </div>
+            </div>
+          </section>
         )}
       </main>
 

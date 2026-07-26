@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { format, addMonths, subMonths, parse, addHours } from 'date-fns'
 import { X, ChevronLeft, ChevronRight, ExternalLink, Download, Clock, Loader2, CheckCircle } from './icons'
+import AvailabilityCalendarGrid from './AvailabilityCalendarGrid'
+import { useApp } from '../context/AppContext'
 import { useArtistAvailability } from '../hooks/useArtistAvailability'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import {
@@ -21,6 +23,7 @@ import {
   listTimeZones,
   isPastDate,
 } from '../lib/availability'
+import { groupBookingsByDate } from '../lib/calendarDayMeta'
 
 const CAL_COMP_NOTE = 'Compensation is agreed with the client for each engagement (not shown here).'
 
@@ -45,6 +48,7 @@ export default function CalendarModal({
   artistDbId = null,
   onAvailabilitySaved = null,
 }) {
+  const { bookings } = useApp()
   const resolvedArtistId = artistDbId || artist.id
   const {
     availability: liveAvailability,
@@ -79,14 +83,13 @@ export default function CalendarModal({
     return normalizeArtistAvailability(artist.availability)
   }, [editable, liveAvailability, artist.availability])
 
-  const availableDateKeys = useMemo(
-    () => (availability || []).map((entry) => entry.date),
-    [availability]
-  )
-  const availableDateSet = useMemo(() => new Set(availableDateKeys), [availableDateKeys])
-
   const openDateKeys = useMemo(() => datesWithOpenSlots(availability), [availability])
   const openDateSet = useMemo(() => new Set(openDateKeys), [openDateKeys])
+
+  const bookingsByDate = useMemo(
+    () => (editable ? groupBookingsByDate(bookings, resolvedArtistId) : {}),
+    [editable, bookings, resolvedArtistId]
+  )
 
   const { weekdayLabels, weeks } = useMemo(
     () => buildMonthWeeks(currentMonth, { timeZone, hidePastDays: true }),
@@ -490,47 +493,19 @@ END:VCALENDAR`
           </button>
         </div>
 
-        <div className="calendar-grid" style={{ marginBottom: 4 }}>
-          {weekdayLabels.map((d) => (
-            <div key={d} className="calendar-header">{d}</div>
-          ))}
-        </div>
-        {weeks.map((week) => (
-          <div key={week[0].dateKey} className="calendar-grid">
-            {week.map((cell) => {
-              const hasOpen = openDateSet.has(cell.dateKey)
-              const hasAnySlots = availableDateSet.has(cell.dateKey)
-              const isSelectedHours = !editable && mode === 'hours' && selectedDateStr === cell.dateKey
-              const isSelectedEdit = editable && selectedDateStr === cell.dateKey
-              const inDayRange = !editable && mode === 'days' && (
-                dayRangeKeys.has(cell.dateKey)
-                || cell.dateKey === dayAnchor
-                || cell.dateKey === dayEnd
-              )
-              const isSelected = isSelectedHours || isSelectedEdit || inDayRange
-              const clickable = editable
-                ? cell.inMonth && !cell.past
-                : hasOpen && cell.inMonth && !cell.past
-
-              return (
-                <div
-                  key={cell.dateKey}
-                  className={`calendar-day ${!cell.inMonth ? 'other-month' : ''} ${cell.isToday ? 'today' : ''} ${(editable ? hasAnySlots : hasOpen) ? 'has-event' : ''}`}
-                  style={{
-                    ...(isSelected
-                      ? { background: 'var(--accent)', color: 'var(--paper)', borderRadius: 'var(--radius-sm)' }
-                      : {}),
-                    cursor: clickable ? 'pointer' : 'default',
-                    opacity: cell.past || !cell.inMonth ? 0.3 : (editable ? hasAnySlots : hasOpen) ? 1 : 0.45,
-                  }}
-                  onClick={() => handleDayClick(cell)}
-                >
-                  {format(cell.date, 'd')}
-                </div>
-              )
-            })}
-          </div>
-        ))}
+        <AvailabilityCalendarGrid
+          weeks={weeks}
+          weekdayLabels={weekdayLabels}
+          availability={availability}
+          selectedDateKey={selectedDateStr}
+          onDayClick={handleDayClick}
+          editable={editable}
+          bookingMode={editable ? null : mode}
+          dayAnchor={dayAnchor}
+          dayEnd={dayEnd}
+          dayRangeKeys={dayRangeKeys}
+          bookingsByDate={bookingsByDate}
+        />
 
         {availability.length === 0 && !editable && (
           <p style={{ marginTop: 16, fontSize: 14, color: 'var(--text-muted)' }}>
@@ -725,16 +700,12 @@ END:VCALENDAR`
         )}
 
         <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
-            {editable ? 'Dot = day has hours set' : 'Open day'}
-          </span>
           <span>
             {editable
-              ? 'Tap hours to open or block segments · booked slots stay locked'
+              ? 'Tap a day to set hours · booked days show a chip · strikethrough = blocked or past'
               : mode === 'hours'
-                ? 'Hourly booking: one day, pick a time range'
-                : 'Multi-day booking: click first and last open day'}
+                ? 'Open days show hours · pick a day, then a time range'
+                : 'Open days only · click first and last day for multi-day booking'}
           </span>
         </div>
       </div>

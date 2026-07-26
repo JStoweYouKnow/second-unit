@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   format,
-  isSameDay,
 } from 'date-fns'
 import { Clock, Loader2, CheckCircle, Plus } from './icons'
+import AvailabilityCalendarGrid from './AvailabilityCalendarGrid'
+import { useApp } from '../context/AppContext'
 import { useArtistAvailability } from '../hooks/useArtistAvailability'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import {
@@ -16,6 +17,7 @@ import {
   listTimeZones,
   formatTimeZoneLabel,
 } from '../lib/availability'
+import { groupBookingsByDate } from '../lib/calendarDayMeta'
 
 export default function ArtistAvailabilityEditor({
   artistId,
@@ -23,6 +25,7 @@ export default function ArtistAvailabilityEditor({
   initialTimeZone = null,
   onTimeZoneChange,
 }) {
+  const { bookings } = useApp()
   const { availability, loading, saving, error, updateDayAvailability } = useArtistAvailability(artistId)
   const [weeksToShow, setWeeksToShow] = useState(6)
   const [selectedDate, setSelectedDate] = useState(null)
@@ -38,7 +41,10 @@ export default function ArtistAvailabilityEditor({
     if (initialTimeZone) setTimeZone(initialTimeZone)
   }, [initialTimeZone])
 
-  const availableDates = useMemo(() => availability.map((a) => a.date), [availability])
+  const bookingsByDate = useMemo(
+    () => groupBookingsByDate(bookings, artistId),
+    [bookings, artistId]
+  )
 
   const selectedDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null
   const dayEntry = availability.find((a) => a.date === selectedDateStr)
@@ -176,56 +182,20 @@ export default function ArtistAvailabilityEditor({
         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>From today forward</span>
       </div>
 
-      <div className="calendar-grid" style={{ marginBottom: 4 }}>
-        {weekdayLabels.map((d, i) => (
-          <div key={`${d}-${i}`} className="calendar-header">{d}</div>
-        ))}
-      </div>
-      {weeks.map((week) => (
-        <div key={week[0].dateKey} className="calendar-grid">
-          {week.map((cell) => {
-            if (cell.hide) {
-              return (
-                <div
-                  key={cell.dateKey}
-                  className="calendar-day"
-                  style={{ visibility: 'hidden', pointerEvents: 'none' }}
-                  aria-hidden
-                />
-              )
-            }
-
-            const hasSlots = availableDates.includes(cell.dateKey)
-            const isSelected = selectedDate && isSameDay(cell.date, selectedDate)
-            const disabled = cell.past || !cell.inMonth
-
-            return (
-              <button
-                key={cell.dateKey}
-                type="button"
-                disabled={disabled}
-                className={`calendar-day ${!cell.inMonth ? 'other-month' : ''} ${cell.isToday ? 'today' : ''} ${hasSlots ? 'has-event' : ''} ${isSelected ? 'calendar-day--selected' : ''}`}
-                onClick={() => {
-                  if (disabled) return
-                  setSelectedDate(cell.date)
-                  setSaveStatus('')
-                }}
-                style={{
-                  opacity: !cell.inMonth ? 0.35 : 1,
-                  cursor: disabled ? 'default' : 'pointer',
-                  border: 'none',
-                  background: isSelected ? 'var(--accent)' : 'transparent',
-                  color: isSelected ? 'var(--paper)' : undefined,
-                }}
-                aria-label={format(cell.date, 'EEEE, MMMM d, yyyy')}
-                aria-pressed={isSelected}
-              >
-                {format(cell.date, 'd')}
-              </button>
-            )
-          })}
-        </div>
-      ))}
+      <AvailabilityCalendarGrid
+        weeks={weeks}
+        weekdayLabels={weekdayLabels}
+        availability={availability}
+        selectedDateKey={selectedDateStr}
+        onDayClick={(cell) => {
+          if (cell.past || !cell.inMonth) return
+          setSelectedDate(cell.date)
+          setSaveStatus('')
+        }}
+        editable
+        bookingsByDate={bookingsByDate}
+        hideEmptyCells
+      />
 
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
         <button
@@ -343,10 +313,7 @@ export default function ArtistAvailabilityEditor({
       )}
 
       <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', fontSize: 13, color: 'var(--text-muted)' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
-          Dot = day has availability · Past dates hidden · Booked slots stay locked
-        </span>
+        Tap a day to set open hours · booked days show a chip · strikethrough = blocked or past
       </div>
     </div>
   )

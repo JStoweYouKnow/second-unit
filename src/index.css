@@ -1156,6 +1156,191 @@ button.mobile-topbar-brand--home:focus-visible {
 }
 .calendar-day.other-month { color: var(--text-muted); opacity: 0.4; }
 
+/* ===== Airbnb-style availability calendar ===== */
+.airbnb-calendar {
+  --airbnb-tile-gap: 6px;
+}
+.airbnb-calendar__weekdays,
+.airbnb-calendar__week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--airbnb-tile-gap);
+}
+.airbnb-calendar__weekdays {
+  margin-bottom: var(--airbnb-tile-gap);
+}
+.airbnb-calendar__week {
+  margin-bottom: var(--airbnb-tile-gap);
+}
+.airbnb-calendar__weekday {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 4px 0 6px;
+  letter-spacing: 0.02em;
+}
+.airbnb-calendar__day {
+  position: relative;
+  min-height: 76px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 8px 6px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  overflow: visible;
+  font-family: inherit;
+  color: inherit;
+}
+.airbnb-calendar__day--spacer {
+  visibility: hidden;
+  pointer-events: none;
+  border: none;
+  background: transparent;
+  min-height: 76px;
+}
+.airbnb-calendar__day:hover:not(:disabled):not(.airbnb-calendar__day--disabled) {
+  border-color: var(--text-secondary);
+  background: var(--bg-card);
+}
+.airbnb-calendar__day--selected {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px var(--ink);
+  background: var(--bg-card);
+}
+.airbnb-calendar__day--available {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+.airbnb-calendar__day--past,
+.airbnb-calendar__day--booked-out,
+.airbnb-calendar__day--blocked {
+  opacity: 0.62;
+}
+.airbnb-calendar__day--other-month {
+  opacity: 0.35;
+}
+.airbnb-calendar__day--disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.airbnb-calendar__day--today .airbnb-calendar__date {
+  font-weight: 700;
+  color: var(--ink);
+}
+.airbnb-calendar__date {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  z-index: 1;
+}
+.airbnb-calendar__date--struck {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+.airbnb-calendar__caption {
+  margin-top: auto;
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.25;
+  padding-top: 6px;
+  z-index: 1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.airbnb-calendar__dogear {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 16px 16px 0;
+  border-color: transparent color-mix(in srgb, var(--ink) 28%, transparent) transparent transparent;
+  border-top-right-radius: 11px;
+  pointer-events: none;
+}
+.airbnb-calendar__chip {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 10px);
+  padding: 3px 7px 3px 3px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+.airbnb-calendar__chip-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.airbnb-calendar__chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 52px;
+}
+.airbnb-calendar__side-tab {
+  position: absolute;
+  left: -1px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 20px;
+  border-radius: 0 4px 4px 0;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .airbnb-calendar__day {
+    min-height: 64px;
+    padding: 6px 4px 4px;
+    border-radius: 10px;
+  }
+  .airbnb-calendar__chip {
+    max-width: calc(100% - 6px);
+    padding: 2px 5px 2px 2px;
+  }
+  .airbnb-calendar__chip-avatar {
+    width: 16px;
+    height: 16px;
+    font-size: 8px;
+  }
+  .airbnb-calendar__chip-label {
+    max-width: 40px;
+    font-size: 9px;
+  }
+  .airbnb-calendar__caption {
+    font-size: 9px;
+  }
+}
+
 /* ===== Messages ===== */
 .message-list { display: flex; flex-direction: column; gap: 2px; }
 .message-item {

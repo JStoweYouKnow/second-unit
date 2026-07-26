@@ -34,7 +34,14 @@ import {
   applyToBrief,
   updateApplicationStatus,
   getArtistApplicationOnBrief,
+  getBriefForViewer,
 } from '../api/_lib/briefs.js'
+import { recordBriefNdaAcceptance } from '../api/_lib/confidentiality.js'
+import {
+  listProjectReferences,
+  addProjectReference,
+  deleteProjectReference,
+} from '../api/_lib/projectReferences.js'
 import { listPaymentsForUser } from '../api/_lib/payments.js'
 import { completeBookingPayment } from '../api/_lib/completeBookingPayment.js'
 import { createProjectCheckoutSession } from '../api/_lib/checkout.js'
@@ -965,11 +972,14 @@ app.post('/api/conversations', async (req, res) => {
   const database = db
   if (!database) return res.status(503).json({ error: 'Database not configured' })
   try {
-    if (req.body?.conversationId && req.body?.text) {
+    if (req.body?.conversationId && (req.body?.text || req.body?.attachmentStoragePath)) {
       const result = await sendConversationMessage(database, {
         conversationId: req.body.conversationId,
         senderId: user.id,
         body: req.body.text,
+        attachmentStoragePath: req.body.attachmentStoragePath ?? null,
+        attachmentName: req.body.attachmentName ?? null,
+        attachmentMime: req.body.attachmentMime ?? null,
       })
       const { data: messages } = await database
         .from('messages')
@@ -1073,6 +1083,54 @@ app.patch('/api/contracts/:id', async (req, res) => {
   }
 })
 
+app.get('/api/contracts/:id/references', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const result = await listProjectReferences(database, req.params.id, user.id)
+    if (result.error === 'not_found') return res.status(404).json({ error: 'Project not found' })
+    if (result.error === 'forbidden') return res.status(403).json({ error: 'Forbidden' })
+    res.json(result)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/contracts/:id/references', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const result = await addProjectReference(database, req.params.id, user.id, req.body || {})
+    if (result.error === 'not_found') return res.status(404).json({ error: 'Project not found' })
+    if (result.error === 'forbidden') return res.status(403).json({ error: 'Forbidden' })
+    if (result.error === 'invalid') return res.status(400).json({ error: 'Invalid reference payload' })
+    res.status(201).json(result.reference)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.delete('/api/contracts/:id/references', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  const database = db
+  if (!database) return res.status(503).json({ error: 'Database not configured' })
+  const referenceId = req.query.referenceId
+  if (!referenceId) return res.status(400).json({ error: 'referenceId required' })
+  try {
+    const result = await deleteProjectReference(database, req.params.id, referenceId, user.id)
+    if (result.error === 'not_found') return res.status(404).json({ error: 'Reference not found' })
+    if (result.error === 'forbidden') return res.status(403).json({ error: 'Forbidden' })
+    res.json({ ok: true, storagePath: result.storagePath })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.get('/api/contracts/:id/milestones', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
@@ -1130,11 +1188,10 @@ app.get('/api/briefs/:id', async (req, res) => {
       return res.json({ ...result.brief, applications: result.applications })
     }
     const myApplication = await getArtistApplicationOnBrief(db, req.params.id, user.id)
+    const brief = await getBriefForViewer(db, req.params.id, user.id)
+    if (!brief) return res.status(404).json({ error: 'Brief not found' })
     return res.json({
-      ...mapBriefToClient(brief, {
-        applied: Boolean(myApplication),
-        applicationStatus: myApplication?.status,
-      }),
+      ...brief,
       myApplication,
     })
   } catch (err) {
@@ -1165,6 +1222,9 @@ app.post('/api/briefs/:id/apply', async (req, res) => {
     if (result.error === 'not_artist') return res.status(403).json({ error: 'Only artists can apply' })
     if (result.error === 'not_found') return res.status(404).json({ error: 'Brief not found' })
     if (result.error === 'closed') return res.status(400).json({ error: 'This brief is no longer open' })
+    if (result.error === 'nda_required') {
+      return res.status(400).json({ error: 'You must review and accept the NDA before applying' })
+    }
     try {
       const { data: artist } = await db.from('artists').select('display_name').eq('id', result.artistId).maybeSingle()
       await createNotification(db, {
@@ -1178,6 +1238,26 @@ app.post('/api/briefs/:id/apply', async (req, res) => {
       console.error('[briefs] apply notify failed:', notifyErr?.message || notifyErr)
     }
     res.status(201).json(result.application)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/briefs/:id/accept-nda', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+  if (!db) return res.status(503).json({ error: 'Database not configured' })
+  try {
+    const brief = await getBriefRow(db, req.params.id)
+    if (!brief) return res.status(404).json({ error: 'Brief not found' })
+    if (!brief.nda_storage_path) {
+      return res.status(400).json({ error: 'This brief has no NDA to accept' })
+    }
+    const result = await recordBriefNdaAcceptance(db, req.params.id, user.id)
+    if (result.error === 'not_artist') {
+      return res.status(403).json({ error: 'Only artists can accept brief NDAs' })
+    }
+    res.json({ acceptedAt: result.acceptedAt })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

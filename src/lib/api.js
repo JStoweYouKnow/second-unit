@@ -270,10 +270,20 @@ export const conversations = {
       body: JSON.stringify({ artistId }),
     }),
 
-  send: (conversationId, text) =>
+  send: (conversationId, text, attachment) =>
     request('/api/conversations', {
       method: 'POST',
-      body: JSON.stringify({ conversationId, text }),
+      body: JSON.stringify({
+        conversationId,
+        text: text || '',
+        ...(attachment?.storagePath
+          ? {
+              attachmentStoragePath: attachment.storagePath,
+              attachmentName: attachment.name,
+              attachmentMime: attachment.mime ?? null,
+            }
+          : {}),
+      }),
     }),
 
   markRead: (conversationId) =>
@@ -330,6 +340,19 @@ export const contracts = {
   listMilestones: (contractId) => request(`/api/contracts/${contractId}/milestones`),
 
   artistTaxDoc: (contractId) => request(`/api/contracts/${contractId}/artist-tax-doc`),
+
+  listReferences: (contractId) => request(`/api/contracts/${contractId}/references`),
+
+  addReference: (contractId, payload) =>
+    request(`/api/contracts/${contractId}/references`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteReference: (contractId, referenceId) =>
+    request(`/api/contracts/${contractId}/references?referenceId=${encodeURIComponent(referenceId)}`, {
+      method: 'DELETE',
+    }),
 }
 
 // ---- Open-brief marketplace ----
@@ -420,6 +443,9 @@ export const briefs = {
     }
     return request(`/api/briefs/${id}/apply`, { method: 'POST', body: JSON.stringify(payload) })
   },
+
+  acceptNda: (id) =>
+    request(`/api/briefs/${id}/accept-nda`, { method: 'POST', body: JSON.stringify({}) }),
 
   setApplicationStatus: async (id, appId, status) => {
     if (!isSupabaseConfigured) {

@@ -7,6 +7,7 @@ import {
   listApplicationsForBrief,
   updateBrief,
   getArtistApplicationOnBrief,
+  getBriefForViewer,
 } from '../../_lib/briefs.js'
 
 export default async function handler(req, res) {
@@ -21,19 +22,18 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      const brief = await getBriefRow(db, id)
-      if (!brief) return res.status(404).json({ error: 'Brief not found' })
+      const briefRow = await getBriefRow(db, id)
+      if (!briefRow) return res.status(404).json({ error: 'Brief not found' })
       // The owner also gets the applicant list.
-      if (brief.employer_id === user.id) {
+      if (briefRow.employer_id === user.id) {
         const result = await listApplicationsForBrief(db, id, user.id)
         return res.json({ ...result.brief, applications: result.applications })
       }
       const myApplication = await getArtistApplicationOnBrief(db, id, user.id)
+      const brief = await getBriefForViewer(db, id, user.id)
+      if (!brief) return res.status(404).json({ error: 'Brief not found' })
       return res.json({
-        ...mapBriefToClient(brief, {
-          applied: Boolean(myApplication),
-          applicationStatus: myApplication?.status,
-        }),
+        ...brief,
         myApplication,
       })
     } catch (err) {

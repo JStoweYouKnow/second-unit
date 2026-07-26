@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Send, Check, CheckCheck, HelpCircle, Wifi, WifiOff, User, Plus, X, Search, ChevronLeft } from '../components/icons'
+import { Send, Check, CheckCheck, HelpCircle, Wifi, WifiOff, User, Plus, X, Search, ChevronLeft, Upload, Download } from '../components/icons'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { useArtists } from '../hooks/useData'
@@ -8,6 +8,12 @@ import { isSupabaseConfigured } from '../lib/supabase'
 import { useTypingBroadcast } from '../hooks/useTypingBroadcast'
 import { isArtistProfile } from '../lib/roleView'
 import { getMessagePrompts } from '../lib/messagePrompts'
+import {
+  uploadMessageAttachment,
+  downloadMessageAttachment,
+  isAllowedMessageAttachmentFile,
+  MAX_MESSAGE_ATTACHMENT_BYTES,
+} from '../lib/messageAttachments'
 
 const ARTIST_ACCEPT_MESSAGE = /^I've accepted the project "/i
 const ARTIST_READY_ACCEPT_MESSAGE = /^I'm ready to accept!/i
@@ -39,6 +45,10 @@ export default function Messages() {
 
   const [activeConv, setActiveConv] = useState(null)
   const [input, setInput] = useState('')
+  const [attachmentFile, setAttachmentFile] = useState(null)
+  const [attachError, setAttachError] = useState('')
+  const [sendBusy, setSendBusy] = useState(false)
+  const attachInputRef = useRef(null)
   // On phones the list and thread are separate panes; this toggles which shows.
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false)
 
@@ -87,6 +97,16 @@ export default function Messages() {
   const showAcceptButton =
     convIsArtist && conversation && !artistHasAcceptedConversation(conversation)
   const quickQuestions = useMemo(() => getMessagePrompts(convIsArtist), [convIsArtist])
+
+  const hasSignedProject = useMemo(() => {
+    if (!conversation?.artistId) return false
+    return localProjects.some(
+      (p) =>
+        String(p.artistId) === String(conversation.artistId) &&
+        p.signedByEmployer &&
+        p.signedByArtist,
+    )
+  }, [conversation?.artistId, localProjects])
 
   useEffect(() => {
     setShowQuestionMenu(false)
@@ -171,28 +191,71 @@ export default function Messages() {
     : conversation?.artistProfileId
 
   const handleSend = async () => {
-    if (!input.trim() || !activeConv) return
+    if ((!input.trim() && !attachmentFile) || !activeConv || sendBusy) return
+
+    setSendBusy(true)
+    setAttachError('')
 
     const senderRole = convIsArtist ? 'artist' : 'user'
-    await sendMessage(activeConv, input.trim(), senderRole)
+    let attachment = null
 
-    if (isSupabaseConfigured) {
-      emitTyping(false)
+    try {
+      if (attachmentFile) {
+        if (!hasSignedProject) {
+          setAttachError('Sign a project agreement before sharing confidential attachments.')
+          setSendBusy(false)
+          return
+        }
+        const storagePath = await uploadMessageAttachment(activeConv, attachmentFile)
+        attachment = {
+          storagePath,
+          name: attachmentFile.name,
+          mime: attachmentFile.type || null,
+        }
+      }
+
+      await sendMessage(activeConv, input.trim(), senderRole, attachment)
+
+      if (isSupabaseConfigured) {
+        emitTyping(false)
+      }
+
+      const socket = getSocket()
+      const preview = input.trim() || `[Attachment: ${attachmentFile?.name}]`
+      if (socket?.connected && conversation && recipientProfileId) {
+        socket.emit('message:send', {
+          conversationId: activeConv,
+          recipientId: recipientProfileId,
+          text: preview,
+          senderName: profile?.full_name || user?.user_metadata?.full_name || 'User',
+          senderRole,
+        })
+        socket.emit('typing:stop', { conversationId: activeConv, recipientId: recipientProfileId })
+      }
+
+      setInput('')
+      setAttachmentFile(null)
+    } catch (err) {
+      setAttachError(err.message || 'Could not send message')
+    } finally {
+      setSendBusy(false)
     }
+  }
 
-    const socket = getSocket()
-    if (socket?.connected && conversation && recipientProfileId) {
-      socket.emit('message:send', {
-        conversationId: activeConv,
-        recipientId: recipientProfileId,
-        text: input.trim(),
-        senderName: profile?.full_name || user?.user_metadata?.full_name || 'User',
-        senderRole,
-      })
-      socket.emit('typing:stop', { conversationId: activeConv, recipientId: recipientProfileId })
+  const handleAttachmentPick = (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    setAttachError('')
+    if (!file) return
+    if (file.size > MAX_MESSAGE_ATTACHMENT_BYTES) {
+      setAttachError('Attachment must be 25MB or smaller.')
+      return
     }
-
-    setInput('')
+    if (!isAllowedMessageAttachmentFile(file)) {
+      setAttachError('File type not allowed for message attachments.')
+      return
+    }
+    setAttachmentFile(file)
   }
 
   const handleTyping = (e) => {
@@ -377,7 +440,17 @@ export default function Messages() {
               const isMe = convIsArtist ? msg.sender === 'artist' : msg.sender === 'user'
               return (
                 <div key={msg.id} className={`chat-bubble ${isMe ? 'sent' : 'received'}`}>
-                  {msg.text}
+                  {msg.text && <div>{msg.text}</div>}
+                  {msg.attachmentName && msg.attachmentStoragePath && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ marginTop: msg.text ? 8 : 0, padding: '4px 8px' }}
+                      onClick={() => downloadMessageAttachment(msg.attachmentStoragePath, msg.attachmentName)}
+                    >
+                      <Download size={14} /> {msg.attachmentName}
+                    </button>
+                  )}
                   <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4, textAlign: isMe ? 'right' : 'left', display: 'flex', alignItems: 'center', justifyContent: isMe ? 'flex-end' : 'flex-start', gap: 4 }}>
                     <span>{msg.time}</span>
                     {isMe && (
@@ -393,15 +466,52 @@ export default function Messages() {
           </div>
 
           <div className="chat-input-bar">
+            {hasSignedProject && (
+              <>
+                <input
+                  ref={attachInputRef}
+                  type="file"
+                  hidden
+                  accept=".pdf,.doc,.docx,.zip,.jpg,.jpeg,.png,.webp,.gif,.mp4,.txt"
+                  onChange={handleAttachmentPick}
+                />
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon"
+                  aria-label="Attach confidential file"
+                  disabled={sendBusy}
+                  onClick={() => attachInputRef.current?.click()}
+                  title="Attach file (requires signed project)"
+                >
+                  <Upload size={16} />
+                </button>
+              </>
+            )}
             <input
               ref={chatInputRef}
               value={input}
               onChange={handleTyping}
-              placeholder="Type a message..."
+              placeholder={hasSignedProject ? 'Type a message or attach a file…' : 'Type a message…'}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             />
-            <button className="btn btn-primary" onClick={handleSend}><Send size={16} /></button>
+            <button className="btn btn-primary" onClick={handleSend} disabled={sendBusy || (!input.trim() && !attachmentFile)}>
+              {sendBusy ? '…' : <Send size={16} />}
+            </button>
           </div>
+          {attachmentFile && (
+            <div style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>Attached: {attachmentFile.name}</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAttachmentFile(null)}>Remove</button>
+            </div>
+          )}
+          {attachError && (
+            <div className="auth-error" style={{ margin: '0 16px 12px' }} role="alert">{attachError}</div>
+          )}
+          {!hasSignedProject && (
+            <p style={{ margin: '0 16px 12px', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+              Confidential file attachments unlock after you and the other party sign a project agreement.
+            </p>
+          )}
         </div>
       ) : (
         <div className="messages-thread-pane" style={{ alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>

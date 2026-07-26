@@ -2,6 +2,7 @@ import { useMemo, useState, useRef, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { FileText, Plus, Download, Eye, CheckCircle, Clock, Archive, X, PenTool, Shield, Copy, Check, Upload, Receipt } from '../components/icons'
 import { ContractMilestonesPanel } from '../components/ContractMilestonesPanel'
+import { ProjectReferencesPanel } from '../components/ProjectReferencesPanel'
 import Bookings from './Bookings'
 import { useArtists } from '../hooks/useData'
 import { useArtistProfile } from '../hooks/useArtistProfile'
@@ -1020,6 +1021,8 @@ ${divider}
                 <div style={{ fontSize: 14, display: 'flex', alignItems: 'center', gap: 4 }}>{showView.type === 'standard' ? <FileText size={13} /> : <PenTool size={13} />}{showView.type === 'standard' ? 'Standard' : 'Custom'} Agreement</div>
               </div>
             </div>
+
+            <ProjectReferencesPanel contract={showView} isArtist={isArtist} />
 
             <ContractMilestonesPanel
               contract={showView}

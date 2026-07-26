@@ -1,5 +1,6 @@
 import { getArtistIdForProfile } from './bookings.js'
 import { notifyMessageReceived } from './notificationEvents.js'
+import { hasSignedContractBetween } from './confidentiality.js'
 
 function formatMessageTime(iso) {
   if (!iso) return ''
@@ -35,6 +36,9 @@ function mapMessageToThread(row, viewerIsArtist, conversation) {
     id: row.id,
     sender,
     text: row.body,
+    attachmentName: row.attachment_name ?? null,
+    attachmentMime: row.attachment_mime ?? null,
+    attachmentStoragePath: row.attachment_storage_path ?? null,
     time: formatMessageTime(row.created_at),
     createdAt: row.created_at,
     read: messageReadByRecipient(row, conversation, viewerIsArtist),
@@ -145,7 +149,14 @@ export async function sendConversationMessage(db, {
   conversationId,
   senderId,
   body,
+  attachmentStoragePath = null,
+  attachmentName = null,
+  attachmentMime = null,
 }) {
+  const trimmed = body?.trim() || ''
+  const hasAttachment = Boolean(attachmentStoragePath && attachmentName)
+  if (!trimmed && !hasAttachment) throw new Error('Message text or attachment required')
+
   const { data: conversation, error: convError } = await db
     .from('conversations')
     .select('*, artist:artists(profile_id)')
@@ -157,7 +168,16 @@ export async function sendConversationMessage(db, {
   const canAccess = await userCanAccessConversation(db, senderId, conversation)
   if (!canAccess) throw new Error('Forbidden')
 
+  if (hasAttachment) {
+    const signed = await hasSignedContractBetween(db, conversation.employer_id, conversation.artist_id)
+    if (!signed) {
+      throw new Error('Sign a project agreement before sharing confidential attachments in messages')
+    }
+  }
+
   const senderRole = conversation.employer_id === senderId ? 'employer' : 'artist'
+
+  const previewText = trimmed || `[Attachment: ${attachmentName}]`
 
   const { data: message, error: msgError } = await db
     .from('messages')
@@ -165,7 +185,10 @@ export async function sendConversationMessage(db, {
       conversation_id: conversationId,
       sender_id: senderId,
       sender_role: senderRole,
-      body: body.trim(),
+      body: trimmed || `[Attachment: ${attachmentName}]`,
+      attachment_storage_path: attachmentStoragePath,
+      attachment_name: attachmentName,
+      attachment_mime: attachmentMime,
     })
     .select()
     .single()
@@ -174,7 +197,7 @@ export async function sendConversationMessage(db, {
 
   const isEmployerSender = senderRole === 'employer'
   const updatePatch = {
-    last_message: body.trim().slice(0, 500),
+    last_message: previewText.slice(0, 500),
     last_message_at: message.created_at,
     employer_unread: isEmployerSender
       ? conversation.employer_unread
@@ -198,7 +221,7 @@ export async function sendConversationMessage(db, {
   await notifyMessageReceived(db, {
     recipientId,
     senderName: senderProfile?.full_name || 'Someone',
-    preview: body.trim(),
+    preview: previewText,
   })
 
   return {

@@ -44,6 +44,7 @@ export const FEATURE_MIGRATIONS = [
   'contract-milestone-descriptions.sql',
   'open-briefs.sql',
   'open-brief-nda.sql',
+  'confidentiality-features.sql',
 ]
 
 /** Tracking table bootstrap — apply once before recording other migrations. */

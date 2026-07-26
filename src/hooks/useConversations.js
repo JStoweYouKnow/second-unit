@@ -84,9 +84,12 @@ export function useConversations(enabled = true) {
     return created
   }, [conversations])
 
-  const sendMessage = useCallback(async (conversationId, text, senderOverride) => {
-    const trimmed = text?.trim()
-    if (!trimmed) return
+  const sendMessage = useCallback(async (conversationId, text, senderOverride, attachment) => {
+    const trimmed = text?.trim() || ''
+    const hasAttachment = Boolean(attachment?.storagePath && attachment?.name)
+    if (!trimmed && !hasAttachment) return
+
+    const preview = trimmed || `[Attachment: ${attachment.name}]`
 
     const appendLocal = (prev) =>
       prev.map((m) => {
@@ -94,12 +97,19 @@ export function useConversations(enabled = true) {
         const sender = senderOverride || 'user'
         return {
           ...m,
-          lastMessage: trimmed,
+          lastMessage: preview,
           time: 'Just now',
           unread: sender === 'artist',
           thread: [
             ...m.thread,
-            { id: `local-${Date.now()}`, sender, text: trimmed, time: 'Just now' },
+            {
+              id: `local-${Date.now()}`,
+              sender,
+              text: trimmed || `[Attachment: ${attachment.name}]`,
+              attachmentName: attachment?.name ?? null,
+              attachmentStoragePath: attachment?.storagePath ?? null,
+              time: 'Just now',
+            },
           ],
         }
       })
@@ -112,7 +122,7 @@ export function useConversations(enabled = true) {
     }
 
     try {
-      const result = await conversationsApi.send(conversationId, trimmed)
+      const result = await conversationsApi.send(conversationId, trimmed, attachment)
       if (result?.conversation) {
         setConversations((prev) =>
           prev.map((c) => (c.id === conversationId ? result.conversation : c))
@@ -190,6 +200,8 @@ export function useConversations(enabled = true) {
             id: msgRow.id,
             sender,
             text: msgRow.body,
+            attachmentName: msgRow.attachment_name ?? null,
+            attachmentStoragePath: msgRow.attachment_storage_path ?? null,
             time: 'Just now',
             createdAt: msgRow.created_at,
           },

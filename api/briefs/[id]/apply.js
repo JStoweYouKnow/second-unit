@@ -8,6 +8,7 @@ import { createNotification } from '../../_lib/notifications.js'
 const ApplySchema = z.object({
   message: z.string().max(2000).optional().default(''),
   proposedRate: z.number().int().nonnegative().nullable().optional(),
+  ndaAccepted: z.boolean().optional().default(false),
 })
 
 export default async function handler(req, res) {
@@ -26,6 +27,9 @@ export default async function handler(req, res) {
     if (result.error === 'not_artist') return res.status(403).json({ error: 'Only artists can apply' })
     if (result.error === 'not_found') return res.status(404).json({ error: 'Brief not found' })
     if (result.error === 'closed') return res.status(400).json({ error: 'This brief is no longer open' })
+    if (result.error === 'nda_required') {
+      return res.status(400).json({ error: 'You must review and accept the NDA before applying' })
+    }
 
     try {
       const { data: artist } = await db

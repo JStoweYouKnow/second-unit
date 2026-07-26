@@ -17,7 +17,10 @@ const CreateSchema = z.object({
 
 const SendSchema = z.object({
   conversationId: z.string().uuid(),
-  text: z.string().min(1).max(5000),
+  text: z.string().max(5000).optional().default(''),
+  attachmentStoragePath: z.string().max(500).optional().nullable(),
+  attachmentName: z.string().max(255).optional().nullable(),
+  attachmentMime: z.string().max(120).optional().nullable(),
 })
 
 export default async function handler(req, res) {
@@ -42,12 +45,15 @@ export default async function handler(req, res) {
     try {
       const body = req.body || {}
 
-      if (body.conversationId && body.text) {
+      if (body.conversationId && (body.text || body.attachmentStoragePath)) {
         const validated = SendSchema.parse(body)
         const result = await sendConversationMessage(db, {
           conversationId: validated.conversationId,
           senderId: user.id,
-          body: validated.text,
+          body: validated.text || '',
+          attachmentStoragePath: validated.attachmentStoragePath,
+          attachmentName: validated.attachmentName,
+          attachmentMime: validated.attachmentMime,
         })
 
         const artistId = await getArtistIdForProfile(db, user.id)
@@ -60,8 +66,9 @@ export default async function handler(req, res) {
           .eq('conversation_id', validated.conversationId)
           .order('created_at', { ascending: true })
 
+        const preview = validated.text || `[Attachment: ${validated.attachmentName}]`
         const clientConv = mapConversationToClient(
-          { ...result.conversation, last_message: validated.text, last_message_at: result.message.created_at },
+          { ...result.conversation, last_message: preview, last_message_at: result.message.created_at },
           messages || [],
           { viewerIsArtist }
         )

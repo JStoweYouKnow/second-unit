@@ -12,7 +12,7 @@ import {
   MAX_BRIEF_NDA_BYTES,
 } from '../lib/briefNda'
 
-const EMPTY_POST = { title: '', description: '', budget: '', timeline: '', location: 'Remote', skills: '' }
+const EMPTY_POST = { title: '', description: '', budget: '', timeline: '', location: 'Remote', skills: '', visibility: 'public' }
 
 export default function Briefs() {
   const navigate = useNavigate()
@@ -32,7 +32,8 @@ export default function Briefs() {
   const ndaInputRef = useRef(null)
 
   const [applyFor, setApplyFor] = useState(null)
-  const [applyForm, setApplyForm] = useState({ message: '', proposedRate: '' })
+  const [applyForm, setApplyForm] = useState({ message: '', proposedRate: '', ndaAccepted: false })
+  const [ndaAcceptBusy, setNdaAcceptBusy] = useState(false)
   const [applyBusy, setApplyBusy] = useState(false)
 
   const [activeBrief, setActiveBrief] = useState(null) // hirer: brief detail w/ applications
@@ -154,6 +155,7 @@ export default function Briefs() {
         timeline: postForm.timeline.trim() || null,
         location: postForm.location.trim() || 'Remote',
         skills: postForm.skills.split(',').map((s) => s.trim()).filter(Boolean),
+        visibility: postForm.visibility,
       })
       if (ndaUpload?.file && created?.id && isSupabaseConfigured) {
         const storagePath = await uploadBriefNda(created.id, ndaUpload.file)
@@ -189,9 +191,10 @@ export default function Briefs() {
       await briefsApi.apply(applyFor.id, {
         message: applyForm.message.trim(),
         proposedRate: Number.isFinite(rate) && rate > 0 ? rate : null,
+        ndaAccepted: applyFor.ndaStoragePath ? applyForm.ndaAccepted : false,
       })
       setApplyFor(null)
-      setApplyForm({ message: '', proposedRate: '' })
+      setApplyForm({ message: '', proposedRate: '', ndaAccepted: false })
       await load()
     } catch (err) {
       setError(err.message || 'Failed to apply')
@@ -231,6 +234,47 @@ export default function Briefs() {
     }
   }
 
+  const handleAcceptNda = async (brief) => {
+    if (!brief?.id) return
+    setNdaAcceptBusy(true)
+    setError('')
+    try {
+      await briefsApi.acceptNda(brief.id)
+      await load()
+      if (artistBrief?.id === brief.id) {
+        const data = await briefsApi.get(brief.id)
+        setArtistBrief(data)
+      }
+    } catch (err) {
+      setError(err.message || 'Could not accept NDA')
+    } finally {
+      setNdaAcceptBusy(false)
+    }
+  }
+
+  const visibilityPill = (visibility) => {
+    const map = {
+      public: { label: 'Public', bg: 'var(--surface)', color: 'var(--text-muted)' },
+      nda_gated: { label: 'NDA required', bg: 'var(--accent-tint-10)', color: 'var(--accent)' },
+      invite_only: { label: 'Invite only', bg: 'var(--surface)', color: 'var(--text-secondary)' },
+    }
+    const s = map[visibility] || map.public
+    return (
+      <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: s.bg, color: s.color }}>
+        {s.label}
+      </span>
+    )
+  }
+
+  const openApplyFlow = (b) => {
+    if (b.visibility === 'nda_gated' && b.descriptionRedacted && !b.ndaAcceptedAt) {
+      openArtistBrief(b.id)
+      return
+    }
+    setApplyForm({ message: '', proposedRate: '', ndaAccepted: false })
+    setApplyFor(b)
+  }
+
   const statusPill = (status) => {
     const map = {
       open: { bg: 'var(--success-muted-bg)', color: 'var(--success)', label: 'Open' },
@@ -260,6 +304,7 @@ export default function Briefs() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
         <h3 style={{ fontSize: 16 }}>{b.title}</h3>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {b.visibility && b.visibility !== 'public' && visibilityPill(b.visibility)}
           {b.applied && b.applicationStatus && applicationStatusPill(b.applicationStatus)}
           {statusPill(b.status)}
         </div>
@@ -268,7 +313,7 @@ export default function Briefs() {
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{b.employerName}</div>
       )}
       {b.description && (
-        <p style={{ fontSize: 13, color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        <p style={{ fontSize: 13, color: b.descriptionRedacted ? 'var(--text-muted)' : 'var(--text-secondary)', fontStyle: b.descriptionRedacted ? 'italic' : 'normal', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {b.description}
         </p>
       )}
@@ -282,7 +327,7 @@ export default function Briefs() {
           {b.skills.map((s) => <span key={s} className="skill-tag">{s}</span>)}
         </div>
       )}
-      {b.ndaStoragePath && (
+      {b.ndaStoragePath && (b.canDownloadNda !== false) && (
         <button type="button" className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => handleDownloadNda(b)}>
           <Download size={14} /> NDA / MNDA{b.ndaName ? `: ${b.ndaName}` : ''}
         </button>
@@ -294,7 +339,7 @@ export default function Briefs() {
               View application <ChevronRight size={14} />
             </button>
           ) : (
-            <button type="button" className="btn btn-primary btn-sm" disabled={b.status !== 'open'} onClick={() => setApplyFor(b)}>
+            <button type="button" className="btn btn-primary btn-sm" disabled={b.status !== 'open'} onClick={() => openApplyFlow(b)}>
               <Send size={14} /> Apply
             </button>
           )
@@ -423,6 +468,21 @@ export default function Briefs() {
                   onChange={(e) => setPostForm((p) => ({ ...p, skills: e.target.value }))} />
               </div>
               <div className="form-group">
+                <label className="form-label">Confidentiality</label>
+                <select
+                  className="form-input"
+                  value={postForm.visibility}
+                  onChange={(e) => setPostForm((p) => ({ ...p, visibility: e.target.value }))}
+                >
+                  <option value="public">Public — full brief visible to all artists</option>
+                  <option value="nda_gated">NDA gated — summary until NDA accepted</option>
+                  <option value="invite_only">Invite only — hidden until artist applies</option>
+                </select>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.45 }}>
+                  For sensitive work, use NDA gated or invite only and keep client names out of the public description.
+                </p>
+              </div>
+              <div className="form-group">
                 <label className="form-label">NDA / MNDA <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
                 <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.45 }}>
                   Upload a mutual or one-way NDA for artists to review before applying. PDF or Word, max 15MB.
@@ -475,10 +535,19 @@ export default function Briefs() {
             <form onSubmit={handleApply}>
               {applyFor.ndaStoragePath && (
                 <div style={{ marginBottom: 16, padding: 12, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', fontSize: 13, color: 'var(--text-secondary)' }}>
-                  This brief includes a confidentiality agreement. Review it before applying.
-                  <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 10 }} onClick={() => handleDownloadNda(applyFor)}>
+                  This brief includes a confidentiality agreement. Download and accept it before applying.
+                  <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 10, marginRight: 8 }} onClick={() => handleDownloadNda(applyFor)}>
                     <Download size={14} /> Download NDA / MNDA
                   </button>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 12, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={applyForm.ndaAccepted}
+                      onChange={(e) => setApplyForm((p) => ({ ...p, ndaAccepted: e.target.checked }))}
+                      required
+                    />
+                    <span>I have read and accept the NDA / MNDA for this brief.</span>
+                  </label>
                 </div>
               )}
               <div className="form-group">
@@ -589,10 +658,25 @@ export default function Briefs() {
               <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{formatBudgetRange(artistBrief.budget ?? artistBrief.budgetMin, artistBrief.budget ?? artistBrief.budgetMax)}</span>
               <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{artistBrief.location || 'Remote'}</span>
             </div>
-            {artistBrief.description && (
-              <p style={{ fontSize: 14, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', marginBottom: 16 }}>{artistBrief.description}</p>
+            {artistBrief.descriptionRedacted && artistBrief.ndaStoragePath && !artistBrief.ndaAcceptedAt && (
+              <div style={{ marginBottom: 16, padding: 16, background: 'var(--accent-tint-10)', borderRadius: 'var(--radius-sm)' }}>
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.5 }}>
+                  This brief is confidential. Download the NDA, then accept it to view the full description and apply.
+                </p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleDownloadNda(artistBrief)}>
+                    <Download size={14} /> Download NDA
+                  </button>
+                  <button type="button" className="btn btn-primary btn-sm" disabled={ndaAcceptBusy} onClick={() => handleAcceptNda(artistBrief)}>
+                    {ndaAcceptBusy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />} Accept NDA
+                  </button>
+                </div>
+              </div>
             )}
-            {artistBrief.ndaStoragePath && (
+            {artistBrief.description && (
+              <p style={{ fontSize: 14, color: artistBrief.descriptionRedacted ? 'var(--text-muted)' : 'var(--text-secondary)', fontStyle: artistBrief.descriptionRedacted ? 'italic' : 'normal', whiteSpace: 'pre-wrap', marginBottom: 16 }}>{artistBrief.description}</p>
+            )}
+            {artistBrief.ndaStoragePath && artistBrief.canDownloadNda !== false && !artistBrief.descriptionRedacted && (
               <button type="button" className="btn btn-secondary btn-sm" style={{ marginBottom: 16 }} onClick={() => handleDownloadNda(artistBrief)}>
                 <Download size={14} /> Download NDA / MNDA
               </button>
@@ -617,6 +701,10 @@ export default function Briefs() {
                   </p>
                 )}
               </div>
+            ) : artistBrief.status === 'open' && !artistBrief.descriptionRedacted ? (
+              <button type="button" className="btn btn-primary" onClick={() => { setArtistBrief(null); openApplyFlow(artistBrief) }}>
+                <Send size={16} /> Apply to this brief
+              </button>
             ) : (
               <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>You haven&apos;t applied to this brief yet.</p>
             )}

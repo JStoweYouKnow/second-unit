@@ -1,4 +1,13 @@
 import { getArtistIdForProfile } from './bookings.js'
+import {
+  BRIEF_VISIBILITY,
+  REDACTED_BRIEF_DESCRIPTION,
+  canViewFullBrief,
+  getBriefNdaAcceptance,
+  redactBriefForViewer,
+} from './confidentiality.js'
+
+export { BRIEF_VISIBILITY, REDACTED_BRIEF_DESCRIPTION }
 
 export function mapBriefToClient(row, extra = {}) {
   if (!row) return null
@@ -14,6 +23,10 @@ export function mapBriefToClient(row, extra = {}) {
     ndaStoragePath: row.nda_storage_path ?? null,
     ndaName: row.nda_name ?? null,
     ndaMime: row.nda_mime ?? null,
+    visibility: row.visibility ?? BRIEF_VISIBILITY.PUBLIC,
+    descriptionRedacted: extra.descriptionRedacted ?? false,
+    ndaAcceptedAt: extra.ndaAcceptedAt ?? null,
+    canDownloadNda: extra.canDownloadNda ?? Boolean(row.nda_storage_path),
     timeline: row.timeline ?? '',
     location: row.location ?? 'Remote',
     skills: Array.isArray(row.skills) ? row.skills : [],
@@ -38,8 +51,20 @@ export function mapApplicationToClient(row) {
     message: row.message ?? '',
     proposedRate: row.proposed_rate ?? null,
     status: row.status,
+    ndaAcceptedAt: row.nda_accepted_at ?? null,
     createdAt: row.created_at,
   }
+}
+
+export async function getBriefForViewer(db, briefId, viewerProfileId) {
+  const brief = await getBriefRow(db, briefId)
+  if (!brief) return null
+  const myApplication = await getArtistApplicationOnBrief(db, briefId, viewerProfileId)
+  return shapeBriefForViewer(db, brief, viewerProfileId, {
+    hasApplication: Boolean(myApplication),
+    applied: Boolean(myApplication),
+    applicationStatus: myApplication?.status,
+  })
 }
 
 export function mapBriefToDb(payload, employerId) {
@@ -64,7 +89,42 @@ export function mapBriefToDb(payload, employerId) {
     skills: Array.isArray(payload.skills)
       ? payload.skills.map((s) => String(s).slice(0, 60)).slice(0, 20)
       : [],
+    visibility:
+      payload.visibility && Object.values(BRIEF_VISIBILITY).includes(payload.visibility)
+        ? payload.visibility
+        : BRIEF_VISIBILITY.PUBLIC,
   }
+}
+
+async function isAdminProfile(db, profileId) {
+  const { data } = await db.from('profiles').select('role').eq('id', profileId).maybeSingle()
+  return data?.role === 'admin'
+}
+
+async function shapeBriefForViewer(db, brief, viewerProfileId, extra = {}) {
+  const admin = await isAdminProfile(db, viewerProfileId)
+  const ndaAcceptedAt = await getBriefNdaAcceptance(db, brief.id, viewerProfileId)
+  const canViewFull = canViewFullBrief({
+    brief,
+    viewerProfileId,
+    isAdmin: admin,
+    ndaAcceptedAt,
+    hasApplication: extra.hasApplication ?? false,
+  })
+  const shaped = redactBriefForViewer(brief, { canViewFull, ndaAcceptedAt })
+  return mapBriefToClient(shaped, {
+    descriptionRedacted: shaped.descriptionRedacted,
+    ndaAcceptedAt: shaped.ndaAcceptedAt,
+    canDownloadNda:
+      Boolean(brief.nda_storage_path) &&
+      (admin ||
+        brief.employer_id === viewerProfileId ||
+        Boolean(ndaAcceptedAt) ||
+        extra.hasApplication ||
+        (brief.visibility === BRIEF_VISIBILITY.NDA_GATED && brief.status === 'open') ||
+        (brief.visibility === BRIEF_VISIBILITY.PUBLIC && brief.status === 'open')),
+    ...extra,
+  })
 }
 
 /** Open briefs for the marketplace, flagged with whether the viewing artist applied. */
@@ -73,6 +133,7 @@ export async function listOpenBriefs(db, viewerProfileId) {
     .from('open_briefs')
     .select('*, employer:profiles!employer_id(full_name)')
     .eq('status', 'open')
+    .in('visibility', [BRIEF_VISIBILITY.PUBLIC, BRIEF_VISIBILITY.NDA_GATED])
     .order('created_at', { ascending: false })
   if (error) throw error
 
@@ -97,14 +158,18 @@ export async function listOpenBriefs(db, viewerProfileId) {
     for (const b of appliedBriefs || []) openById.set(b.id, b)
   }
 
-  return [...openById.values()]
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    .map((b) =>
-      mapBriefToClient(b, {
-        applied: appStatusByBriefId.has(b.id),
-        applicationStatus: appStatusByBriefId.get(b.id),
+  return Promise.all(
+    [...openById.values()]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .map(async (b) => {
+        const client = await shapeBriefForViewer(db, b, viewerProfileId, {
+          hasApplication: appStatusByBriefId.has(b.id),
+          applied: appStatusByBriefId.has(b.id),
+          applicationStatus: appStatusByBriefId.get(b.id),
+        })
+        return client
       }),
-    )
+  )
 }
 
 export async function getArtistApplicationOnBrief(db, briefId, artistProfileId) {
@@ -112,7 +177,7 @@ export async function getArtistApplicationOnBrief(db, briefId, artistProfileId) 
   if (!artistId) return null
   const { data, error } = await db
     .from('brief_applications')
-    .select('id, status, message, proposed_rate, created_at')
+    .select('id, status, message, proposed_rate, nda_accepted_at, created_at')
     .eq('brief_id', briefId)
     .eq('artist_id', artistId)
     .maybeSingle()
@@ -123,6 +188,7 @@ export async function getArtistApplicationOnBrief(db, briefId, artistProfileId) 
     status: data.status,
     message: data.message ?? '',
     proposedRate: data.proposed_rate ?? null,
+    ndaAcceptedAt: data.nda_accepted_at ?? null,
     createdAt: data.created_at,
   }
 }
@@ -189,6 +255,9 @@ export async function updateBrief(db, id, employerId, patch) {
   if (patch.ndaMime !== undefined) {
     update.nda_mime = patch.ndaMime ? String(patch.ndaMime).slice(0, 120) : null
   }
+  if (patch.visibility && Object.values(BRIEF_VISIBILITY).includes(patch.visibility)) {
+    update.visibility = patch.visibility
+  }
 
   const { data, error } = await db.from('open_briefs').update(update).eq('id', id).select('*').single()
   if (error) throw error
@@ -203,6 +272,14 @@ export async function applyToBrief(db, briefId, artistProfileId, payload) {
   if (!brief) return { error: 'not_found' }
   if (brief.status !== 'open') return { error: 'closed' }
 
+  if (brief.nda_storage_path) {
+    if (!payload.ndaAccepted) return { error: 'nda_required' }
+    if (brief.visibility === BRIEF_VISIBILITY.NDA_GATED) {
+      const accepted = await getBriefNdaAcceptance(db, briefId, artistProfileId)
+      if (!accepted) return { error: 'nda_required' }
+    }
+  }
+
   const row = {
     brief_id: briefId,
     artist_id: artistId,
@@ -211,6 +288,7 @@ export async function applyToBrief(db, briefId, artistProfileId, payload) {
       payload.proposedRate != null && Number.isFinite(Number(payload.proposedRate))
         ? Math.round(Number(payload.proposedRate))
         : null,
+    nda_accepted_at: payload.ndaAccepted ? new Date().toISOString() : null,
   }
 
   const { data, error } = await db

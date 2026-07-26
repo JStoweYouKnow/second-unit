@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase'
+import { SENSITIVE_SIGNED_URL_TTL } from './sensitiveStorage'
 
 const BUCKET = 'brief-nda'
 export const MAX_BRIEF_NDA_BYTES = 15 * 1024 * 1024
@@ -38,7 +39,7 @@ export async function uploadBriefNda(briefId, file) {
   return path
 }
 
-export async function getBriefNdaSignedUrl(storagePath, expiresIn = 3600) {
+export async function getBriefNdaSignedUrl(storagePath, expiresIn = SENSITIVE_SIGNED_URL_TTL) {
   if (!isSupabaseConfigured || !supabase || !storagePath) return null
 
   const { data, error } = await supabase.storage

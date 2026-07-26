@@ -2422,9 +2422,9 @@ button.mobile-topbar-brand--home:focus-visible {
 }
 .landing-brand-lockup {
   display: block;
-  width: min(560px, 86vw);
+  width: min(840px, 94vw);
   max-width: 100%;
-  height: clamp(148px, 23vw, 196px);
+  height: clamp(222px, 34.5vw, 294px);
   margin-inline: auto;
   object-fit: cover;
   object-position: center 42%;

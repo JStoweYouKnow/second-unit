@@ -2280,10 +2280,12 @@ button.mobile-topbar-brand--home:focus-visible {
 
 /* ===== Landing page ===== */
 .landing-page {
-  height: 100vh;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   --landing-bg: #e3e3e0;
   --landing-header-bg: #e3e3e0;
   --landing-header-fg: #0a0a0a;
@@ -2301,9 +2303,12 @@ button.mobile-topbar-brand--home:focus-visible {
 }
 @media (max-width: 768px), (max-height: 550px) {
   .landing-page {
-    height: auto;
-    overflow: auto;
+    min-height: 100dvh;
   }
+}
+
+.landing-content {
+  flex: 0 0 auto;
 }
 
 .landing-header {
@@ -2409,11 +2414,11 @@ button.mobile-topbar-brand--home:focus-visible {
 }
 
 .landing-hero {
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px 24px 40px;
+  padding: 16px 24px 20px;
   border-bottom: none;
   box-sizing: border-box;
   position: relative;
@@ -2490,7 +2495,7 @@ button.mobile-topbar-brand--home:focus-visible {
 }
 
 .landing-features {
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -2559,7 +2564,7 @@ button.mobile-topbar-brand--home:focus-visible {
 }
 
 .landing-cta-container {
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -2621,7 +2626,8 @@ button.mobile-topbar-brand--home:focus-visible {
 }
 
 .landing-footer {
-  padding: 32px clamp(20px, 5vw, 48px);
+  flex-shrink: 0;
+  padding: 14px clamp(20px, 5vw, 48px) 16px;
   border-top: 1px solid var(--border);
   display: flex;
   justify-content: space-between;

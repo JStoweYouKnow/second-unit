@@ -228,46 +228,25 @@ button.logo:focus-visible {
 }
 .logo-text { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
 
-/* Brand lockup — full-width home control (transparent PNG) */
-/* Theme-colored wordmark lockup (dark on light UI, light on dark UI via currentColor). */
-.brand-logo {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 0.14em;
-  color: var(--text-primary);
-  font-family: var(--font-display);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: -0.02em;
-  line-height: 0.95;
-  white-space: nowrap;
-  font-size: 20px; /* default: sidebar */
+/* Brand lockup — PNG wordmark (black on light UI, white on dark UI). */
+.brand-logo-img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  object-position: left center;
   -webkit-user-select: none;
   user-select: none;
 }
-.brand-logo__word { display: inline-block; }
-.brand-logo__ai {
-  font-size: 0.30em;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75em;
-  height: 1.75em;
-  border: 0.14em solid currentColor;
-  border-radius: 999px;
-  margin-top: -0.15em; /* superscript lift */
-  flex-shrink: 0;
-  box-sizing: border-box;
+.brand-logo-img--sidebar { height: 22px; }
+.brand-logo-img--compact { height: 26px; }
+.brand-logo-img--landing { height: 26px; }
+.brand-logo-img--auth {
+  height: clamp(32px, 5vw, 44px);
+  margin-inline: auto;
 }
-/* On an intentionally dark surface regardless of theme. */
-.brand-logo.brand-logo--on-dark { color: #fafaf8; }
-.logo--home .brand-logo { margin-left: -2px; }
-.brand-logo.brand-logo--compact { font-size: 24px; }
-.brand-logo.brand-logo--landing { font-size: 24px; }
-.brand-logo.brand-logo--auth { display: flex; justify-content: center; font-size: clamp(30px, 5vw, 42px); }
+.logo--home .brand-logo-img { margin-left: -2px; }
 
 .sidebar-nav {
   display: flex;
@@ -995,8 +974,8 @@ button.mobile-topbar-brand--home {
   min-width: 0;
   justify-content: flex-start;
 }
-button.mobile-topbar-brand--home .brand-logo {
-  font-size: 20px;
+button.mobile-topbar-brand--home .brand-logo-img {
+  height: 20px;
 }
 button.mobile-topbar-brand--home:hover {
   background: var(--surface);

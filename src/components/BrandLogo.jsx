@@ -1,32 +1,36 @@
 import { useTheme } from '../context/ThemeContext'
 
+/** Black wordmark — shown on light UI surfaces. */
+const LOGO_LIGHT_MODE = '/brand/the-callsheet-wordmark-light.png'
+/** White wordmark — shown on dark UI surfaces. */
+const LOGO_DARK_MODE = '/brand/the-callsheet-wordmark-dark.png'
+
 /**
- * The Callsheet brand lockup — a theme-colored vector wordmark.
+ * The Callsheet brand lockup — theme-aware PNG wordmark.
  *
- * Rendered as live text (not a raster) using `currentColor`, so it is dark on
- * light UI and light on dark UI automatically — matching the light/dark logo
- * artwork. On an intentionally dark surface regardless of theme, pass onDark.
+ * Uses the black artwork in light mode and the white artwork in dark mode.
+ * Pass onDark when the logo sits on an intentionally dark surface regardless
+ * of theme (e.g. the landing page header bar).
  *
  * variant: sidebar | compact | landing | auth
  */
-export default function BrandLogo({ variant = 'sidebar', onDark }) {
+export default function BrandLogo({ variant = 'sidebar', onDark, className = '' }) {
   const { isDark } = useTheme()
-  const useOnDark = onDark ?? isDark
+  const useDarkLogo = onDark ?? isDark
 
   return (
-    <span
-      role="img"
-      aria-label="The Callsheet AI"
+    <img
+      src={useDarkLogo ? LOGO_DARK_MODE : LOGO_LIGHT_MODE}
+      alt="The Callsheet AI"
       className={[
-        'brand-logo',
-        `brand-logo--${variant}`,
-        useOnDark ? 'brand-logo--on-dark' : '',
+        'brand-logo-img',
+        `brand-logo-img--${variant}`,
+        className,
       ]
         .filter(Boolean)
         .join(' ')}
-    >
-      <span className="brand-logo__word" aria-hidden="true">The Callsheet</span>
-      <span className="brand-logo__ai" aria-hidden="true">AI</span>
-    </span>
+      decoding="async"
+      draggable={false}
+    />
   )
 }

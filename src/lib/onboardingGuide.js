@@ -94,8 +94,18 @@ const GUIDES = {
     eyebrow: 'Artist guide',
     title: 'Welcome to The Callsheet',
     intro:
-      'A quick tour of how bookings, projects, and payouts work for artists. You can reopen this anytime from Help or the sidebar.',
+      'A quick tour of finding work, setting up your profile, and getting paid on The Callsheet. Reopen this anytime from Help or the sidebar.',
     steps: [
+      {
+        title: 'Find work & get help',
+        body: 'Browse Open Briefs for posted opportunities, and use Disputes if you need platform mediation.',
+        bullets: [
+          'Open Briefs — hirers post needs; you can respond from the brief',
+          'Disputes — open a case if payment or delivery needs mediation',
+          'Help — full FAQ and support email',
+        ],
+        cta: { label: 'Browse Open Briefs', path: '/briefs' },
+      },
       {
         title: 'Set up your profile & calendar',
         body: 'Hirers book you from your public profile. Open availability on days and hours you want work.',
@@ -135,16 +145,6 @@ const GUIDES = {
           'Export contract or invoice PDFs from the project detail view',
         ],
         cta: { label: 'View Projects', path: '/projects' },
-      },
-      {
-        title: 'Find work & get help',
-        body: 'Browse Open Briefs for posted opportunities, and use Disputes if you need platform mediation.',
-        bullets: [
-          'Open Briefs — hirers post needs; you can respond from the brief',
-          'Disputes — open a case if payment or delivery needs mediation',
-          'Help — full FAQ and support email',
-        ],
-        cta: { label: 'Browse Open Briefs', path: '/briefs' },
       },
     ],
   },

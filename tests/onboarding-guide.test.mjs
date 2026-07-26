@@ -25,7 +25,8 @@ describe('onboardingGuide', () => {
   it('returns role-specific guides with payment steps', () => {
     const artist = getOnboardingGuide('artist')
     const hirer = getOnboardingGuide('hirer')
-    assert.match(artist.steps[2].title, /paid/i)
+    assert.match(artist.steps[0].title, /find work/i)
+    assert.match(artist.steps[3].title, /paid/i)
     assert.match(hirer.steps[2].title, /pay/i)
     assert.ok(artist.steps.length >= 4)
     assert.ok(hirer.steps.length >= 4)

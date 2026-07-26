@@ -6,6 +6,11 @@ import {
   dismissOnboarding,
   isOnboardingDismissed,
   clearOnboardingDismissed,
+  markOnboardingPending,
+  clearOnboardingPending,
+  isOnboardingPending,
+  shouldAutoShowOnboarding,
+  finishOnboarding,
   ONBOARDING_GUIDE_VERSION,
 } from '../src/lib/onboardingGuide.js'
 
@@ -31,6 +36,7 @@ describe('onboardingGuide', () => {
     const userId = 'test-user-onboarding'
     const role = 'artist'
     clearOnboardingDismissed(userId, role)
+    clearOnboardingPending(userId)
     assert.equal(isOnboardingDismissed(userId, role), false)
     dismissOnboarding(userId, role)
     assert.equal(isOnboardingDismissed(userId, role), true)
@@ -39,5 +45,27 @@ describe('onboardingGuide', () => {
       String(ONBOARDING_GUIDE_VERSION)
     )
     clearOnboardingDismissed(userId, role)
+  })
+
+  it('auto-shows only for pending new accounts', () => {
+    if (typeof localStorage === 'undefined') return
+    const userId = 'test-user-pending'
+    const role = 'hirer'
+    clearOnboardingDismissed(userId, role)
+    clearOnboardingPending(userId)
+
+    assert.equal(shouldAutoShowOnboarding(userId, role), false)
+
+    markOnboardingPending(userId)
+    assert.equal(isOnboardingPending(userId), true)
+    assert.equal(shouldAutoShowOnboarding(userId, role), true)
+
+    finishOnboarding(userId, role)
+    assert.equal(shouldAutoShowOnboarding(userId, role), false)
+    assert.equal(isOnboardingPending(userId), false)
+    assert.equal(isOnboardingDismissed(userId, role), true)
+
+    clearOnboardingDismissed(userId, role)
+    clearOnboardingPending(userId)
   })
 })

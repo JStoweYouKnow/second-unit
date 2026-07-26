@@ -4,6 +4,7 @@ import { Mail, User, ArrowLeft, UserPlus, Palette, Briefcase } from '../componen
 import PasswordInput from '../components/PasswordInput'
 import { useAuth } from '../context/AuthContext'
 import { authApi } from '../lib/api'
+import { markOnboardingPending } from '../lib/onboardingGuide'
 import BrandLogo from '../components/BrandLogo'
 import ThemeToggle from '../components/ThemeToggle'
 import OAuthButtons from '../components/OAuthButtons'
@@ -43,7 +44,7 @@ export default function SignUp() {
 
       // Server path: confirmed account without Supabase confirmation-email SMTP.
       await authApi.signupHirer({ email, password, fullName })
-      const { error: signInError } = await signIn({ email, password })
+      const { data: signInData, error: signInError } = await signIn({ email, password })
       if (signInError) {
         setError(
           signInError.message ||
@@ -51,6 +52,7 @@ export default function SignUp() {
         )
         return
       }
+      if (signInData?.user?.id) markOnboardingPending(signInData.user.id)
       navigate('/home')
     } catch (err) {
       setError(err.message || 'Could not create account')

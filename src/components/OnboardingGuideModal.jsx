@@ -21,6 +21,10 @@ export default function OnboardingGuideModal({ role, open, onClose, onDismiss })
 
   const handleDismiss = () => {
     onDismiss?.()
+  }
+
+  const handleClose = () => {
+    onDismiss?.()
     onClose?.()
   }
 
@@ -32,12 +36,12 @@ export default function OnboardingGuideModal({ role, open, onClose, onDismiss })
   const handleCta = () => {
     if (step.cta?.path) {
       navigate(step.cta.path)
-      onClose?.()
+      handleClose()
     }
   }
 
   return (
-    <div className="modal-overlay onboarding-guide-overlay" role="presentation" onClick={onClose}>
+    <div className="modal-overlay onboarding-guide-overlay" role="presentation" onClick={handleClose}>
       <div
         className="modal onboarding-guide-modal"
         role="dialog"
@@ -53,7 +57,7 @@ export default function OnboardingGuideModal({ role, open, onClose, onDismiss })
             </div>
             <h2 id="onboarding-guide-title">{step.title}</h2>
           </div>
-          <button type="button" className="btn-icon" onClick={onClose} aria-label="Close guide">
+          <button type="button" className="btn-icon" onClick={handleClose} aria-label="Close guide">
             <X size={18} />
           </button>
         </div>

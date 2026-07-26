@@ -276,12 +276,6 @@ export default function ArtistProfile() {
                     </div>
                   </>
                 )}
-                {isOwnProfile && (
-                  <div className="profile-hero-stat">
-                    <span className="profile-hero-stat-label">Total reviews</span>
-                    <span className="profile-hero-stat-value">{allReviews.length}</span>
-                  </div>
-                )}
                 <div className="profile-hero-stat">
                   <span className="profile-hero-stat-label">Member since</span>
                   <span className="profile-hero-stat-value">

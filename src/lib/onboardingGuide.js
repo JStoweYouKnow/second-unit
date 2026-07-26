@@ -3,6 +3,7 @@ import { PLATFORM_FEE_PERCENT, ARTIST_PAYOUT_RATE } from './fees.js'
 export const ONBOARDING_GUIDE_VERSION = 1
 
 const STORAGE_PREFIX = 'callsheet_onboarding_v1'
+const PENDING_PREFIX = 'callsheet_onboarding_pending_v1'
 
 /** Which guide to show: admin console, artist workspace, or hirer workspace. */
 export function resolveOnboardingRole({ isAdmin, adminViewAs, effectiveRole }) {
@@ -13,6 +14,50 @@ export function resolveOnboardingRole({ isAdmin, adminViewAs, effectiveRole }) {
 
 function storageKey(userId, role) {
   return `${STORAGE_PREFIX}_${userId}_${role}`
+}
+
+function pendingKey(userId) {
+  return `${PENDING_PREFIX}_${userId}`
+}
+
+/** Mark that this user should see the guide once after account creation. */
+export function markOnboardingPending(userId) {
+  if (!userId) return
+  try {
+    localStorage.setItem(pendingKey(userId), '1')
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+export function clearOnboardingPending(userId) {
+  if (!userId) return
+  try {
+    localStorage.removeItem(pendingKey(userId))
+  } catch {
+    // ignore
+  }
+}
+
+export function isOnboardingPending(userId) {
+  if (!userId) return false
+  try {
+    return localStorage.getItem(pendingKey(userId)) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Auto-show only for brand-new accounts that have not finished the guide yet. */
+export function shouldAutoShowOnboarding(userId, role) {
+  if (!userId || !role) return false
+  return isOnboardingPending(userId) && !isOnboardingDismissed(userId, role)
+}
+
+/** Persist that the user has seen the guide (any close counts). */
+export function finishOnboarding(userId, role) {
+  dismissOnboarding(userId, role)
+  clearOnboardingPending(userId)
 }
 
 export function isOnboardingDismissed(userId, role) {

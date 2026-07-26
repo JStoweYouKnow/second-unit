@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured, clearPersistedAuthSession } from '../li
 import { getAuthRedirectBaseUrl } from '../lib/siteUrl'
 import { getPasswordResetRedirectUrl } from '../lib/authRecovery'
 import { flushPendingArtistApplication } from '../hooks/useArtistApplication'
+import { markOnboardingPending } from '../lib/onboardingGuide'
 
 const AuthContext = createContext()
 
@@ -86,9 +87,14 @@ export function AuthProvider({ children }) {
       })
 
     // Never await Supabase DB calls inside onAuthStateChange — it can deadlock sign-in.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null)
       if (session?.user) {
+        if (event === 'SIGNED_IN') {
+          const createdAt = session.user.created_at ? new Date(session.user.created_at).getTime() : 0
+          const isNewAccount = createdAt > 0 && Date.now() - createdAt < 5 * 60 * 1000
+          if (isNewAccount) markOnboardingPending(session.user.id)
+        }
         scheduleProfileFetch(session.user.id, session.user)
       } else {
         setProfile(null)
@@ -181,6 +187,7 @@ export function AuthProvider({ children }) {
       
       setUser(newUser)
       setProfile(newProfile)
+      markOnboardingPending(newUser.id)
       return { data: { user: newUser }, error: null }
     }
 
@@ -197,6 +204,9 @@ export function AuthProvider({ children }) {
         console.warn(
           '[auth] Profile insert likely failed in Postgres. Run supabase/fix-database-error-new-user.sql in the Supabase SQL Editor, then check Logs → Postgres for the exact error.'
         )
+      }
+      if (!error && data?.user?.id) {
+        markOnboardingPending(data.user.id)
       }
       return { data, error }
     } catch (err) {

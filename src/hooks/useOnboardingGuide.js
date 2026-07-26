@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  dismissOnboarding,
-  isOnboardingDismissed,
+  finishOnboarding,
   resolveOnboardingRole,
+  shouldAutoShowOnboarding,
 } from '../lib/onboardingGuide'
 
 export function useOnboardingGuide({
@@ -23,7 +23,7 @@ export function useOnboardingGuide({
 
   useEffect(() => {
     if (authLoading || !enabled || !userId || !role || manualOpen) return
-    setOpen(!isOnboardingDismissed(userId, role))
+    setOpen(shouldAutoShowOnboarding(userId, role))
   }, [authLoading, enabled, userId, role, manualOpen])
 
   const showGuide = useCallback(() => {
@@ -32,12 +32,13 @@ export function useOnboardingGuide({
   }, [])
 
   const closeGuide = useCallback(() => {
+    if (userId && role) finishOnboarding(userId, role)
     setOpen(false)
     setManualOpen(false)
-  }, [])
+  }, [userId, role])
 
   const dismissGuide = useCallback(() => {
-    if (userId && role) dismissOnboarding(userId, role)
+    if (userId && role) finishOnboarding(userId, role)
     setOpen(false)
     setManualOpen(false)
   }, [userId, role])

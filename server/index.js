@@ -1188,10 +1188,10 @@ app.get('/api/briefs/:id', async (req, res) => {
       return res.json({ ...result.brief, applications: result.applications })
     }
     const myApplication = await getArtistApplicationOnBrief(db, req.params.id, user.id)
-    const brief = await getBriefForViewer(db, req.params.id, user.id)
-    if (!brief) return res.status(404).json({ error: 'Brief not found' })
+    const briefForViewer = await getBriefForViewer(db, req.params.id, user.id)
+    if (!briefForViewer) return res.status(404).json({ error: 'Brief not found' })
     return res.json({
-      ...brief,
+      ...briefForViewer,
       myApplication,
     })
   } catch (err) {

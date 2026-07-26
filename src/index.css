@@ -239,14 +239,14 @@ button.logo:focus-visible {
   -webkit-user-select: none;
   user-select: none;
 }
-.brand-logo-img--sidebar { height: 22px; }
-.brand-logo-img--compact { height: 26px; }
-.brand-logo-img--landing { height: 26px; }
+.brand-logo-img--sidebar { height: 44px; }
+.brand-logo-img--compact { height: 52px; }
+.brand-logo-img--landing { height: 52px; }
 .brand-logo-img--auth {
-  height: clamp(32px, 5vw, 44px);
+  height: clamp(64px, 10vw, 88px);
   margin-inline: auto;
 }
-.logo--home .brand-logo-img { margin-left: -2px; }
+.logo--home .brand-logo-img { margin-left: -4px; }
 
 .sidebar-nav {
   display: flex;
@@ -975,7 +975,7 @@ button.mobile-topbar-brand--home {
   justify-content: flex-start;
 }
 button.mobile-topbar-brand--home .brand-logo-img {
-  height: 20px;
+  height: 40px;
 }
 button.mobile-topbar-brand--home:hover {
   background: var(--surface);

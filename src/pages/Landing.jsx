@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { ArrowRight, Star, Play, CheckCircle } from '../components/icons'
 import ThemeToggle from '../components/ThemeToggle'
 import BrandLogo from '../components/BrandLogo'
+import LandingBrandLockup from '../components/LandingBrandLockup'
 import { useAuth } from '../context/AuthContext'
 
 export default function Landing() {
@@ -19,7 +20,7 @@ export default function Landing() {
     <div className="landing-page">
       <header className="landing-header">
         <div className="logo-home">
-          <BrandLogo variant="landing" onDark />
+          <BrandLogo variant="landing" />
         </div>
         <nav className="landing-nav" aria-label="Main Navigation">
           <button
@@ -54,25 +55,11 @@ export default function Landing() {
       <main className="landing-content">
         {activeTab === 'overview' && (
           <section className="landing-hero landing-tab-content" key="overview">
-            <video
-              className="landing-hero__video"
-              autoPlay
-              muted
-              loop
-              playsInline
-              aria-hidden="true"
-            >
-              <source src="/videos/hero-bg.mp4" type="video/mp4" />
-            </video>
-            <div className="landing-hero__video-overlay" />
             <div className="landing-hero__inner">
-              <div className="landing-eyebrow hero-animate hero-animate--1">
+              <LandingBrandLockup className="landing-hero__lockup hero-animate hero-animate--1" />
+              <div className="landing-eyebrow hero-animate hero-animate--2">
                 <Star size={14} /> Now in Private Beta
               </div>
-              <h1 className="landing-hero__title hero-animate hero-animate--2">
-                The premier marketplace for{' '}
-                <span className="landing-hero__emphasis">AI native creatives</span>
-              </h1>
               <p className="landing-hero__lede hero-animate hero-animate--3">
                 Connect with elite AI visual artists, motion designers, and virtual production
                 specialists for your next studio campaign.

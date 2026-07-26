@@ -2422,16 +2422,17 @@ button.mobile-topbar-brand--home:focus-visible {
 }
 .landing-brand-lockup {
   display: block;
-  width: min(640px, 88vw);
+  width: min(560px, 86vw);
   max-width: 100%;
-  height: auto;
+  height: clamp(148px, 23vw, 196px);
   margin-inline: auto;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center 42%;
   -webkit-user-select: none;
   user-select: none;
 }
 .landing-hero__lockup {
-  margin-bottom: clamp(20px, 4vw, 36px);
+  margin-bottom: 12px;
 }
 .landing-hero__inner {
   position: relative;

@@ -2,6 +2,7 @@ import Stripe from 'stripe'
 import { db } from '../_lib/db.js'
 import { completeBookingPayment } from '../_lib/completeBookingPayment.js'
 import { completeMilestonePayment } from '../_lib/milestones.js'
+import { claimStripeEvent, releaseStripeEvent } from '../_lib/stripeEvents.js'
 import { captureException, initSentry } from '../_lib/sentry.js'
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null
@@ -15,6 +16,15 @@ function readMetadata(obj) {
       ? obj.payment_intent.metadata
       : {}
   return { ...piMeta, ...meta }
+}
+
+/** Amount Stripe actually captured, in cents, for the events we act on. */
+function capturedAmountCents(event, obj) {
+  if (event.type === 'checkout.session.completed') {
+    return obj.amount_total ?? null
+  }
+  // payment_intent.succeeded
+  return obj.amount_received ?? obj.amount ?? null
 }
 
 export default async function handler(req, res) {
@@ -46,22 +56,47 @@ export default async function handler(req, res) {
       ? (typeof obj.payment_intent === 'string' ? obj.payment_intent : obj.payment_intent?.id)
       : obj.id
 
-  try {
-    if (
-      db &&
-      (event.type === 'payment_intent.succeeded' || event.type === 'checkout.session.completed')
-    ) {
-      // Always escrow on the platform — artist payouts happen on milestone approval / booking complete.
-      if (milestoneId) {
-        await completeMilestonePayment(db, milestoneId, { paymentIntentId })
-      } else if (bookingId) {
-        await completeBookingPayment(db, bookingId, { paymentIntentId })
-      }
-    }
-  } catch (err) {
-    captureException(err, { route: 'webhooks/stripe', bookingId, milestoneId, type: event.type })
-    return res.status(500).json({ error: 'Webhook processing failed' })
+  const isPaymentEvent =
+    event.type === 'payment_intent.succeeded' || event.type === 'checkout.session.completed'
+
+  if (!db || !isPaymentEvent || (!milestoneId && !bookingId)) {
+    return res.json({ received: true })
   }
 
-  res.json({ received: true })
+  // A Checkout session fires BOTH checkout.session.completed and
+  // payment_intent.succeeded, and Stripe retries on non-2xx — so claim the event
+  // before doing any work. A losing claim is a duplicate, not a failure.
+  const claim = await claimStripeEvent(db, event)
+  if (!claim.claimed) {
+    return res.json({ received: true, duplicate: true })
+  }
+
+  try {
+    const captured = capturedAmountCents(event, obj)
+
+    // Always escrow on the platform — artist payouts happen on milestone approval / booking complete.
+    const result = milestoneId
+      ? await completeMilestonePayment(db, milestoneId, {
+          paymentIntentId,
+          capturedAmountCents: captured,
+        })
+      : await completeBookingPayment(db, bookingId, {
+          paymentIntentId,
+          capturedAmountCents: captured,
+        })
+
+    // These helpers report failure by returning { error }, not by throwing.
+    // Swallowing it would strand a captured payment with no record and no retry.
+    if (result?.error) {
+      throw new Error(result.error)
+    }
+
+    return res.json({ received: true })
+  } catch (err) {
+    // Let Stripe retry: release the claim so the retry can do the work.
+    await releaseStripeEvent(db, event.id)
+    captureException(err, { route: 'webhooks/stripe', bookingId, milestoneId, type: event.type })
+    console.error('[webhooks/stripe]', event.type, err?.message || err)
+    return res.status(500).json({ error: 'Webhook processing failed' })
+  }
 }

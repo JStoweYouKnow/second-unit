@@ -3,7 +3,6 @@ import { requireAuth } from '../../_lib/auth.js'
 import { rateLimit, getClientIp } from '../../_lib/ratelimit.js'
 import {
   getBriefRow,
-  mapBriefToClient,
   listApplicationsForBrief,
   updateBrief,
   getArtistApplicationOnBrief,

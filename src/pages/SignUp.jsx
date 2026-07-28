@@ -12,7 +12,7 @@ import OAuthButtons from '../components/OAuthButtons'
 export default function SignUp() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { signUp, signIn, signInWithOAuth, isMockMode } = useAuth()
+  const { signUp, signIn, isMockMode } = useAuth()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

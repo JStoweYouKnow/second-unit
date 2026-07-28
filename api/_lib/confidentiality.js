@@ -67,7 +67,7 @@ export async function recordBriefNdaAcceptance(db, briefId, artistProfileId) {
   return { acceptedAt: data.accepted_at }
 }
 
-export function canViewFullBrief({ brief, viewerProfileId, isAdmin, ndaAcceptedAt, hasApplication }) {
+export function canViewFullBrief({ brief, viewerProfileId, isAdmin, ndaAcceptedAt, hasApplication: _hasApplication }) {
   if (!brief) return false
   if (isAdmin) return true
   if (brief.employer_id === viewerProfileId) return true

@@ -8,7 +8,6 @@ import {
   setArtistReviewSettings,
   setReviewVisibleOnProfile,
   isReviewVisibleOnProfile,
-  getAverageRating,
   submitHirerReview,
   findHirerReview,
   saveReviewResponseLocal,

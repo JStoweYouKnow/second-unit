@@ -6,7 +6,6 @@ import {
   listConversationsForUser,
   getOrCreateConversation,
   sendConversationMessage,
-  markConversationRead,
   mapConversationToClient,
 } from '../_lib/messages.js'
 import { getArtistIdForProfile } from '../_lib/bookings.js'

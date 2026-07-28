@@ -356,7 +356,7 @@ export default function Bookings({ embedded = false }) {
         bookingId: showPay.id,
       })
       window.location.href = url
-    } catch (err) {
+    } catch {
       setError('Could not start checkout. Please try again.')
       setLoading(null)
     }

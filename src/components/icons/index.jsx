@@ -683,7 +683,7 @@ export function RefreshCw({ size = 24, color = 'currentColor', className = '', s
 }
 
 // Rank medal icons — replaces 🥇🥈🥉 emoji
-export function MedalGold({ size = 24, color = '#f5c542', className = '', style } = {}) {
+export function MedalGold({ size = 24, color: _color = '#f5c542', className = '', style } = {}) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={style}>
       <circle cx="12" cy="14" r="7" fill="#f5c542" fillOpacity=".15" stroke="#f5c542" strokeWidth="1.5" />
@@ -693,7 +693,7 @@ export function MedalGold({ size = 24, color = '#f5c542', className = '', style 
   )
 }
 
-export function MedalSilver({ size = 24, color = '#adb5bd', className = '', style } = {}) {
+export function MedalSilver({ size = 24, color: _color = '#adb5bd', className = '', style } = {}) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={style}>
       <circle cx="12" cy="14" r="7" fill="#adb5bd" fillOpacity=".15" stroke="#adb5bd" strokeWidth="1.5" />
@@ -703,7 +703,7 @@ export function MedalSilver({ size = 24, color = '#adb5bd', className = '', styl
   )
 }
 
-export function MedalBronze({ size = 24, color = '#cd7f32', className = '', style } = {}) {
+export function MedalBronze({ size = 24, color: _color = '#cd7f32', className = '', style } = {}) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={style}>
       <circle cx="12" cy="14" r="7" fill="#cd7f32" fillOpacity=".15" stroke="#cd7f32" strokeWidth="1.5" />

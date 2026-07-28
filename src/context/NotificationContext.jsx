@@ -99,10 +99,12 @@ export function NotificationProvider({ children }) {
       }
     }
 
-    const socket = connectSocket(user.id)
+    // Attach listeners synchronously, then dial — connectSocket resolves the
+    // access token asynchronously and the server derives the user id from it.
+    const socket = getSocket()
     socket.on('connect', () => {
       setSocketConnected(true)
-      socket.emit('register', user.id)
+      socket.emit('register')
     })
     socket.on('disconnect', () => setSocketConnected(false))
     socket.on('notifications:unread', (unread) => {
@@ -115,6 +117,8 @@ export function NotificationProvider({ children }) {
     socket.on('notification:new', (notification) => {
       setNotifications((prev) => upsertNotification(prev, notification))
     })
+
+    void connectSocket()
 
     return () => {
       socket.off('connect')

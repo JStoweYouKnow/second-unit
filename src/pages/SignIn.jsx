@@ -23,7 +23,7 @@ function readOAuthErrorFromUrl() {
 
 export default function SignIn() {
   const navigate = useNavigate()
-  const { signIn, signInWithOAuth, resetPassword, isMockMode } = useAuth()
+  const { signIn, resetPassword, isMockMode } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')

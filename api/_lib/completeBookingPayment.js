@@ -1,11 +1,16 @@
 import { platformFeeAmountCents, artistPayoutAmountCents } from './fees.js'
+import { bookingAmountDollars } from './bookingCheckout.js'
 
 /**
  * Mark a booking paid and record a payment row (idempotent).
  * Charges are collected from the hirer onto the platform account.
  * Artist payout stays pending until the booking is completed (or a milestone is released).
+ *
+ * @param {number|null} capturedAmountCents  What Stripe actually captured. When
+ *   supplied it must equal the booking's own total — otherwise the payout math
+ *   would be derived from a number the hirer never paid, so we refuse the write.
  */
-export async function completeBookingPayment(db, bookingId, { paymentIntentId = null, splitAtPayment: _splitAtPayment = false } = {}) {
+export async function completeBookingPayment(db, bookingId, { paymentIntentId = null, capturedAmountCents = null, splitAtPayment: _splitAtPayment = false } = {}) {
   if (!db || !bookingId) {
     return { error: 'Database or booking id missing' }
   }
@@ -30,7 +35,19 @@ export async function completeBookingPayment(db, bookingId, { paymentIntentId = 
     .eq('id', booking.artist_id)
     .maybeSingle()
 
-  const amountCents = Math.round(Number(booking.agreed_total ?? booking.rate ?? 0) * 100)
+  let amountCents
+  try {
+    amountCents = Math.round(bookingAmountDollars(booking) * 100)
+  } catch (err) {
+    return { error: err.message }
+  }
+
+  if (capturedAmountCents != null && Math.round(Number(capturedAmountCents)) !== amountCents) {
+    return {
+      error: `Captured amount ${capturedAmountCents} does not match booking total ${amountCents} — refusing to mark paid`,
+    }
+  }
+
   const description = `${booking.booking_type} · ${booking.date}`
 
   const { error: bookingError } = await db

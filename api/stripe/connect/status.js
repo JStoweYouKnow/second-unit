@@ -11,7 +11,7 @@ function bankLast4FromAccount(account) {
   return bank?.last4 ? String(bank.last4) : null
 }
 
-function deriveStatus({ accountId, detailsSubmitted, chargesEnabled, payoutsEnabled, currentlyDue }) {
+function deriveStatus({ accountId, detailsSubmitted, chargesEnabled: _chargesEnabled, payoutsEnabled, currentlyDue }) {
   if (!accountId) return 'not_connected'
   if (payoutsEnabled && detailsSubmitted) return 'ready'
   if (currentlyDue?.length || (!detailsSubmitted && accountId)) return 'incomplete'

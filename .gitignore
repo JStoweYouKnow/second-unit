@@ -11,11 +11,10 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Environment
-.env
-.env.local
-.env.production
-.env.development
-.env.*.local
+# Catch-all first: any .env variant, including backups like .env.local.bak,
+# which the narrower patterns below do not match.
+.env*
+!.env.example
 
 # Build
 dist

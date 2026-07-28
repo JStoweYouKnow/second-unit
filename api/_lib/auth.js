@@ -26,6 +26,25 @@ const supabase =
     ? createClient(supabaseUrl, supabaseKey)
     : null
 
+/** True when the Supabase client could not be constructed from env. */
+export const authUnavailable = !supabase
+
+/**
+ * Verify a Supabase access token.
+ * Transport-agnostic so both HTTP handlers and the Socket.io handshake can use it.
+ *
+ * @returns {Promise<object|null>} the user, or null if the token is absent/invalid
+ */
+export async function verifyAccessToken(token) {
+  if (!supabase || !token) return null
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token)
+  if (error || !user) return null
+  return user
+}
+
 export async function requireAuth(req, res) {
   if (!supabase) {
     res.status(503).json({
@@ -39,12 +58,8 @@ export async function requireAuth(req, res) {
     res.status(401).json({ error: 'Unauthorized' })
     return null
   }
-  const token = auth.slice(7)
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(token)
-  if (error || !user) {
+  const user = await verifyAccessToken(auth.slice(7))
+  if (!user) {
     res.status(401).json({ error: 'Invalid or expired token' })
     return null
   }

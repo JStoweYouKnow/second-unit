@@ -221,6 +221,7 @@ export default function ArtistProfile() {
                 ]
                   .map((item) => ({ ...item, href: normalizeSocialUrl(item.value, item.platform) }))
                   .filter(({ href }) => href)
+                  // eslint-disable-next-line no-unused-vars -- Icon is used as <Icon /> below; eslint core misses JSX use of destructured params
                   .map(({ href, title, Icon }) => (
                     <a
                       key={title}

@@ -3,7 +3,7 @@ import { buildForwardWeeks, buildMonthWeeks, todayKeyInZone } from '../src/lib/a
 
 const TZ = 'America/Los_Angeles'
 const todayKey = todayKeyInZone(TZ)
-const [y, m, d] = todayKey.split('-').map(Number)
+const [y, m] = todayKey.split('-').map(Number)
 const monthDate = new Date(y, m - 1, 1)
 
 const forward = buildForwardWeeks(2, { timeZone: TZ })

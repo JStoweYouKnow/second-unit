@@ -12,7 +12,6 @@ import {
   platformFeeAmountCents,
   artistPayoutAmountCents,
 } from '../api/_lib/fees.js'
-import { completeBookingPayment } from '../api/_lib/completeBookingPayment.js'
 
 config({ path: '.env.local', override: true })
 

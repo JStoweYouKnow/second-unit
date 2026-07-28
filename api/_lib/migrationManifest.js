@@ -20,6 +20,10 @@ export const PAYMENTS_MIGRATIONS = [
   'dispute-payouts-migration.sql',
   'milestone-deliverables.sql',
   'contract-signature-audit.sql',
+  // Payment idempotency + privilege-escalation and PII fixes. Required before
+  // taking real money: without it, duplicate webhook deliveries can double-write
+  // payment rows and any user can self-promote to admin.
+  'security-hardening.sql',
 ]
 
 export const FEATURE_MIGRATIONS = [

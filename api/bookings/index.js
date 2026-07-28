@@ -6,7 +6,6 @@ import {
   listBookingsForUser,
   mapBookingToClient,
   mapBookingToDb,
-  userCanAccessBooking,
 } from '../_lib/bookings.js'
 import { notifyBookingRequested } from '../_lib/notificationEvents.js'
 import { backfillMissingBookingsForUser } from '../_lib/linkContractBooking.js'

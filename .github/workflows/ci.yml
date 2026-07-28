@@ -20,6 +20,11 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Lint
+        # Fails on errors only; the react-hooks refactor backlog is tracked as
+        # warnings in eslint.config.js so the gate stays meaningful.
+        run: npm run lint
+
       - name: Unit tests
         run: npm test
 

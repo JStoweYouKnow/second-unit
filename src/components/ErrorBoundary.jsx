@@ -36,7 +36,7 @@ class ErrorBoundary extends React.Component {
           <button className="btn btn-primary" onClick={() => window.location.reload()}>
             <RefreshCw size={18} /> Refresh Page
           </button>
-          {process.env.NODE_ENV === 'development' && (
+          {import.meta.env.DEV && (
             <pre style={{
               marginTop: 40, padding: 16, background: 'var(--surface)', borderRadius: 8,
               fontSize: 12, textAlign: 'left', overflow: 'auto', maxWidth: '80vw'

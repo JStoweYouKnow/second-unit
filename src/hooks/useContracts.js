@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { contracts as contractsApi } from '../lib/api'
 import { isSupabaseConfigured } from '../lib/supabase'
-import { buildDefaultMilestones, canPayMilestone } from '../lib/milestones'
+import { buildDefaultMilestones } from '../lib/milestones'
 
 const MOCK_KEY = 'mock_contracts'
 

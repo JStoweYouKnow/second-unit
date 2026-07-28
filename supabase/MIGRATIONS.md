@@ -46,6 +46,7 @@ npm run verify:migrations                      # includes product features
 | 13 | `dispute-payouts-migration.sql` | Dispute refund/release payouts |
 | 14 | `milestone-deliverables.sql` | Deliverables + release requests + storage |
 | 15 | `contract-signature-audit.sql` | Typed e-sign audit events + document hash |
+| 16 | `security-hardening.sql` | Locks `profiles.role` + artist rating/payout columns, scopes profile reads, adds payment unique indexes + `stripe_webhook_events` ledger |
 
 ## Product features (recommended)
 
@@ -84,6 +85,9 @@ npm run verify:migrations                      # includes product features
 
 - [ ] `schema-migrations.sql` applied
 - [ ] All **Payments & contracts** files applied and recorded (`npm run verify:migrations -- --required-only`)
+- [ ] `security-hardening.sql` applied — without it any user can self-promote to
+      admin (which unlocks dispute payouts) and duplicate webhook deliveries can
+      write duplicate payment rows
 - [ ] `milestone-deliverables.sql` applied (if using deliverables / release request)
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` set on Vercel + Railway/API host
 - [ ] `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` set (live keys for production)

@@ -210,7 +210,7 @@ export async function userCanAccessMilestoneContract(db, userId, contract) {
   return artistId != null && contract.artist_id === artistId
 }
 
-export async function completeMilestonePayment(db, milestoneId, { paymentIntentId = null, splitAtPayment: _splitAtPayment = false } = {}) {
+export async function completeMilestonePayment(db, milestoneId, { paymentIntentId = null, capturedAmountCents = null, splitAtPayment: _splitAtPayment = false } = {}) {
   const { milestone, contract } = await getMilestoneWithContract(db, milestoneId)
 
   if (milestone.status !== 'awaiting_payment') {
@@ -230,6 +230,15 @@ export async function completeMilestonePayment(db, milestoneId, { paymentIntentI
     .maybeSingle()
 
   const amountCents = Math.round(Number(milestone.amount) * 100)
+
+  // What Stripe captured must equal the milestone's own amount, or the payout
+  // math would be derived from a number the hirer never paid.
+  if (capturedAmountCents != null && Math.round(Number(capturedAmountCents)) !== amountCents) {
+    return {
+      error: `Captured amount ${capturedAmountCents} does not match milestone total ${amountCents} — refusing to mark paid`,
+    }
+  }
+
   const description = `${contract.title} · ${milestone.title}`
 
   const { data: existingPayment } = await db

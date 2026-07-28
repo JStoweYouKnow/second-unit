@@ -15,7 +15,7 @@ import { validateInviteToken } from '../api/_lib/validateInvite.js'
 import { applyWithArtistInvite } from '../api/_lib/inviteApply.js'
 import { signupHirer } from '../api/_lib/hirerSignup.js'
 import { db, dbUsesServiceRole } from '../api/_lib/db.js'
-import { requireAuth } from '../api/_lib/auth.js'
+import { requireAuth, verifyAccessToken } from '../api/_lib/auth.js'
 import {
   mapBookingToClient,
   mapBookingToDb,
@@ -23,12 +23,13 @@ import {
   getArtistIdForProfile,
 } from '../api/_lib/bookings.js'
 import { updatePendingBooking } from '../api/_lib/updateBooking.js'
+import { resolveBookingCharge, BookingCheckoutError } from '../api/_lib/bookingCheckout.js'
+import { claimStripeEvent, releaseStripeEvent } from '../api/_lib/stripeEvents.js'
 import {
   listOpenBriefs,
   listMyBriefs,
   createBrief,
   getBriefRow,
-  mapBriefToClient,
   listApplicationsForBrief,
   updateBrief,
   applyToBrief,
@@ -55,7 +56,6 @@ import {
 } from '../api/_lib/messages.js'
 import {
   listContractsForUser,
-  mapContractToClient,
   mapContractToDb,
   signContract,
   updateContractAttachment,
@@ -202,13 +202,28 @@ const onlineUsers = new Map()
 // =============================================
 // SOCKET.IO
 // =============================================
-io.on('connection', (socket) => {
-  console.log(`🔌 Client connected: ${socket.id}`)
+// Authenticate the handshake. The user id comes from the verified Supabase JWT,
+// never from the client — otherwise any client could emit a victim's id and join
+// `user:<victim>` to receive their messages and notifications.
+io.use(async (socket, next) => {
+  const token = socket.handshake.auth?.token
+  if (!token) return next(new Error('Unauthorized: missing token'))
 
-  socket.on('register', (userId) => {
+  const user = await verifyAccessToken(token)
+  if (!user) return next(new Error('Unauthorized: invalid token'))
+
+  socket.data.userId = user.id
+  next()
+})
+
+io.on('connection', (socket) => {
+  const userId = socket.data.userId
+  console.log(`🔌 Client connected: ${socket.id} (user ${userId})`)
+
+  socket.on('register', () => {
     onlineUsers.set(socket.id, userId)
     socket.join(`user:${userId}`)
-    
+
     // Send pending notifications
     const pending = notificationsStore.get(userId) || []
     const unread = pending.filter(n => !n.read)
@@ -219,7 +234,8 @@ io.on('connection', (socket) => {
     try {
       const validatedData = MessageSchema.parse(data)
       const { conversationId, recipientId, text, senderName, senderAvatar, senderRole } = validatedData
-      const senderId = onlineUsers.get(socket.id)
+      // Authenticated identity from the handshake — not the client payload.
+      const senderId = socket.data.userId
       if (!senderId) return
 
       const database = db
@@ -571,71 +587,74 @@ app.post('/api/payments/create-checkout', async (req, res) => {
   const user = await requireAuth(req, res)
   if (!user) return
 
-  const { amount, artistName, description, bookingId } = req.body
-  const database = db
-
-  if (bookingId && database) {
-    const { data: booking } = await database
-      .from('bookings')
-      .select('employer_id')
-      .eq('id', bookingId)
-      .maybeSingle()
-
-    if (booking && booking.employer_id !== user.id) {
-      return res.status(403).json({ error: 'Not authorized to pay for this booking' })
-    }
-  }
-
   if (rejectIfStripeMissing(res)) return
 
+  // `amount` is intentionally NOT read from the body — the booking row decides.
+  const { artistName, description, bookingId } = req.body || {}
+
   try {
+    const { booking, amountDollars } = await resolveBookingCharge(db, bookingId, user.id)
+
     let artistStripeAccountId = null
-    if (bookingId && database) {
-      const { data: bookingRow } = await database
-        .from('bookings')
-        .select('artist_id')
-        .eq('id', bookingId)
+    if (booking.artist_id) {
+      const { data: artistRow } = await db
+        .from('artists')
+        .select('stripe_account_id')
+        .eq('id', booking.artist_id)
         .maybeSingle()
-      if (bookingRow?.artist_id) {
-        const { data: artistRow } = await database
-          .from('artists')
-          .select('stripe_account_id')
-          .eq('id', bookingRow.artist_id)
-          .maybeSingle()
-        artistStripeAccountId = artistRow?.stripe_account_id ?? null
-      }
+      artistStripeAccountId = artistRow?.stripe_account_id ?? null
     }
 
     const session = await createProjectCheckoutSession(stripe, {
-      amountDollars: amount,
-      productName: description || `Booking with ${artistName}`,
+      amountDollars,
+      productName: description || `Booking with ${artistName || booking.artist_name || 'artist'}`,
       productDescription: 'Project payment held in escrow — artist payout releases after work is approved',
-      successUrl: `${FRONTEND_URL}/bookings?payment_success=1&booking_id=${bookingId || ''}`,
+      successUrl: `${FRONTEND_URL}/bookings?payment_success=1&booking_id=${booking.id}`,
       cancelUrl: `${FRONTEND_URL}/bookings?payment_cancelled=1`,
-      metadata: { bookingId: bookingId || '' },
+      metadata: { bookingId: String(booking.id) },
       artistStripeAccountId,
     })
     res.json({ url: session.url })
   } catch (err) {
+    if (err instanceof BookingCheckoutError) {
+      return res.status(err.status).json({ error: err.message })
+    }
     captureException(err, { route: 'payments/create-checkout' })
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: 'Could not start checkout' })
   }
 })
 
 // ---- Payment Intent Routes ----
 app.post('/api/payments/create-intent', async (req, res) => {
+  const user = await requireAuth(req, res)
+  if (!user) return
+
   if (rejectIfStripeMissing(res)) return
+
+  // The webhook trusts `bookingId` metadata to mark a booking paid, so ownership
+  // and amount are both proven from the booking row — never from the body.
+  const { bookingId, description } = req.body || {}
+
   try {
-    const { amount, bookingId, description } = req.body
+    const { booking, amountDollars } = await resolveBookingCharge(db, bookingId, user.id)
+
     // Separate charges: no transfer_data — full amount lands on platform account.
     const intent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100),
+      amount: Math.round(amountDollars * 100),
       currency: 'usd',
-      metadata: { bookingId, description },
+      metadata: {
+        bookingId: String(booking.id),
+        description: String(description || '').slice(0, 500),
+        escrow: '1',
+      },
     })
     res.json({ clientSecret: intent.client_secret })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    if (err instanceof BookingCheckoutError) {
+      return res.status(err.status).json({ error: err.message })
+    }
+    captureException(err, { route: 'payments/create-intent' })
+    res.status(500).json({ error: 'Could not start payment' })
   }
 })
 
@@ -870,22 +889,56 @@ async function handleWebhook(req, res) {
       : obj.id
 
   const database = db
-  if (
-    database &&
-    (event.type === 'payment_intent.succeeded' || event.type === 'checkout.session.completed')
-  ) {
-    // Always escrow on the platform — artist payouts happen on milestone approval / booking complete.
-    if (milestoneId) {
-      await completeMilestonePayment(database, milestoneId, { paymentIntentId })
-    } else if (bookingId) {
-      await completeBookingPayment(database, bookingId, { paymentIntentId })
+  const isPaymentEvent =
+    event.type === 'payment_intent.succeeded' || event.type === 'checkout.session.completed'
+
+  if (!database) {
+    if (bookingId) {
+      const booking = bookingsStore.find(b => b.id === bookingId)
+      if (booking) booking.status = 'paid'
     }
-  } else if (bookingId) {
-    const booking = bookingsStore.find(b => b.id === bookingId)
-    if (booking) booking.status = 'paid'
+    return res.json({ received: true })
   }
 
-  res.json({ received: true })
+  if (!isPaymentEvent || (!milestoneId && !bookingId)) {
+    return res.json({ received: true })
+  }
+
+  // A Checkout session emits two payment events and Stripe retries non-2xx,
+  // so claim the event before doing any work.
+  const claim = await claimStripeEvent(database, event)
+  if (!claim.claimed) {
+    return res.json({ received: true, duplicate: true })
+  }
+
+  try {
+    const captured =
+      event.type === 'checkout.session.completed'
+        ? obj.amount_total ?? null
+        : obj.amount_received ?? obj.amount ?? null
+
+    // Always escrow on the platform — artist payouts happen on milestone approval / booking complete.
+    const result = milestoneId
+      ? await completeMilestonePayment(database, milestoneId, {
+          paymentIntentId,
+          capturedAmountCents: captured,
+        })
+      : await completeBookingPayment(database, bookingId, {
+          paymentIntentId,
+          capturedAmountCents: captured,
+        })
+
+    // These helpers report failure by returning { error }, not by throwing.
+    if (result?.error) throw new Error(result.error)
+
+    return res.json({ received: true })
+  } catch (err) {
+    // Let Stripe retry rather than stranding a captured payment.
+    await releaseStripeEvent(database, event.id)
+    captureException(err, { route: 'webhooks/stripe', bookingId, milestoneId, type: event.type })
+    console.error('[webhooks/stripe]', event.type, err?.message || err)
+    return res.status(500).json({ error: 'Webhook processing failed' })
+  }
 }
 
 app.get('/api/health', (req, res) => {

@@ -1,6 +1,6 @@
-import { db } from '../_lib/db.js'
-import { buildIcalCalendar, getProfileIdForFeedToken } from '../_lib/icalFeed.js'
-import { FRONTEND_URL } from '../_lib/stripe.js'
+import { db } from '../../_lib/db.js'
+import { buildIcalCalendar, getProfileIdForFeedToken } from '../../_lib/icalFeed.js'
+import { FRONTEND_URL } from '../../_lib/stripe.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {

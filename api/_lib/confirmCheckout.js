@@ -38,7 +38,10 @@ export async function confirmCheckoutSession(db, sessionId, userId) {
     if (contract.employer_id !== userId) {
       throw new Error('Not authorized to confirm this payment')
     }
-    const result = await completeMilestonePayment(db, milestoneId, { paymentIntentId })
+    const result = await completeMilestonePayment(db, milestoneId, {
+      paymentIntentId,
+      capturedAmountCents: session.amount_total ?? null,
+    })
     if (result.error) throw new Error(result.error)
     return {
       type: 'milestone',
@@ -59,7 +62,10 @@ export async function confirmCheckoutSession(db, sessionId, userId) {
     if (booking.employer_id !== userId) {
       throw new Error('Not authorized to confirm this payment')
     }
-    const result = await completeBookingPayment(db, bookingId, { paymentIntentId })
+    const result = await completeBookingPayment(db, bookingId, {
+      paymentIntentId,
+      capturedAmountCents: session.amount_total ?? null,
+    })
     if (result.error) throw new Error(result.error)
     return {
       type: 'booking',

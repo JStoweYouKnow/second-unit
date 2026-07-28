@@ -28,10 +28,22 @@ export function rateLimit(key, limit = 20, windowMs = 60_000) {
   return { ok: timestamps.length <= limit, remaining }
 }
 
+/**
+ * Best-effort client IP, preferring headers a client cannot forge.
+ *
+ * `x-forwarded-for` is caller-supplied on any host that does not overwrite it,
+ * so trusting it first lets an attacker rotate the header to get a fresh rate
+ * limit bucket per request. Vercel sets `x-vercel-forwarded-for` itself, so
+ * prefer it and only fall back to x-f-f for local/Express runs.
+ */
 export function getClientIp(req) {
+  const first = (value) =>
+    typeof value === 'string' ? value.split(',')[0].trim() || null : null
+
   return (
-    req.headers['x-forwarded-for']?.split(',')[0].trim() ||
-    req.headers['x-real-ip'] ||
+    first(req.headers['x-vercel-forwarded-for']) ||
+    first(req.headers['x-real-ip']) ||
+    first(req.headers['x-forwarded-for']) ||
     req.socket?.remoteAddress ||
     'unknown'
   )

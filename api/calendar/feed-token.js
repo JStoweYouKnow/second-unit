@@ -1,7 +1,7 @@
-import { db } from '../../_lib/db.js'
-import { requireAuth } from '../../_lib/auth.js'
-import { ensureCalendarFeedToken } from '../../_lib/icalFeed.js'
-import { FRONTEND_URL } from '../../_lib/stripe.js'
+import { db } from '../_lib/db.js'
+import { requireAuth } from '../_lib/auth.js'
+import { ensureCalendarFeedToken } from '../_lib/icalFeed.js'
+import { FRONTEND_URL } from '../_lib/stripe.js'
 
 export default async function handler(req, res) {
   const user = await requireAuth(req, res)

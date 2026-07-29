@@ -1,8 +1,8 @@
 import { z } from 'zod'
-import { db } from '../_lib/db.js'
-import { requireAuth } from '../_lib/auth.js'
-import { rateLimit, getClientIp } from '../_lib/ratelimit.js'
-import { isAdmin } from '../_lib/disputes.js'
+import { db } from '../../_lib/db.js'
+import { requireAuth } from '../../_lib/auth.js'
+import { rateLimit, getClientIp } from '../../_lib/ratelimit.js'
+import { isAdmin } from '../../_lib/disputes.js'
 
 const VerifySchema = z.object({
   brandName: z.string().min(1).max(120),

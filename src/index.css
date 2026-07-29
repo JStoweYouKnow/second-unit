@@ -1578,7 +1578,7 @@ button.mobile-topbar-brand--home:focus-visible {
 .profile-hero--visual .profile-hero-meta {
   flex-shrink: 0;
   width: auto;
-  max-width: min(420px, 42vw);
+  max-width: min(480px, 46vw);
   border-top: none;
   padding-top: 0;
   align-items: flex-end;
@@ -1588,7 +1588,11 @@ button.mobile-topbar-brand--home:focus-visible {
   justify-content: flex-end;
 }
 .profile-hero--visual .profile-hero-stats {
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  justify-content: stretch;
 }
 .profile-hero--visual .profile-hero-content * { color: rgba(255,255,255,0.85) !important; }
 /* Brand chips keep a solid --surface bg; over a photo hero the forced-white text
@@ -1689,6 +1693,8 @@ button.mobile-topbar-brand--home:focus-visible {
   border: 1px solid var(--border);
 }
 .profile-hero--visual .profile-hero-stat {
+  min-width: 0;
+  padding: 8px 10px;
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(8px);
@@ -1709,6 +1715,8 @@ button.mobile-topbar-brand--home:focus-visible {
   color: var(--text-primary);
 }
 .profile-hero--visual .profile-hero-stat-value {
+  font-size: 13px;
+  line-height: 1.25;
   color: #fff !important;
 }
 .profile-hero-stat-value--gold {
@@ -2099,6 +2107,9 @@ button.mobile-topbar-brand--home:focus-visible {
   .profile-hero--visual .profile-hero-brands-list,
   .profile-hero--visual .profile-hero-stats {
     justify-content: flex-start;
+  }
+  .profile-hero--visual .profile-hero-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .auth-role-picker { flex-direction: column; }
 }

@@ -1,0 +1,21 @@
+# Robots.txt for The Callsheet (https://thecallsheet.ai)
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /help
+Allow: /terms
+Allow: /privacy
+Allow: /apply
+Allow: /signin
+Allow: /signup
+
+# Disallow private dashboard and admin routes from search indexing
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /messages
+Disallow: /projects
+Disallow: /payments
+Disallow: /account
+Disallow: /disputes
+
+Sitemap: https://thecallsheet.ai/sitemap.xml

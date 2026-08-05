@@ -2,9 +2,14 @@ import { db } from '../../_lib/db.js'
 import { requireAuth } from '../../_lib/auth.js'
 import { mapBookingToClient } from '../../_lib/bookings.js'
 import { createArtistTransfer, resolveArtistDestination } from '../../_lib/artistTransfer.js'
+import { rateLimit, getClientIp } from '../../_lib/ratelimit.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+  // Moves money: completing a booking triggers a Stripe transfer to the artist.
+  const { ok } = rateLimit(getClientIp(req), 10, 60_000)
+  if (!ok) return res.status(429).json({ error: 'Too many requests' })
 
   const user = await requireAuth(req, res)
   if (!user) return

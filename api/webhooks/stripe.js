@@ -27,6 +27,11 @@ function capturedAmountCents(event, obj) {
   return obj.amount_received ?? obj.amount ?? null
 }
 
+/**
+ * Deliberately not rate limited. Stripe delivers retries and backlog replays in
+ * bursts from a small pool of IPs, so an IP bucket here would drop legitimate
+ * payment events. The signature check below is the access control.
+ */
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   await initSentry()

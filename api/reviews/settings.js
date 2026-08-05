@@ -2,12 +2,16 @@ import { z } from 'zod'
 import { db } from '../_lib/db.js'
 import { requireAuth } from '../_lib/auth.js'
 import { updateArtistReviewSettings } from '../_lib/reviews.js'
+import { rateLimit, getClientIp } from '../_lib/ratelimit.js'
 
 const SettingsSchema = z.object({
   showReviewsOnProfile: z.boolean(),
 })
 
 export default async function handler(req, res) {
+  const { ok } = rateLimit(getClientIp(req), 20, 60_000)
+  if (!ok) return res.status(429).json({ error: 'Too many requests' })
+
   const user = await requireAuth(req, res)
   if (!user) return
 

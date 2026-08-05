@@ -1,11 +1,17 @@
 import { db } from '../../_lib/db.js'
 import { buildIcalCalendar, getProfileIdForFeedToken } from '../../_lib/icalFeed.js'
+import { rateLimit, getClientIp } from '../../_lib/ratelimit.js'
 import { FRONTEND_URL } from '../../_lib/stripe.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // The feed token is the only credential here, so an unthrottled endpoint is a
+  // token-guessing oracle. Calendar clients refresh on the order of minutes.
+  const { ok } = rateLimit(getClientIp(req), 20, 60_000)
+  if (!ok) return res.status(429).send('Too many requests')
 
   if (!db) {
     return res.status(503).send('Database not configured')
